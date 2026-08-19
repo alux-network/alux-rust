@@ -1,0 +1,18 @@
+{
+  "name": "ALUX Rust",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "vadimcn.vscode-lldb",
+        "DavidAnson.vscode-markdownlint"
+      ],
+      "settings": {
+        "rust-analyzer.cargo.features": "all",
+        "rust-analyzer.procMacro.enable": true
+      }
+    }
+  },
+  "postCreateCommand": "cargo install just"
+}
