@@ -57,6 +57,7 @@ must_use_candidate = "allow"
 
 [workspace.metadata.release]
 push = true
+push-remote = "upstream"
 tag = true
 allow-branch = ["master"]
 sign-commit = true
