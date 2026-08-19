@@ -22,22 +22,25 @@ impl<T> Api<T>
 where
     T: DownloadAlg<File = Body, Error = Infallible> + StatusAlg<Status = u32> + Send + Sync + 'static,
 {
+    /// Returns the reading as it stands.
     #[oai(path = "/status", method = "get")]
     async fn get_status(&self) -> Json<u32> {
         Json(self.0.status_current().await)
     }
 
+    /// Returns one identified reading, its id taken from the path.
     #[oai(path = "/status/:id", method = "get")]
     async fn get_status_for_id(&self, id: Path<u32>) -> Json<u32> {
         Json(self.0.status_for_id(*id).await)
     }
 
+    /// Applies an adjustment, its temperature taken from the request body.
     #[oai(path = "/set_temp", method = "post")]
     async fn post_adjusted_temp(&self, adj_temp: Json<f32>) -> Json<u32> {
         Json(self.0.status_adjusted(*adj_temp).await)
     }
 
-    /// Downloads the current data file.
+    /// Sends the file under the name the domain offers it as.
     #[oai(path = "/download", method = "get")]
     async fn download_file(&self) -> Attachment<Body> {
         let (file, name) = self.0.download_current().await;

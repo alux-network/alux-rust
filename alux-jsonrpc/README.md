@@ -41,12 +41,15 @@ impl<This> This
 where
     This: JsonRpcApiAlg,
 {
+    /// Declares the status surface: a reading and an adjustment.
     fn status_rpc<Alg>(&self)
     where
         Alg: StatusAlg,
     {
         self.methods()
+            // The reading as it stands, taking no parameters.
             .method("status_current", self.op(Alg::status_current))
+            // An adjustment, decoded from a JSON object using the authored argument names.
             .method("status_set_temp", self.op(Alg::status_adjusted).named())
     }
 }
@@ -70,6 +73,7 @@ impl StatusAlg for App {
 let builder = JsonRpcProgramBuilder;
 let program = builder
     .methods()
+    // The same method, declared without the convenience macro.
     .method("status_current", builder.op(StatusCurrentOperation::<App>::default()))
     .into_program();
 let _merged = builder.methods().merge(builder.program(program)).into_program();

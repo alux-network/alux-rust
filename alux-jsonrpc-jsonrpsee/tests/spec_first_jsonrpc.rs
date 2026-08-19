@@ -1,5 +1,7 @@
-//! Declares the surface the specification-first way: method programs over the derived operations,
+//! Declares the surface the specification-first way: one method program over the derived operations,
 //! compiled by the jsonrpsee interpreter.
+//!
+//! `spec_first_jsonrpc_merge` states the same surface as separately declared programs instead.
 
 mod common;
 mod expect;
@@ -13,45 +15,25 @@ use common::{
 };
 use expect::expect_example_rpc;
 
-#[ext(name = StatusRpcExt, defunc(via = jsonrpc))]
-impl<This> This
-where
-    This: JsonRpcApiAlg,
-{
-    fn status_rpc<Alg>(&self)
-    where
-        Alg: StatusAlg,
-    {
-        self.methods()
-            .method("status_current", self.op(Alg::jsonrpc_status_current))
-            .method("status_set_temp", self.op(Alg::jsonrpc_status_adjusted).positional())
-            .method("status_set_temp_named", self.op(Alg::jsonrpc_status_adjusted).named())
-    }
-}
-
-#[ext(name = ItemsRpcExt, defunc(via = jsonrpc))]
-impl<This> This
-where
-    This: JsonRpcApiAlg,
-{
-    fn items_rpc<Alg>(&self)
-    where
-        Alg: ItemsAlg,
-    {
-        self.methods().method("items_current", self.op(Alg::jsonrpc_items_current))
-    }
-}
-
 #[ext(name = ExampleRpcExt, defunc(via = jsonrpc))]
 impl<This> This
 where
     This: JsonRpcApiAlg,
 {
+    /// Declares the whole surface: three status methods and one item listing.
     fn example_rpc<Alg>(&self)
     where
         Alg: StatusAlg + ItemsAlg,
     {
-        self.methods().merge(self.status_rpc::<Alg>()).merge(self.items_rpc::<Alg>())
+        self.methods()
+            // The reading as it stands, taking no parameters.
+            .method("status_current", self.op(Alg::jsonrpc_status_current))
+            // An adjustment, decoded from a JSON array.
+            .method("status_set_temp", self.op(Alg::jsonrpc_status_adjusted).positional())
+            // The same operation, decoded from a JSON object using the authored argument names.
+            .method("status_set_temp_named", self.op(Alg::jsonrpc_status_adjusted).named())
+            // Every item the domain holds.
+            .method("items_current", self.op(Alg::jsonrpc_items_current))
     }
 }
 

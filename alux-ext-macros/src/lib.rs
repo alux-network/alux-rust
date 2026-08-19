@@ -55,6 +55,7 @@ use proc_macro::TokenStream;
 /// where
 ///     This: HttpApiAlg + JsonOutAlg,
 /// {
+///     /// Declares the status surface.
 ///     fn status_routes<Alg>(&self)
 ///     where
 ///         Alg: StatusAlg,
@@ -90,6 +91,7 @@ pub fn ext(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// where
 ///     This: HttpApiAlg + JsonOutAlg,
 /// {
+///     /// Declares the status surface.
 ///     fn status_api<Alg>(&self)
 ///     where
 ///         Alg: StatusAlg,
@@ -126,6 +128,7 @@ pub fn http(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// where
 ///     This: JsonRpcApiAlg,
 /// {
+///     /// Declares the status surface.
 ///     fn status_rpc<Alg>(&self)
 ///     where
 ///         Alg: StatusAlg,

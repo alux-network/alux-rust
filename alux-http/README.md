@@ -41,12 +41,15 @@ impl<This> This
 where
     This: HttpApiAlg + JsonOutAlg,
 {
+    /// Declares the status surface: the current reading and one identified reading.
     fn status_api<Alg>(&self)
     where
         Alg: StatusAlg,
     {
         self.routes()
+            // The reading as it stands.
             .get("/status", self.op(Alg::status_current).json())
+            // One identified reading, its id taken from the path.
             .get("/status/:id", self.op(Alg::status_for_id).path::<u32>().json())
     }
 }
@@ -70,6 +73,7 @@ impl StatusAlg for App {
 let builder = HttpProgramBuilder;
 let program = builder
     .routes()
+    // The same endpoint, declared without the convenience macro.
     .get("/status", builder.op(StatusCurrentOperation::<App>::default()).json())
     .into_program();
 let _nested = builder.routes().nest("/api", builder.program(program)).into_program();

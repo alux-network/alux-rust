@@ -1,7 +1,7 @@
-//! Declares the surface the specification-first way: one route program over the derived operations,
-//! compiled by the Poem interpreter.
+//! The same surface as `spec_first_http`, composed by merging separately declared programs.
 //!
-//! `spec_first_http_merge` states the same surface as separately declared programs instead.
+//! Each program states one part of the surface and needs only the capabilities that part uses, so
+//! independently published fragments compose into one route coproduct.
 
 mod common;
 mod expect;
@@ -16,15 +16,15 @@ use common::{
 };
 use expect::expect_example_api;
 
-#[ext(name = ExampleApiExt, defunc(via = http))]
+#[ext(name = StatusApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg + FileOutAlg,
+    This: HttpApiAlg + JsonOutAlg,
 {
-    /// Declares the whole surface: three status routes and one download.
-    fn example_api<Alg>(&self)
+    /// Declares the status surface: the current reading, one identified reading, and an adjustment.
+    fn status_api<Alg>(&self)
     where
-        Alg: StatusAlg + DownloadAlg,
+        Alg: StatusAlg,
     {
         self.routes()
             // The reading as it stands.
@@ -33,13 +33,40 @@ where
             .get("/status/:id", self.op(Alg::status_for_id).path::<u32>().json())
             // An adjustment, its temperature taken from the request body.
             .post("/set_temp", self.op(Alg::status_adjusted).body::<f32>().json())
-            // The file and the name to offer it under.
-            .get("/download", self.op(Alg::download_current).file())
+    }
+}
+
+#[ext(name = DownloadApiExt, defunc(via = http))]
+impl<This> This
+where
+    This: HttpApiAlg + FileOutAlg,
+{
+    /// Declares the download surface, whose output kind only a framework can convert.
+    fn download_api<Alg>(&self)
+    where
+        Alg: DownloadAlg,
+    {
+        // The file and the name to offer it under.
+        self.routes().get("/download", self.op(Alg::download_current).file())
+    }
+}
+
+#[ext(name = ExampleApiExt, defunc(via = http))]
+impl<This> This
+where
+    This: HttpApiAlg,
+{
+    /// Composes the whole surface from the two independently declared programs.
+    fn example_api<Alg>(&self)
+    where
+        Alg: StatusAlg + DownloadAlg,
+    {
+        self.routes().merge(self.status_api::<Alg>()).merge(self.download_api::<Alg>())
     }
 }
 
 #[tokio::test]
-async fn compiles_a_spec_first_program_into_poem_routes() {
+async fn merges_separately_declared_programs_into_poem_routes() {
     let api = PoemHandlerImpl::new(App(40));
     let route = api.compile_http(api.example_api::<App>()).into_poem();
 

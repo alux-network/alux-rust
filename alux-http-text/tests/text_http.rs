@@ -89,14 +89,19 @@ impl<This> This
 where
     This: HttpApiAlg + JsonOutAlg,
 {
+    /// Declares the status surface, one route per input role.
     fn status_api<Alg>(&self)
     where
         Alg: StatusAlg,
     {
         self.routes()
+            // The reading as it stands.
             .get("/status", self.op(Alg::status_current).json())
+            // One identified reading, its id taken from the path.
             .get("/status/:id", self.op(Alg::status_for_path).path::<u32>().json())
+            // A search, its term taken from the query string.
             .get("/status_search", self.op(Alg::status_for_query).query::<String>().json())
+            // An adjustment, its temperature taken from the request body.
             .post("/set_temp", self.op(Alg::status_adjusted).body::<f32>().json())
     }
 }
@@ -106,10 +111,12 @@ impl<This> This
 where
     This: HttpApiAlg + FileOutAlg,
 {
+    /// Declares the download surface, whose output kind is streamed rather than JSON.
     fn download_api<Alg>(&self)
     where
         Alg: DownloadAlg,
     {
+        // The file and the name to offer it under.
         self.routes().get("/download", self.op(Alg::download_current).file())
     }
 }
@@ -119,6 +126,7 @@ impl<This> This
 where
     This: HttpApiAlg,
 {
+    /// Composes the whole surface from the two independently declared programs.
     fn example_api<Alg>(&self)
     where
         Alg: StatusAlg + DownloadAlg,
@@ -194,6 +202,7 @@ fn describes_example_http_surface() {
 fn compiles_a_first_order_route_without_an_http_program_macro() {
     let compiler = TextHandlerImpl;
     let builder = HttpProgramBuilder;
+    // The reading as it stands, declared without the convenience macro.
     let status = builder.routes().get("/status", builder.op(StatusCurrentOperation::<TestStatus>::default()).json());
     let program = builder.routes().nest("/api", status).into_program();
     let routes = program.compile_route(&compiler);
