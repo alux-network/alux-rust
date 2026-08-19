@@ -4,6 +4,7 @@ members = [
     "alux-ext",
     "alux-ext-macros",
     "alux-http",
+    "alux-jsonrpc",
 ]
 
 [workspace.package]
@@ -19,6 +20,7 @@ rust-version = "1.97"
 alux-ext = { version = "0.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.1", path = "alux-ext-macros" }
 alux-http = { version = "0.1", path = "alux-http" }
+alux-jsonrpc = { version = "0.1", path = "alux-jsonrpc" }
 
 extend = "1"
 proc-macro2 = "1"
