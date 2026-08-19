@@ -1,0 +1,69 @@
+name: ALUX Rust CI
+
+on:
+  push:
+    branches:
+    - trying
+    - staging
+    - master
+    tags: '**'
+  pull_request:
+    branches:
+    - master
+    - 'feature/**'
+    - 'release/**'
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: true
+  RUSTC_WRAPPER: sccache
+
+jobs:
+  build:
+    name: 🚀 ALUX Rust build and test
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install sccache
+      uses: mozilla-actions/sccache-action@v0.0.9
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: '1.97'
+        components: clippy,rustfmt
+
+    - name: Install Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-targets: false
+
+    - name: Install Just
+      run: cargo install just
+
+    - name: Install Nextest
+      uses: taiki-e/install-action@nextest
+
+    - name: 🔨 Check formatting
+      run: just fmt
+
+    - name: 🚀 Build
+      run: RUST_BACKTRACE=1 just build
+
+    - name: 🔨 Run Clippy
+      run: just clippy
+
+    - name: 🔨 Generate documentation
+      run: just doc
+
+    - name: 🚦 Run tests
+      run: RUST_BACKTRACE=1 just test
+
+    - name: 📦 Check package
+      run: just package
