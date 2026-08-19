@@ -1,0 +1,22 @@
+[package]
+name = "alux-ext"
+version.workspace = true
+description = "Meaning-first Rust extensions with first-order operation defunctionalization"
+documentation = "https://docs.rs/alux-ext"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext-macros.workspace = true
+extend.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

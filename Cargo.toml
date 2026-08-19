@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "alux-ext",
     "alux-ext-macros",
 ]
 
@@ -14,11 +15,14 @@ license = "MIT"
 rust-version = "1.97"
 
 [workspace.dependencies]
+alux-ext = { version = "0.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.1", path = "alux-ext-macros" }
 
+extend = "1"
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "3", features = ["full", "visit-mut"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [workspace.lints.rust]
 missing_docs = "warn"
