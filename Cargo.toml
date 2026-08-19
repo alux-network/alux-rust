@@ -7,6 +7,7 @@ members = [
     "alux-http-poem",
     "alux-http-text",
     "alux-jsonrpc",
+    "alux-jsonrpc-jsonrpsee",
 ]
 
 [workspace.package]
@@ -25,9 +26,13 @@ alux-http = { version = "0.1", path = "alux-http" }
 alux-http-poem = { path = "alux-http-poem" }
 alux-http-text = { path = "alux-http-text" }
 alux-jsonrpc = { version = "0.1", path = "alux-jsonrpc" }
+alux-jsonrpc-jsonrpsee = { path = "alux-jsonrpc-jsonrpsee" }
 
 anyhow = "1"
+derive_more = { version = "2", features = ["deref", "deref_mut", "from"] }
+derive-new = "0.7"
 extend = "1"
+jsonrpsee = { version = "0.26", features = ["server", "macros"] }
 poem = "3"
 poem-openapi = "5"
 proc-macro2 = "1"

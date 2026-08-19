@@ -1,0 +1,28 @@
+[package]
+name = "alux-jsonrpc-jsonrpsee"
+version.workspace = true
+description = "jsonrpsee interpretation of ALUX typed JSON-RPC programs"
+documentation = "https://docs.rs/alux-jsonrpc-jsonrpsee"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-jsonrpc.workspace = true
+derive_more.workspace = true
+derive-new.workspace = true
+jsonrpsee.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+tokio.workspace = true
