@@ -11,7 +11,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::{self, VisitMut};
 use syn::{
-    Expr, GenericParam, Ident, ImplItem, ImplItemFn, ItemImpl, Token, Type, TypeParam, TypePath, Visibility,
+    Expr, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Token, Type, TypeParam, TypePath, Visibility,
     WherePredicate, parse_quote,
 };
 
@@ -38,9 +38,20 @@ impl ExtensionImpl {
         self.visibility.clone().unwrap_or(Visibility::Inherited)
     }
 
-    /// Returns the semantic dependencies stated by the impl's `where` clause.
+    /// Returns the semantic dependencies the impl states, however they are written.
     pub(crate) fn impl_predicates(&self) -> Punctuated<WherePredicate, Token![,]> {
-        self.item.generics.where_clause.as_ref().map(|clause| clause.predicates.clone()).unwrap_or_default()
+        predicates(&self.item.generics)
+    }
+
+    /// Returns the extension declaration with its semantic dependencies removed.
+    ///
+    /// They move to the program's interpretation, so the method that merely names a program stays
+    /// callable without them.
+    pub(crate) fn unbounded_item(&self) -> ItemImpl {
+        let mut item = self.item.clone();
+        unbind(&mut item.generics);
+
+        item
     }
 
     /// Returns the attribute arguments forwarded to `extend::ext`, authored visibility first.
@@ -48,6 +59,42 @@ impl ExtensionImpl {
         match &self.visibility {
             Some(visibility) => quote!(#visibility, #attr),
             None => attr,
+        }
+    }
+}
+
+/// Reads every bound a declaration states, whether on a generic parameter or in a `where` clause.
+///
+/// A bound means the same thing in both places, so a lowering that treats them alike lets an author
+/// choose either spelling.
+pub(crate) fn predicates(generics: &Generics) -> Punctuated<WherePredicate, Token![,]> {
+    let mut predicates: Punctuated<WherePredicate, Token![,]> = generics
+        .params
+        .iter()
+        .filter_map(|param| match param {
+            GenericParam::Type(param) if !param.bounds.is_empty() => {
+                let (parameter, bounds) = (&param.ident, &param.bounds);
+                let predicate: WherePredicate = parse_quote!(#parameter: #bounds);
+                Some(predicate)
+            }
+            _ => None,
+        })
+        .collect();
+    if let Some(clause) = &generics.where_clause {
+        predicates.extend(clause.predicates.clone());
+    }
+
+    predicates
+}
+
+/// Removes every bound from a declaration, leaving the parameters it introduces.
+///
+/// Bounds belong to the interpretation that needs them, never to the definition of a program type.
+pub(crate) fn unbind(generics: &mut Generics) {
+    generics.where_clause = None;
+    for param in &mut generics.params {
+        if let GenericParam::Type(param) = param {
+            param.bounds.clear();
         }
     }
 }
@@ -94,7 +141,11 @@ pub(crate) fn program_type_params(method: &ImplItemFn, rejected: &str) -> syn::R
         .params
         .iter()
         .map(|param| match param {
-            GenericParam::Type(param) => Ok(param.clone()),
+            GenericParam::Type(param) => {
+                let mut param = param.clone();
+                param.bounds.clear();
+                Ok(param)
+            }
             _ => Err(syn::Error::new_spanned(param, rejected)),
         })
         .collect()

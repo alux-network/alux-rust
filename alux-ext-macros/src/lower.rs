@@ -5,7 +5,9 @@
 //! discovered in the body become the `where` clause of one interpretation. A backend supplies only
 //! what its own transport means.
 
-use crate::syntax::{ExtensionImpl, ReplaceSelf, Subprograms, method_names, program_ident, program_type_params};
+use crate::syntax::{
+    ExtensionImpl, ReplaceSelf, Subprograms, method_names, predicates, program_ident, program_type_params, unbind,
+};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
@@ -50,8 +52,7 @@ where
     let input = syn::parse2::<ExtensionImpl>(item)?;
     let visibility = input.item_visibility();
     let impl_predicates = input.impl_predicates();
-    let mut extension = input.item.clone();
-    extension.generics.where_clause = None;
+    let mut extension = input.unbounded_item();
     let methods = method_names(&extension);
     let mut generated = Vec::new();
     for item in &mut extension.items {
@@ -100,9 +101,10 @@ where
     Backend::require_declarations(&mut compiler);
     ReplaceSelf.visit_block_mut(&mut compiler.block);
 
-    let method_predicates =
-        compiler.sig.generics.where_clause.as_ref().map(|clause| clause.predicates.clone()).unwrap_or_default();
-    let predicates = impl_predicates
+    // The bounds move to the interpretation; the parameters they introduce stay.
+    let method_predicates = predicates(&compiler.sig.generics);
+    unbind(&mut compiler.sig.generics);
+    let obligations = impl_predicates
         .iter()
         .map(|predicate| quote!(#predicate))
         .chain(method_predicates.iter().map(|predicate| quote!(#predicate)))
@@ -111,7 +113,7 @@ where
     let lowered = LoweredProgram {
         program_type,
         compiler_params: compiler.sig.generics.params.clone(),
-        predicates,
+        predicates: obligations,
         body: compiler.block,
     };
     let compile = Backend::compile_program(&lowered);

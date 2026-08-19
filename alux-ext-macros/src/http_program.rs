@@ -185,6 +185,38 @@ mod tests {
     }
 
     #[test]
+    fn reads_bounds_on_the_generic_parameter_as_a_where_clause() {
+        let expand = |item| http_program_defunc_internal(quote!(name = StatusApiExt), item).unwrap().to_string();
+        let on_parameter = expand(quote! {
+            impl<This: HttpApiAlg + JsonOutAlg> This {
+                fn status_api<Alg: StatusAlg>(&self) {
+                    self.routes().get("/status", self.op(Alg::status_current).json())
+                }
+            }
+        });
+        let in_where_clause = expand(quote! {
+            impl<This> This
+            where
+                This: HttpApiAlg + JsonOutAlg,
+            {
+                fn status_api<Alg>(&self)
+                where
+                    Alg: StatusAlg,
+                {
+                    self.routes().get("/status", self.op(Alg::status_current).json())
+                }
+            }
+        });
+
+        for output in [&on_parameter, &in_where_clause] {
+            // Both spellings state the same obligations on the interpretation.
+            assert!(output.contains("where This : HttpApiAlg + JsonOutAlg , Alg : StatusAlg ,"));
+            // Neither states them on the program type, which needs no algebra to exist.
+            assert!(output.contains("struct StatusApiProgram < Alg > (core :: marker :: PhantomData"));
+        }
+    }
+
+    #[test]
     fn composes_any_method_declared_by_the_same_extension() {
         let output = http_program_defunc_internal(
             quote!(name = RootApiExt),
