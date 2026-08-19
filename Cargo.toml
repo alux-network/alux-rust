@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "alux-ext",
     "alux-ext-macros",
+    "alux-http",
 ]
 
 [workspace.package]
@@ -17,6 +18,7 @@ rust-version = "1.97"
 [workspace.dependencies]
 alux-ext = { version = "0.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.1", path = "alux-ext-macros" }
+alux-http = { version = "0.1", path = "alux-http" }
 
 extend = "1"
 proc-macro2 = "1"

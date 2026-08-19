@@ -1,0 +1,18 @@
+[package]
+name = "alux-http"
+version.workspace = true
+description = "Composable, interpreter-independent HTTP programs for meaning-first Rust design"
+documentation = "https://docs.rs/alux-http"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
