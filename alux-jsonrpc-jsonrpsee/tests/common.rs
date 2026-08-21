@@ -16,6 +16,9 @@ use alux_jsonrpc::RpcErrorAlg;
 use core::fmt::{self, Display};
 use core::future::Future;
 
+/// What every fallible reading in this domain answers with, named once like a real domain does.
+pub type StatusResult<Value> = Result<Value, NoHistory>;
+
 /// The one reason this domain fails: it keeps no history.
 #[derive(Debug)]
 pub struct NoHistory;
@@ -80,7 +83,7 @@ where
     }
 
     /// Returns the reading this domain does not keep, stating its own failure.
-    async fn jsonrpc_status_history(&self) -> Result<This::Status, NoHistory> {
+    async fn jsonrpc_status_history(&self) -> StatusResult<This::Status> {
         Err(NoHistory)
     }
 }
