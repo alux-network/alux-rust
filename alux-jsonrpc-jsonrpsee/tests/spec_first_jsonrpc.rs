@@ -34,7 +34,8 @@ where
             .method("status_set_temp_named", self.op(Alg::jsonrpc_status_adjusted).named())
             // An adjustment whose offset the caller may leave out.
             .method("status_set_temp_offset", self.op(Alg::jsonrpc_status_offset))
-            // A reading that fails, so its error answers as a JSON-RPC error.
+            // `.fallible()` converts the domain's error into a JSON-RPC protocol error, marked
+            // here per method. The same can be stated once on the ext, as the merge example does.
             .method("status_history", self.op(Alg::jsonrpc_status_history).fallible())
             // Every item the domain holds.
             .method("items_current", self.op(Alg::jsonrpc_items_current))

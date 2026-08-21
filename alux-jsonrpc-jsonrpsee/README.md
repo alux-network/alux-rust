@@ -12,9 +12,9 @@ let rpc = JsonrpseeImpl::new(App::new());
 let methods = rpc.compile_jsonrpc(rpc.status_rpc::<App>())?;
 ```
 
-A method declared `.fallible()` answers with its value or with the error its `Result` carries, so the
-interpreter needs `RpcErrorAlg` for that error and builds the `ErrorObject` itself. Every other method
-answers with any value `serde` can serialize.
+A method marked fallible — with `.fallible()`, or by the `fallible` attribute on its ext — converts its
+error into a protocol error, so the interpreter needs `RpcErrorAlg` for that error and builds the
+`ErrorObject` itself. Every other method answers with any value `serde` can serialize.
 
 `RpcCtx` carries a semantic context when a native `#[rpc(server)]` trait is implemented instead, and
 `ResultToRpcExt` and `RpcErrorExt` convert semantic errors at the boundary. A shared scenario in `tests/` runs one

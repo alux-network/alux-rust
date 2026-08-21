@@ -34,11 +34,11 @@ pub struct Positional;
 #[derive(Debug, Default)]
 pub struct NamedParams;
 
-/// Selects positional decoding for a method whose operation can fail.
+/// Selects positional decoding for a method whose error answers as a protocol error.
 #[derive(Debug, Default)]
 pub struct FalliblePositional;
 
-/// Selects named decoding for a method whose operation can fail.
+/// Selects named decoding for a method whose error answers as a protocol error.
 #[derive(Debug, Default)]
 pub struct FallibleNamed;
 
@@ -126,14 +126,14 @@ impl<Handler> Operation<Handler, Positional> {
         self.retyped()
     }
 
-    /// States that the operation can fail, so its error answers as a JSON-RPC error.
+    /// Converts the operation's error into a JSON-RPC protocol error.
     pub fn fallible(self) -> Operation<Handler, FalliblePositional> {
         self.retyped()
     }
 }
 
 impl<Handler> Operation<Handler, NamedParams> {
-    /// States that the operation can fail, so its error answers as a JSON-RPC error.
+    /// Converts the operation's error into a JSON-RPC protocol error.
     pub fn fallible(self) -> Operation<Handler, FallibleNamed> {
         self.retyped()
     }

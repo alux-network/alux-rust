@@ -34,7 +34,7 @@ pub trait JsonRpcMethodAlg<Context, Args, Output> {
 
 /// Names the two halves of an outcome, so a bound can speak of a failure without spelling it.
 ///
-/// A declaration states failability; this is what lets an interpretation name the value it answers
+/// A declaration states the conversion; this is what lets an interpretation name the value it answers
 /// with and the failure it reports, given only the operation's output.
 pub trait OutcomeAlg {
     /// The value a successful outcome carries.
@@ -72,7 +72,7 @@ pub trait RpcErrorAlg {
     fn rpc_message(&self) -> String;
 }
 
-/// Compiles a typed JSON-RPC method whose operation can fail.
+/// Compiles a typed JSON-RPC method whose error answers as a protocol error.
 ///
 /// A method registered here answers with its value or with a JSON-RPC error, so a domain that states
 /// failure in its own vocabulary reaches a caller as a failed call rather than as a successful one

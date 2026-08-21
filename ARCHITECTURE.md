@@ -228,12 +228,12 @@ operation. Heterogeneous Rust argument products remain typed even though JSON-RP
 a JSON array and named input is a JSON object. An argument a request leaves out reads as absent, which
 only an optional argument accepts.
 
-`.fallible()` is the other distinction a method can carry: whether it can fail. It selects
-`JsonRpcFallibleAlg` instead of `JsonRpcMethodAlg`, so an operation's `Result` answers as a JSON-RPC
-error rather than as a success carrying an error-shaped value. Failability belongs to the program
-because it is part of what the surface promises, not an accident of a Rust type. A program whose
-methods all fail states it once as `fallible` in the attribute, and every silent declaration in it is
-read that way.
+`.fallible()` is the other distinction a method carries: it converts the operation's error into a
+JSON-RPC protocol error. It selects `JsonRpcFallibleAlg` instead of `JsonRpcMethodAlg`, so an
+operation's `Result` answers in the response's `error` member rather than as a success carrying an
+error-shaped value. The conversion belongs to the program because it is part of what the surface
+promises, not an accident of a Rust type. A program whose methods all convert states it once as
+`fallible` in the attribute, and every silent declaration in it is read that way.
 
 `OutcomeAlg` names the two halves of a fallible output and `RpcErrorAlg` says what the failing half
 denotes: a code and a message. Both live in the specification, so a domain states what its failures

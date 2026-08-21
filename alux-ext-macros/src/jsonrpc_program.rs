@@ -20,7 +20,7 @@ struct JsonRpcBackend;
 /// What a JSON-RPC program states once about every method it declares.
 #[derive(Clone, Copy, Default)]
 pub(crate) struct MethodDefaults {
-    /// The program states that its methods can fail, so every declaration is read as fallible.
+    /// The program converts every method's error, so every declaration is read as fallible.
     fallible: bool,
 }
 
@@ -42,7 +42,7 @@ fn split_arguments(attr: TokenStream) -> syn::Result<(MethodDefaults, TokenStrea
     Ok((defaults, quote!(#forwarded)))
 }
 
-/// Carries one method's operation and whether the declaration says it can fail.
+/// Carries one method's operation and whether its error answers as a protocol error.
 struct MethodRequirement {
     reified: Reified,
     fallible: bool,
@@ -73,7 +73,7 @@ impl VisitMut for Methods<'_> {
         {
             let declared = is_fallible(declaration);
             if let Some(reified) = lift_operation(declaration) {
-                // A program that states failability says it for the declarations that stay silent.
+                // A program that states the conversion states it for the declarations staying silent.
                 if self.defaults.fallible && !declared {
                     let total = declaration.clone();
                     *declaration = parse_quote!(#total.fallible());
@@ -87,7 +87,7 @@ impl VisitMut for Methods<'_> {
 }
 
 impl ProgramBackendAlg for JsonRpcBackend {
-    /// A JSON-RPC program states whether its methods can fail.
+    /// A JSON-RPC program states whether its methods' errors answer as protocol errors.
     type Defaults = MethodDefaults;
 
     const NESTED_SUFFIX: &'static str = "_rpc";
@@ -117,8 +117,8 @@ impl ProgramBackendAlg for JsonRpcBackend {
                     >
                     + Send + Sync + 'static
             });
-            // A fallible declaration answers with a value or a failure, so it needs the registration
-            // that can report one; every other method needs the registration that answers with a value.
+            // A fallible declaration answers with a value or a protocol error, so it needs the
+            // registration that can report one; every other method answers with a value only.
             let registration = if fallible {
                 quote!(::alux_jsonrpc::JsonRpcFallibleAlg)
             } else {

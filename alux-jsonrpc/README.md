@@ -90,7 +90,7 @@ whole of it — no shared method table, no registry, no framework in the picture
 
 ```rust
 use alux_ext::ext;
-use alux_jsonrpc::{JsonRpcApiAlg, jsonrpc};
+use alux_jsonrpc::{JsonRpcApiAlg, RpcErrorAlg, jsonrpc};
 use core::future::Future;
 
 trait StatusAlg {
@@ -104,6 +104,20 @@ trait ItemsAlg {
     type Items;
 
     fn items(&self) -> impl Future<Output = Self::Items> + Send;
+}
+
+/// The one reason this domain fails: it keeps no history.
+struct NoHistory;
+
+/// What that failure denotes on an RPC surface. The domain says it once, naming no interpreter.
+impl RpcErrorAlg for NoHistory {
+    fn rpc_code(&self) -> i32 {
+        -32000
+    }
+
+    fn rpc_message(&self) -> String {
+        "the domain keeps no history".to_owned()
+    }
 }
 
 #[ext(name = StatusOperationExt, defunc)]
@@ -120,6 +134,18 @@ where
     async fn status_adjusted(&self, temp: f32) -> This::Status {
         self.status_set_temp(temp).await
     }
+
+    /// Returns the reading this domain does not keep, stating its own failure.
+    async fn status_history(&self) -> Result<This::Status, NoHistory> {
+        Err(NoHistory)
+    }
+
+    /// Returns the reading from a moment the domain no longer holds.
+    async fn status_at(&self, moment: u32) -> Result<This::Status, NoHistory> {
+        let _ = moment;
+
+        Err(NoHistory)
+    }
 }
 
 #[ext(name = ItemsOperationExt, defunc)]
@@ -133,7 +159,8 @@ where
     }
 }
 
-/// One surface fragment, offering one operation under both parameter modes.
+/// One surface fragment, mixing methods that answer with a value and one that answers with a
+/// protocol error.
 #[ext(name = StatusRpcExt, defunc(via = jsonrpc))]
 impl<This> This
 where
@@ -151,6 +178,9 @@ where
             .method("status_set_temp", self.op(Alg::status_adjusted).positional())
             // The same operation, decoded from a JSON object using the authored argument names.
             .method("status_set_temp_named", self.op(Alg::status_adjusted).named())
+            // `.fallible()` converts the operation's error into a JSON-RPC protocol error. This is
+            // the method-level marker; `history_rpc` below states the same once on the ext.
+            .method("status_at", self.op(Alg::status_at).fallible())
     }
 }
 
@@ -170,18 +200,38 @@ where
     }
 }
 
-/// The whole service, as the union of both fragments.
+/// A fragment whose errors all answer as protocol errors, marked once on the ext instead of per
+/// method.
+#[ext(name = HistoryRpcExt, defunc(via = jsonrpc), fallible)]
+impl<This> This
+where
+    This: JsonRpcApiAlg,
+{
+    /// Declares the history method, whose readings answer as JSON-RPC errors.
+    fn history_rpc<Alg>(&self)
+    where
+        Alg: StatusAlg,
+    {
+        // The ext-level `fallible` marker states it for every method here, so this one stays silent.
+        self.methods().method("status_history", self.op(Alg::status_history))
+    }
+}
+
+/// The whole service, as the union of every fragment.
 #[ext(name = ServiceRpcExt, defunc(via = jsonrpc))]
 impl<This> This
 where
     This: JsonRpcApiAlg,
 {
-    /// Declares every method both fragments contribute.
+    /// Declares every method the fragments contribute.
     fn service_rpc<Alg>(&self)
     where
         Alg: StatusAlg + ItemsAlg,
     {
-        self.methods().merge(self.status_rpc::<Alg>()).merge(self.items_rpc::<Alg>())
+        self.methods()
+            .merge(self.status_rpc::<Alg>())
+            .merge(self.history_rpc::<Alg>())
+            .merge(self.items_rpc::<Alg>())
     }
 }
 ```
@@ -215,41 +265,33 @@ retained by `alux-ext`. An argument the request leaves out reads as absent, whic
 argument accepts, so a positional array may stop short of the product and a parameter object may omit
 a name.
 
-`.fallible()` states that an operation can fail, so its `Result` answers with a value or with a
-JSON-RPC error rather than with a success carrying an error-shaped value. A program whose every method
-can fail says so once, in the attribute, and its declarations stay silent:
+`fallible` is the other distinction a method carries: it converts the operation's error into a JSON-RPC
+protocol error, so the failure answers in the response's `error` member instead of inside a successful
+result. It can be marked in either place. A program that mixes both kinds marks the declarations that
+convert, as `status_rpc` marks `status_at` above; a program whose errors all convert says so once as
+`fallible` on the ext, as `history_rpc` does, and each of its declarations stays silent. Marking it both
+ways means what marking it once means, and the two distinctions are independent — `.named().fallible()`
+states both, in either order.
 
-```rust ignore
-#[ext(name = HistoryRpcExt, defunc(via = jsonrpc), fallible)]
-impl<This> This
-where
-    This: JsonRpcApiAlg,
-{
-    /// Declares the history surface, whose readings answer as JSON-RPC errors.
-    fn history_rpc<Alg>(&self)
-    where
-        Alg: StatusAlg,
-    {
-        self.methods().method("status_history", self.op(Alg::status_history))
-    }
-}
+What a failure denotes is `RpcErrorAlg`, implemented above for `NoHistory`: the code the JSON-RPC
+specification carries and the message the failure states. A domain says that once for its own error
+type, and nothing about it names an interpreter — which is what lets a specification state the meaning
+of its failures without depending on whichever library answers the call.
+
+Marking it is also the migration path away from a failure that never reaches the protocol. An
+operation returning `Result` on the value path is serialized whole, so its error travels inside a
+successful answer — the shape JSON-RPC reserves a member for:
+
+```text
+{"jsonrpc":"2.0","id":1,"result":{"Err":{"code":-32000,"message":"..."}}}   a failure as a success
+{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"..."}}           a failure as a failure
 ```
 
-What a failure denotes is `RpcErrorAlg`: the code the JSON-RPC specification carries and the message
-the failure states. A domain implements it once for its own error type and names no interpreter doing
-so.
-
-```rust ignore
-impl RpcErrorAlg for NoHistory {
-    fn rpc_code(&self) -> i32 {
-        -32000
-    }
-
-    fn rpc_message(&self) -> String {
-        self.to_string()
-    }
-}
-```
+Moving from the first line to the second is two edits: mark `fallible` on the method or its ext, and
+implement `RpcErrorAlg` for the error type. Neither is guesswork — a fallible declaration does not
+compile until the error says what it denotes, and an error that is not serializable does not compile on
+the value path, which is what surfaces the mistake in the first place. An error type that happens to be
+serializable compiles either way, so those are the declarations worth reading twice.
 
 [`alux-jsonrpc-jsonrpsee`](https://docs.rs/alux-jsonrpc-jsonrpsee) compiles the same program into
 jsonrpsee `Methods`.

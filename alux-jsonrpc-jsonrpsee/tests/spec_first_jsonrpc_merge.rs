@@ -2,7 +2,7 @@
 //!
 //! Each program states one part of the surface and needs only the capabilities that part uses, so
 //! independently published fragments compose into one method collection. `history_rpc` states its
-//! failability once for the whole program rather than once per method.
+//! its error conversion once on the ext rather than once per method.
 
 mod common;
 mod expect;
@@ -38,7 +38,8 @@ where
     }
 }
 
-/// Declares a surface whose every method can fail, stated once for the whole program.
+/// Declares a surface whose errors all answer as protocol errors, marked once on the ext instead of
+/// per method.
 #[ext(name = HistoryRpcExt, defunc(via = jsonrpc), fallible)]
 impl<This> This
 where
@@ -49,7 +50,7 @@ where
     where
         Alg: StatusAlg,
     {
-        // A reading this domain does not keep. The program already said it can fail.
+        // The ext-level `fallible` marker states it for every method here, so this one stays silent.
         self.methods().method("status_history", self.op(Alg::jsonrpc_status_history))
     }
 }
