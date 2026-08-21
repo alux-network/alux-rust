@@ -1,6 +1,6 @@
 [package]
 name = "alux-jsonrpc-jsonrpsee"
-version.workspace = true
+version = "0.1.1"
 description = "jsonrpsee interpretation of ALUX typed JSON-RPC programs"
 documentation = "https://docs.rs/alux-jsonrpc-jsonrpsee"
 authors.workspace = true
