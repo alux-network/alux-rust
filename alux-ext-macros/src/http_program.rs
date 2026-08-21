@@ -6,7 +6,7 @@
 //! [`crate::lower`] and [`crate::syntax`].
 
 use crate::lower::{LoweredProgram, ProgramBackendAlg, expand_program};
-use crate::syntax::lift_operation;
+use crate::syntax::{Reified, lift_operation};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::visit_mut::{self, VisitMut};
@@ -16,7 +16,7 @@ use syn::{Expr, ExprMethodCall, GenericArgument, Ident, ImplItemFn, Type, parse_
 struct HttpBackend;
 
 /// Carries one route's operation, ordered input roles, and output kind.
-type RouteRequirement = (Type, Vec<InputDeclaration>, Ident);
+type RouteRequirement = (Reified, Vec<InputDeclaration>, Ident);
 
 /// Carries one input role together with the argument type it supplies.
 type InputDeclaration = (Ident, Type);
@@ -70,9 +70,9 @@ fn endpoint_roles(declaration: &Expr) -> Option<(Vec<InputDeclaration>, Ident)> 
 /// Lifts one endpoint declaration into the requirement it places on an interpreter.
 fn lift_route(declaration: &mut Expr) -> Option<RouteRequirement> {
     let (inputs, transform) = endpoint_roles(declaration)?;
-    let operation = lift_operation(declaration)?;
+    let reified = lift_operation(declaration)?;
 
-    Some((operation, inputs, transform))
+    Some((reified, inputs, transform))
 }
 
 impl ProgramBackendAlg for HttpBackend {
@@ -83,10 +83,18 @@ impl ProgramBackendAlg for HttpBackend {
         let mut requirements = Vec::new();
         Routes(&mut requirements).visit_block_mut(&mut method.block);
         let where_clause = method.sig.generics.make_where_clause();
-        if !requirements.is_empty() {
-            where_clause.predicates.push(parse_quote!(This: ::alux_ext::HandlerContextAlg<Alg>));
+        // One handle obligation per distinct domain, however many operations name it.
+        let mut carriers: Vec<Ident> = Vec::new();
+        for reified in &requirements {
+            let carrier = &reified.0.carrier;
+            if !carriers.contains(carrier) {
+                carriers.push(carrier.clone());
+            }
         }
-        for (operation, inputs, transform) in requirements {
+        for carrier in carriers {
+            where_clause.predicates.push(parse_quote!(This: ::alux_ext::HandlerContextAlg<#carrier>));
+        }
+        for (Reified { operation, carrier }, inputs, transform) in requirements {
             let input_types = inputs.iter().map(|(_, input)| input);
             let args = if inputs.is_empty() { quote!(()) } else { quote!((#(#input_types,)*)) };
             let roles = inputs.iter().map(|(role, input)| match role.to_string().as_str() {
@@ -101,17 +109,17 @@ impl ProgramBackendAlg for HttpBackend {
             });
             let roles = if inputs.is_empty() { quote!(()) } else { quote!((#(#roles,)*)) };
             where_clause.predicates.push(parse_quote! {
-                #operation: ::alux_ext::ApplyAlg<<This as ::alux_ext::HandlerContextAlg<Alg>>::Handle, #args>
+                #operation: ::alux_ext::ApplyAlg<<This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle, #args>
                     + Send + Sync + 'static
             });
             where_clause.predicates.push(parse_quote! {
                 This: ::alux_http::HandlerEndpointAlg<
-                    <This as ::alux_ext::HandlerContextAlg<Alg>>::Handle,
+                    <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
                     #roles,
                     #args,
                     ::alux_http::#transform,
                     <#operation as ::alux_ext::ApplyAlg<
-                        <This as ::alux_ext::HandlerContextAlg<Alg>>::Handle,
+                        <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
                         #args,
                     >>::Output
                 >
@@ -182,6 +190,33 @@ mod tests {
         assert!(output.contains("StatusCurrentOperation < Alg >"));
         assert!(output.contains("default"));
         assert!(output.contains("CompileRouteProgram :: compile_route"));
+    }
+
+    #[test]
+    fn names_the_domain_the_author_named() {
+        let output = http_program_defunc_internal(
+            quote!(name = StatusApiExt),
+            quote! {
+                impl<This> This
+                where
+                    This: HttpApiAlg + JsonOutAlg,
+                {
+                    fn status_api<Domain>(&self)
+                    where
+                        Domain: StatusAlg,
+                    {
+                        self.routes().get("/status", self.op(Domain::status_current).json())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // The expansion reuses the authored parameter rather than inventing one.
+        assert!(output.contains("StatusCurrentOperation < Domain >"));
+        assert!(output.contains("HandlerContextAlg < Domain >"));
+        assert!(!output.contains("< Alg >"), "a hardcoded `Alg` leaked into the expansion");
     }
 
     #[test]

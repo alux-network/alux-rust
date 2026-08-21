@@ -6,25 +6,25 @@
 //! [`crate::lower`] and [`crate::syntax`].
 
 use crate::lower::{LoweredProgram, ProgramBackendAlg, expand_program};
-use crate::syntax::lift_operation;
+use crate::syntax::{Reified, lift_operation};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::visit_mut::{self, VisitMut};
-use syn::{ExprMethodCall, ImplItemFn, Type, parse_quote};
+use syn::{ExprMethodCall, Ident, ImplItemFn, parse_quote};
 
 /// Interprets the shared lowering as a JSON-RPC method program.
 struct JsonRpcBackend;
 
 /// Finds the method declarations of a JSON-RPC program.
-struct Methods<'a>(&'a mut Vec<Type>);
+struct Methods<'a>(&'a mut Vec<Reified>);
 
 impl VisitMut for Methods<'_> {
     fn visit_expr_method_call_mut(&mut self, call: &mut ExprMethodCall) {
         if call.method == "method"
             && let Some(declaration) = call.args.iter_mut().nth(1)
-            && let Some(operation) = lift_operation(declaration)
+            && let Some(reified) = lift_operation(declaration)
         {
-            self.0.push(operation);
+            self.0.push(reified);
         }
         visit_mut::visit_expr_method_call_mut(self, call);
     }
@@ -38,24 +38,32 @@ impl ProgramBackendAlg for JsonRpcBackend {
         let mut operations = Vec::new();
         Methods(&mut operations).visit_block_mut(&mut method.block);
         let where_clause = method.sig.generics.make_where_clause();
-        if !operations.is_empty() {
-            where_clause.predicates.push(parse_quote!(This: ::alux_ext::HandlerContextAlg<Alg>));
+        // One handle obligation per distinct domain, however many operations name it.
+        let mut carriers: Vec<Ident> = Vec::new();
+        for reified in &operations {
+            let carrier = &reified.carrier;
+            if !carriers.contains(carrier) {
+                carriers.push(carrier.clone());
+            }
         }
-        for operation in operations {
+        for carrier in carriers {
+            where_clause.predicates.push(parse_quote!(This: ::alux_ext::HandlerContextAlg<#carrier>));
+        }
+        for Reified { operation, carrier } in operations {
             where_clause.predicates.push(parse_quote! {
-                #operation: ::alux_ext::OperationAlg<Context = Alg>
+                #operation: ::alux_ext::OperationAlg<Context = #carrier>
                     + ::alux_ext::ApplyAlg<
-                        <This as ::alux_ext::HandlerContextAlg<Alg>>::Handle,
+                        <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
                         <#operation as ::alux_ext::OperationAlg>::Args,
                     >
                     + Send + Sync + 'static
             });
             where_clause.predicates.push(parse_quote! {
                 This: ::alux_jsonrpc::JsonRpcMethodAlg<
-                    <This as ::alux_ext::HandlerContextAlg<Alg>>::Handle,
+                    <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
                     <#operation as ::alux_ext::OperationAlg>::Args,
                     <#operation as ::alux_ext::ApplyAlg<
-                        <This as ::alux_ext::HandlerContextAlg<Alg>>::Handle,
+                        <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
                         <#operation as ::alux_ext::OperationAlg>::Args,
                     >>::Output
                 >

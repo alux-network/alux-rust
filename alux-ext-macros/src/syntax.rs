@@ -11,8 +11,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::{self, VisitMut};
 use syn::{
-    Expr, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Token, Type, TypeParam, TypePath, Visibility,
-    WherePredicate, parse_quote,
+    Expr, GenericArgument, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, PathArguments, Token, Type,
+    TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
 };
 
 /// Parses the visibility syntax accepted by `extend::ext` before an inherent impl.
@@ -120,7 +120,7 @@ pub(crate) fn pascal_ident(name: &Ident, suffix: &str) -> Ident {
             pascal.extend(chars);
         }
     }
-    format_ident!("{pascal}{suffix}")
+    format_ident!("{pascal}{suffix}", span = name.span())
 }
 
 /// Names the first-order operation reifying one method's application.
@@ -151,7 +151,30 @@ pub(crate) fn program_type_params(method: &ImplItemFn, rejected: &str) -> syn::R
         .collect()
 }
 
-/// Reads an already first-order handler written as `Operation::<Alg>::default()`.
+/// Names the operation a declaration denotes, together with the domain it is written against.
+///
+/// Both idents come from the authored source, so the expansion carries the author's spans and the
+/// author's parameter name rather than one this macro invented.
+pub(crate) struct Reified {
+    /// The operation type to store in the program.
+    pub(crate) operation: Type,
+    /// The domain the operation interprets, as the author named it.
+    pub(crate) carrier: Ident,
+}
+
+/// Reads the domain out of an already first-order handler's type arguments.
+fn carrier_of(operation: &Type) -> Option<Ident> {
+    let Type::Path(path) = operation else { return None };
+    let PathArguments::AngleBracketed(arguments) = &path.path.segments.last()?.arguments else {
+        return None;
+    };
+    arguments.args.iter().find_map(|argument| match argument {
+        GenericArgument::Type(Type::Path(carrier)) => Some(carrier.path.segments.last()?.ident.clone()),
+        _ => None,
+    })
+}
+
+/// Reads an already first-order handler written as `Operation::<Domain>::default()`.
 fn first_order_type(expression: &Expr) -> Option<Type> {
     let Expr::Call(call) = expression else { return None };
     if !call.args.is_empty() {
@@ -173,25 +196,32 @@ fn first_order_type(expression: &Expr) -> Option<Type> {
 /// A handler written as a method path is replaced by its generated operation value; a handler that is
 /// already first-order is left as authored. The declaration is unchanged when it denotes no
 /// operation.
-pub(crate) fn lift_operation(declaration: &mut Expr) -> Option<Type> {
+pub(crate) fn lift_operation(declaration: &mut Expr) -> Option<Reified> {
     let mut current = declaration;
     loop {
         let Expr::MethodCall(call) = current else { return None };
         if call.method == "op" {
             let handler = call.args.first()?;
-            let (operation, reified) = match handler {
+            let (operation, carrier, reify) = match handler {
                 Expr::Path(handler) => {
-                    let method = handler.path.segments.last()?.ident.clone();
+                    // `Domain::method` names both halves; reusing them keeps the expansion hygienic.
+                    let mut segments = handler.path.segments.iter().rev();
+                    let method = segments.next()?.ident.clone();
+                    let carrier = segments.next()?.ident.clone();
                     let operation = operation_ident(&method);
-                    (parse_quote!(#operation<Alg>), true)
+                    (parse_quote!(#operation<#carrier>), carrier, true)
                 }
-                handler => (first_order_type(handler)?, false),
+                handler => {
+                    let operation = first_order_type(handler)?;
+                    let carrier = carrier_of(&operation)?;
+                    (operation, carrier, false)
+                }
             };
-            if reified {
+            if reify {
                 let argument: Expr = parse_quote!(<#operation>::default());
                 call.args = Punctuated::from_iter([argument]);
             }
-            return Some(operation);
+            return Some(Reified { operation, carrier });
         }
         current = &mut call.receiver;
     }
