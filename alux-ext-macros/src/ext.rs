@@ -6,7 +6,7 @@
 //! attribute-macro backend while retaining the same extension surface.
 
 use crate::http_program::http_program_defunc_internal;
-use crate::syntax::{ExtensionImpl, operation_ident};
+use crate::syntax::{ExtensionImpl, documentation, operation_ident};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
@@ -149,8 +149,10 @@ fn defunctionalize(
     let receiver = if mutable_receiver { quote!(#context.as_mut()) } else { quote!(#context.as_ref()) };
     let call = quote!(#receiver.#method_name(#(#arguments),*));
     let application = if method.sig.asyncness.is_some() { quote!(#call.await) } else { call };
+    let documentation = documentation(&method.attrs);
 
     Ok(quote! {
+        #(#documentation)*
         #[doc(hidden)]
         #visibility struct #operation<Context>(core::marker::PhantomData<fn() -> Context>);
 
@@ -305,6 +307,28 @@ mod tests {
         assert!(output.contains("alux_http :: HttpProgramAlg"));
         assert!(output.contains("ExampleSummaryOperation :: < Alg > :: default"));
         assert!(!output.contains("struct DirectApiOperation"));
+    }
+
+    #[test]
+    fn carries_the_authored_documentation_onto_the_operation() {
+        let output = ext_internal(
+            quote!(name = ValueExt, defunc),
+            quote! {
+                impl<This> This {
+                    /// Returns the value as it stands.
+                    async fn value(&self) -> u32 {
+                        1
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // A reader landing on the generated type sees what the method says.
+        assert!(
+            output.contains(r#"# [doc = r" Returns the value as it stands."] # [doc (hidden)] struct ValueOperation"#)
+        );
     }
 
     #[test]

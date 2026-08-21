@@ -11,8 +11,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::{self, VisitMut};
 use syn::{
-    Expr, GenericArgument, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, PathArguments, Token, Type,
-    TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
+    Attribute, Expr, GenericArgument, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, PathArguments,
+    Token, Type, TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
 };
 
 /// Parses the visibility syntax accepted by `extend::ext` before an inherent impl.
@@ -97,6 +97,14 @@ pub(crate) fn unbind(generics: &mut Generics) {
             param.bounds.clear();
         }
     }
+}
+
+/// Returns the documentation an authored item carries.
+///
+/// A generated type is where a reader lands from the declaration that named it, so it says what the
+/// author wrote rather than nothing at all.
+pub(crate) fn documentation(attrs: &[Attribute]) -> Vec<Attribute> {
+    attrs.iter().filter(|attr| attr.path().is_ident("doc")).cloned().collect()
 }
 
 /// Returns the names of every method the extension declares.

@@ -6,7 +6,8 @@
 //! what its own transport means.
 
 use crate::syntax::{
-    ExtensionImpl, ReplaceSelf, Subprograms, method_names, predicates, program_ident, program_type_params, unbind,
+    ExtensionImpl, ReplaceSelf, Subprograms, documentation, method_names, predicates, program_ident,
+    program_type_params, unbind,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -127,8 +128,10 @@ where
     };
     let compile = Backend::compile_program(&lowered);
     let program_type = &lowered.program_type;
+    let documentation = documentation(&method.attrs);
 
     let generated = quote! {
+        #(#documentation)*
         #[doc(hidden)]
         #visibility struct #program<#(#type_params),*>(core::marker::PhantomData<#marker>);
 

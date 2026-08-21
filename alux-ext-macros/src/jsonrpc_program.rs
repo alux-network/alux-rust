@@ -207,6 +207,29 @@ mod tests {
     }
 
     #[test]
+    fn carries_the_authored_documentation_onto_the_program() {
+        let output = jsonrpc_program_defunc_internal(
+            quote!(name = StatusRpcExt),
+            quote! {
+                pub impl<This> This {
+                    /// Declares the status methods.
+                    fn status_rpc<Alg>(&self) {
+                        self.methods().method("status", self.op(Alg::status_current))
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // A reader landing on the generated type sees what the declaration says.
+        assert!(
+            output
+                .contains(r#"# [doc = r" Declares the status methods."] # [doc (hidden)] pub struct StatusRpcProgram"#)
+        );
+    }
+
+    #[test]
     fn reads_every_declaration_of_a_fallible_program_as_fallible() {
         let output = jsonrpc_program_defunc_internal(
             quote!(name = StatusRpcExt, fallible),
