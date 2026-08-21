@@ -28,6 +28,9 @@ pub(crate) struct LoweredProgram {
 
 /// Describes what one transport contributes to the shared program lowering.
 pub(crate) trait ProgramBackendAlg {
+    /// What a program states once about every declaration it contains.
+    type Defaults;
+
     /// Marks a method name whose call denotes a nested program of this transport.
     const NESTED_SUFFIX: &'static str;
 
@@ -35,7 +38,7 @@ pub(crate) trait ProgramBackendAlg {
     const REJECTED_PARAM: &'static str;
 
     /// Adds the interpreter evidence implied by the declarations in one method body.
-    fn require_declarations(method: &mut ImplItemFn);
+    fn require_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults);
 
     /// States the obligation carried by a nested program value.
     fn require_subprogram(program: &TokenStream) -> TokenStream;
@@ -45,7 +48,11 @@ pub(crate) trait ProgramBackendAlg {
 }
 
 /// Expands a program declaration into its extension trait and its first-order programs.
-pub(crate) fn expand_program<Backend>(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream>
+pub(crate) fn expand_program<Backend>(
+    attr: TokenStream,
+    item: TokenStream,
+    defaults: &Backend::Defaults,
+) -> syn::Result<TokenStream>
 where
     Backend: ProgramBackendAlg,
 {
@@ -57,7 +64,8 @@ where
     let mut generated = Vec::new();
     for item in &mut extension.items {
         if let ImplItem::Fn(method) = item {
-            let (constructor, program) = lower_program::<Backend>(method, &methods, &visibility, &impl_predicates)?;
+            let (constructor, program) =
+                lower_program::<Backend>(method, &methods, &visibility, &impl_predicates, defaults)?;
             *method = constructor;
             generated.push(program);
         }
@@ -77,6 +85,7 @@ fn lower_program<Backend>(
     methods: &[Ident],
     visibility: &Visibility,
     impl_predicates: &Punctuated<WherePredicate, Token![,]>,
+    defaults: &Backend::Defaults,
 ) -> syn::Result<(ImplItemFn, TokenStream)>
 where
     Backend: ProgramBackendAlg,
@@ -98,7 +107,7 @@ where
     let mut compiler = method.clone();
     let mut subprograms = Subprograms::new(methods, Backend::NESTED_SUFFIX);
     subprograms.visit_block_mut(&mut compiler.block);
-    Backend::require_declarations(&mut compiler);
+    Backend::require_declarations(&mut compiler, defaults);
     ReplaceSelf.visit_block_mut(&mut compiler.block);
 
     // The bounds move to the interpretation; the parameters they introduce stay.

@@ -7,7 +7,7 @@
 mod common;
 mod expect;
 
-use alux_jsonrpc_jsonrpsee::RpcCtx;
+use alux_jsonrpc_jsonrpsee::{RpcCtx, RpcErrorExt};
 use common::{App, ItemsAlg, ItemsOperationExt, StatusAlg, StatusOperationExt};
 use expect::expect_example_rpc;
 use jsonrpsee::core::{RpcResult, async_trait};
@@ -67,7 +67,8 @@ where
     }
 
     async fn history(&self) -> RpcResult<u32> {
-        self.jsonrpc_status_history().await.map_err(Into::into)
+        // A native author converts the domain's failure at their own boundary.
+        self.jsonrpc_status_history().await.map_err(|failure| failure.to_rpc_error())
     }
 }
 

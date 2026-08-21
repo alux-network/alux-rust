@@ -12,10 +12,9 @@
 #![allow(async_fn_in_trait)]
 
 use alux_ext::ext;
-use alux_jsonrpc_jsonrpsee::rpc_error;
+use alux_jsonrpc::RpcErrorAlg;
 use core::fmt::{self, Display};
 use core::future::Future;
-use jsonrpsee::types::ErrorObjectOwned;
 
 /// The one reason this domain fails: it keeps no history.
 #[derive(Debug)]
@@ -27,11 +26,15 @@ impl Display for NoHistory {
     }
 }
 
-/// The domain's one statement about a transport: which JSON-RPC error its failure denotes. Nothing
-/// else in this file names a transport.
-impl From<NoHistory> for ErrorObjectOwned {
-    fn from(failure: NoHistory) -> Self {
-        rpc_error(-32000, failure.to_string(), None::<()>)
+/// The domain's one statement about its failure on an RPC surface: the code it carries and the
+/// message it states. No interpreter is named here, or anywhere else in this file.
+impl RpcErrorAlg for NoHistory {
+    fn rpc_code(&self) -> i32 {
+        -32000
+    }
+
+    fn rpc_message(&self) -> String {
+        self.to_string()
     }
 }
 

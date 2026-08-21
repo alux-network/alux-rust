@@ -1,7 +1,8 @@
 //! The same surface as `spec_first_jsonrpc`, composed by merging separately declared programs.
 //!
 //! Each program states one part of the surface and needs only the capabilities that part uses, so
-//! independently published fragments compose into one method collection.
+//! independently published fragments compose into one method collection. `history_rpc` states its
+//! failability once for the whole program rather than once per method.
 
 mod common;
 mod expect;
@@ -34,8 +35,22 @@ where
             .method("status_set_temp_named", self.op(Alg::jsonrpc_status_adjusted).named())
             // An adjustment whose offset the caller may leave out.
             .method("status_set_temp_offset", self.op(Alg::jsonrpc_status_offset))
-            // A reading that fails, so its error answers as a JSON-RPC error.
-            .method("status_history", self.op(Alg::jsonrpc_status_history).fallible())
+    }
+}
+
+/// Declares a surface whose every method can fail, stated once for the whole program.
+#[ext(name = HistoryRpcExt, defunc(via = jsonrpc), fallible)]
+impl<This> This
+where
+    This: JsonRpcApiAlg,
+{
+    /// Declares the history surface, whose readings answer as JSON-RPC errors.
+    fn history_rpc<Alg>(&self)
+    where
+        Alg: StatusAlg,
+    {
+        // A reading this domain does not keep. The program already said it can fail.
+        self.methods().method("status_history", self.op(Alg::jsonrpc_status_history))
     }
 }
 
@@ -59,12 +74,12 @@ impl<This> This
 where
     This: JsonRpcApiAlg,
 {
-    /// Composes the whole surface from the two independently declared programs.
+    /// Composes the whole surface from the three independently declared programs.
     fn example_rpc<Alg>(&self)
     where
         Alg: StatusAlg + ItemsAlg,
     {
-        self.methods().merge(self.status_rpc::<Alg>()).merge(self.items_rpc::<Alg>())
+        self.methods().merge(self.status_rpc::<Alg>()).merge(self.history_rpc::<Alg>()).merge(self.items_rpc::<Alg>())
     }
 }
 

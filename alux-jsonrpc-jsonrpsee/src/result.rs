@@ -1,4 +1,5 @@
 use alux_ext::ext;
+use alux_jsonrpc::RpcErrorAlg;
 use jsonrpsee::core::RpcResult;
 use jsonrpsee::types::ErrorObjectOwned;
 use jsonrpsee::types::error::INTERNAL_ERROR_CODE;
@@ -16,6 +17,18 @@ where
 /// Constructs an internal JSON-RPC error without implementation-specific data.
 pub fn internal_rpc_error(message: impl Into<String>) -> ErrorObjectOwned {
     ErrorObjectOwned::owned(INTERNAL_ERROR_CODE, message, None::<()>)
+}
+
+/// Reads a domain failure as the JSON-RPC error it denotes.
+#[ext(name = RpcErrorExt)]
+pub impl<This> This
+where
+    This: RpcErrorAlg,
+{
+    /// Builds the owned JSON-RPC error this failure states.
+    fn to_rpc_error(&self) -> ErrorObjectOwned {
+        rpc_error(self.rpc_code(), self.rpc_message(), None::<()>)
+    }
 }
 
 /// Converts semantic results into JSON-RPC boundary results.
@@ -49,8 +62,29 @@ pub impl<Output, Error> Result<Output, Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::ResultToRpcExt;
+    use super::{ResultToRpcExt, RpcErrorExt};
+    use alux_jsonrpc::RpcErrorAlg;
     use jsonrpsee::types::error::INTERNAL_ERROR_CODE;
+
+    struct NoHistory;
+
+    impl RpcErrorAlg for NoHistory {
+        fn rpc_code(&self) -> i32 {
+            -32000
+        }
+
+        fn rpc_message(&self) -> String {
+            "the domain keeps no history".to_owned()
+        }
+    }
+
+    #[test]
+    fn reads_a_domain_failure_as_the_error_it_denotes() {
+        let error = NoHistory.to_rpc_error();
+
+        assert_eq!(error.code(), -32000);
+        assert_eq!(error.message(), "the domain keeps no history");
+    }
 
     #[test]
     fn converts_a_semantic_error_at_the_rpc_boundary() {

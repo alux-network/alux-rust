@@ -59,11 +59,25 @@ impl<Value, Error> OutcomeAlg for Result<Value, Error> {
     }
 }
 
+/// States what a domain failure denotes on a JSON-RPC surface.
+///
+/// A domain says this once for its own error type: the code the JSON-RPC specification carries and
+/// the message the failure states. Nothing here names a transport library, so a specification can
+/// state what its failures mean without depending on whichever interpreter answers the call.
+pub trait RpcErrorAlg {
+    /// The code the JSON-RPC specification carries for this failure.
+    fn rpc_code(&self) -> i32;
+
+    /// The message this failure states.
+    fn rpc_message(&self) -> String;
+}
+
 /// Compiles a typed JSON-RPC method whose operation can fail.
 ///
 /// A method registered here answers with its value or with a JSON-RPC error, so a domain that states
 /// failure in its own vocabulary reaches a caller as a failed call rather than as a successful one
-/// carrying an error-shaped value.
+/// carrying an error-shaped value. [`OutcomeAlg`] names the two halves of the output and
+/// [`RpcErrorAlg`] says what the failing half denotes.
 pub trait JsonRpcFallibleAlg<Context, Args, Output> {
     /// Registers a fallible handler decoded from positional parameters.
     fn finish_jsonrpc_positional_fallible<Handler>(&self, name: &'static str, handler: Handler) -> Self::Methods

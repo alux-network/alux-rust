@@ -76,10 +76,13 @@ fn lift_route(declaration: &mut Expr) -> Option<RouteRequirement> {
 }
 
 impl ProgramBackendAlg for HttpBackend {
+    /// An HTTP program states nothing once for all of its routes.
+    type Defaults = ();
+
     const NESTED_SUFFIX: &'static str = "_api";
     const REJECTED_PARAM: &'static str = "HTTP programs currently support type parameters only";
 
-    fn require_declarations(method: &mut ImplItemFn) {
+    fn require_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
         let mut requirements = Vec::new();
         Routes(&mut requirements).visit_block_mut(&mut method.block);
         let where_clause = method.sig.generics.make_where_clause();
@@ -156,7 +159,7 @@ impl ProgramBackendAlg for HttpBackend {
 
 /// Expands the facade macro after converting compiler token streams into testable tokens.
 pub(crate) fn http_program_defunc_internal(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
-    expand_program::<HttpBackend>(attr, item)
+    expand_program::<HttpBackend>(attr, item, &())
 }
 
 #[cfg(test)]

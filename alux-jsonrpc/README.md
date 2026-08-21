@@ -216,9 +216,40 @@ argument accepts, so a positional array may stop short of the product and a para
 a name.
 
 `.fallible()` states that an operation can fail, so its `Result` answers with a value or with a
-JSON-RPC error rather than with a success carrying an error-shaped value. The domain keeps stating
-failure in its own vocabulary; only its statement of what that failure denotes at the boundary is
-transport-facing.
+JSON-RPC error rather than with a success carrying an error-shaped value. A program whose every method
+can fail says so once, in the attribute, and its declarations stay silent:
+
+```rust ignore
+#[ext(name = HistoryRpcExt, defunc(via = jsonrpc), fallible)]
+impl<This> This
+where
+    This: JsonRpcApiAlg,
+{
+    /// Declares the history surface, whose readings answer as JSON-RPC errors.
+    fn history_rpc<Alg>(&self)
+    where
+        Alg: StatusAlg,
+    {
+        self.methods().method("status_history", self.op(Alg::status_history))
+    }
+}
+```
+
+What a failure denotes is `RpcErrorAlg`: the code the JSON-RPC specification carries and the message
+the failure states. A domain implements it once for its own error type and names no interpreter doing
+so.
+
+```rust ignore
+impl RpcErrorAlg for NoHistory {
+    fn rpc_code(&self) -> i32 {
+        -32000
+    }
+
+    fn rpc_message(&self) -> String {
+        self.to_string()
+    }
+}
+```
 
 [`alux-jsonrpc-jsonrpsee`](https://docs.rs/alux-jsonrpc-jsonrpsee) compiles the same program into
 jsonrpsee `Methods`.

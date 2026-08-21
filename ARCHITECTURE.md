@@ -231,7 +231,14 @@ only an optional argument accepts.
 `.fallible()` is the other distinction a method can carry: whether it can fail. It selects
 `JsonRpcFallibleAlg` instead of `JsonRpcMethodAlg`, so an operation's `Result` answers as a JSON-RPC
 error rather than as a success carrying an error-shaped value. Failability belongs to the program
-because it is part of what the surface promises, not an accident of a Rust type.
+because it is part of what the surface promises, not an accident of a Rust type. A program whose
+methods all fail states it once as `fallible` in the attribute, and every silent declaration in it is
+read that way.
+
+`OutcomeAlg` names the two halves of a fallible output and `RpcErrorAlg` says what the failing half
+denotes: a code and a message. Both live in the specification, so a domain states what its failures
+mean without naming an interpreter, and an interpretation reads that statement to build whatever error
+its transport library uses.
 
 `JsonrpseeImpl`, published as `alux-jsonrpc-jsonrpsee`, owns deserialization, method registration,
 context sharing, application, serialization, and boundary error conversion. These are jsonrpsee

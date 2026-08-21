@@ -119,6 +119,10 @@ pub fn http(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// authored argument names, and a call to another method of the same extension becomes a nested
 /// program.
 ///
+/// A `fallible` argument states failability once for every method the program declares, so each
+/// declaration that does not say otherwise is read as `.fallible()`. This argument belongs to the
+/// JSON-RPC backend; every other argument is forwarded to `extend::ext`.
+///
 /// ```ignore
 /// use alux_ext::ext;
 /// use alux_jsonrpc::{JsonRpcApiAlg, jsonrpc};

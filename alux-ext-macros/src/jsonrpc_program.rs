@@ -9,11 +9,38 @@ use crate::lower::{LoweredProgram, ProgramBackendAlg, expand_program};
 use crate::syntax::{Reified, lift_operation};
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
 use syn::visit_mut::{self, VisitMut};
-use syn::{Expr, ExprMethodCall, Ident, ImplItemFn, parse_quote};
+use syn::{Expr, ExprMethodCall, Ident, ImplItemFn, Meta, Token, parse_quote};
 
 /// Interprets the shared lowering as a JSON-RPC method program.
 struct JsonRpcBackend;
+
+/// What a JSON-RPC program states once about every method it declares.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct MethodDefaults {
+    /// The program states that its methods can fail, so every declaration is read as fallible.
+    fallible: bool,
+}
+
+/// Separates the program-level arguments this backend owns from those `extend::ext` reads.
+fn split_arguments(attr: TokenStream) -> syn::Result<(MethodDefaults, TokenStream)> {
+    if attr.is_empty() {
+        return Ok((MethodDefaults::default(), attr));
+    }
+    let mut defaults = MethodDefaults::default();
+    let mut forwarded = Punctuated::<Meta, Token![,]>::new();
+    for argument in Punctuated::<Meta, Token![,]>::parse_terminated.parse2(attr)? {
+        if matches!(&argument, Meta::Path(path) if path.is_ident("fallible")) {
+            defaults.fallible = true;
+        } else {
+            forwarded.push(argument);
+        }
+    }
+
+    Ok((defaults, quote!(#forwarded)))
+}
 
 /// Carries one method's operation and whether the declaration says it can fail.
 struct MethodRequirement {
@@ -33,17 +60,26 @@ fn is_fallible(declaration: &Expr) -> bool {
     }
 }
 
-/// Finds the method declarations of a JSON-RPC program.
-struct Methods<'a>(&'a mut Vec<MethodRequirement>);
+/// Finds the method declarations of a JSON-RPC program, reading each under the program's defaults.
+struct Methods<'a> {
+    requirements: &'a mut Vec<MethodRequirement>,
+    defaults: MethodDefaults,
+}
 
 impl VisitMut for Methods<'_> {
     fn visit_expr_method_call_mut(&mut self, call: &mut ExprMethodCall) {
         if call.method == "method"
             && let Some(declaration) = call.args.iter_mut().nth(1)
         {
-            let fallible = is_fallible(declaration);
+            let declared = is_fallible(declaration);
             if let Some(reified) = lift_operation(declaration) {
-                self.0.push(MethodRequirement { reified, fallible });
+                // A program that states failability says it for the declarations that stay silent.
+                if self.defaults.fallible && !declared {
+                    let total = declaration.clone();
+                    *declaration = parse_quote!(#total.fallible());
+                }
+                let fallible = declared || self.defaults.fallible;
+                self.requirements.push(MethodRequirement { reified, fallible });
             }
         }
         visit_mut::visit_expr_method_call_mut(self, call);
@@ -51,12 +87,15 @@ impl VisitMut for Methods<'_> {
 }
 
 impl ProgramBackendAlg for JsonRpcBackend {
+    /// A JSON-RPC program states whether its methods can fail.
+    type Defaults = MethodDefaults;
+
     const NESTED_SUFFIX: &'static str = "_rpc";
     const REJECTED_PARAM: &'static str = "JSON-RPC programs currently support type parameters only";
 
-    fn require_declarations(method: &mut ImplItemFn) {
+    fn require_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults) {
         let mut operations = Vec::new();
-        Methods(&mut operations).visit_block_mut(&mut method.block);
+        Methods { requirements: &mut operations, defaults: *defaults }.visit_block_mut(&mut method.block);
         let where_clause = method.sig.generics.make_where_clause();
         // One handle obligation per distinct domain, however many operations name it.
         let mut carriers: Vec<Ident> = Vec::new();
@@ -127,7 +166,9 @@ impl ProgramBackendAlg for JsonRpcBackend {
 
 /// Expands the facade macro after converting compiler token streams into testable tokens.
 pub(crate) fn jsonrpc_program_defunc_internal(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
-    expand_program::<JsonRpcBackend>(attr, item)
+    let (defaults, forwarded) = split_arguments(attr)?;
+
+    expand_program::<JsonRpcBackend>(forwarded, item, &defaults)
 }
 
 #[cfg(test)]
@@ -163,6 +204,76 @@ mod tests {
         assert!(output.contains("StatusCurrentOperation < Alg >"));
         assert!(output.contains("StatusForPathOperation < Alg >"));
         assert!(output.contains("CompileJsonRpcProgram :: compile_jsonrpc_program"));
+    }
+
+    #[test]
+    fn reads_every_declaration_of_a_fallible_program_as_fallible() {
+        let output = jsonrpc_program_defunc_internal(
+            quote!(name = StatusRpcExt, fallible),
+            quote! {
+                pub impl<This> This
+                where
+                    This: JsonRpcApiAlg,
+                {
+                    fn status_rpc<Alg>(&self)
+                    where
+                        Alg: StatusAlg,
+                    {
+                        self.methods()
+                            .method("status", self.op(Alg::status_current))
+                            .method("status_for", self.op(Alg::status_for_path).named())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // The program said it once, so each silent declaration is read as fallible.
+        assert_eq!(output.matches("JsonRpcFallibleAlg").count(), 2);
+        assert!(!output.contains("JsonRpcMethodAlg"));
+        assert_eq!(output.matches(". fallible ()").count(), 2);
+        // The flag is this backend's own argument and reaches no other macro.
+        assert!(!output.contains("fallible)"), "the flag leaked into a forwarded attribute");
+    }
+
+    #[test]
+    fn keeps_a_declaration_that_states_its_own_mode() {
+        let output = jsonrpc_program_defunc_internal(
+            quote!(name = StatusRpcExt, fallible),
+            quote! {
+                pub impl<This> This {
+                    fn status_rpc<Alg>(&self) {
+                        self.methods().method("status", self.op(Alg::status_current).fallible())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // Saying it twice means the same as saying it once.
+        assert_eq!(output.matches(". fallible ()").count(), 1);
+        assert_eq!(output.matches("JsonRpcFallibleAlg").count(), 1);
+    }
+
+    #[test]
+    fn leaves_a_silent_program_on_the_value_path() {
+        let output = jsonrpc_program_defunc_internal(
+            quote!(name = StatusRpcExt),
+            quote! {
+                pub impl<This> This {
+                    fn status_rpc<Alg>(&self) {
+                        self.methods().method("status", self.op(Alg::status_current))
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("JsonRpcMethodAlg"));
+        assert!(!output.contains("fallible"));
     }
 
     #[test]

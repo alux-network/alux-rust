@@ -1,6 +1,7 @@
 use crate::args::JsonrpseeArgs;
+use crate::result::RpcErrorExt;
 use alux_ext::{ApplyAlg, HandlerContextAlg};
-use alux_jsonrpc::{JsonRpcAlg, JsonRpcFallibleAlg, JsonRpcMethodAlg, OutcomeAlg};
+use alux_jsonrpc::{JsonRpcAlg, JsonRpcFallibleAlg, JsonRpcMethodAlg, OutcomeAlg, RpcErrorAlg};
 use jsonrpsee::Methods;
 use jsonrpsee::core::RegisterMethodError;
 use jsonrpsee::core::server::ResponsePayload;
@@ -64,7 +65,7 @@ impl<Context> JsonrpseeImpl<Context> {
         Args: Send + 'static,
         Output: OutcomeAlg + Send + 'static,
         Output::Value: Serialize + Clone + Send + 'static,
-        Output::Error: Into<ErrorObjectOwned> + Send + 'static,
+        Output::Error: RpcErrorAlg + Send + 'static,
         Handler: ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
         Parse: Fn(Params<'static>) -> Result<Args, ErrorObjectOwned> + Send + Sync + 'static,
     {
@@ -78,7 +79,7 @@ impl<Context> JsonrpseeImpl<Context> {
                 match parse(params) {
                     Ok(args) => match handler.apply(context, args).await.outcome() {
                         Ok(value) => ResponsePayload::success(value),
-                        Err(failure) => ResponsePayload::error(failure),
+                        Err(failure) => ResponsePayload::error(failure.to_rpc_error()),
                     },
                     Err(error) => ResponsePayload::error(error),
                 }
@@ -146,7 +147,7 @@ where
     Args: JsonrpseeArgs + Send + 'static,
     Output: OutcomeAlg + Send + 'static,
     Output::Value: Serialize + Clone + Send + 'static,
-    Output::Error: Into<ErrorObjectOwned> + Send + 'static,
+    Output::Error: RpcErrorAlg + Send + 'static,
 {
     fn finish_jsonrpc_positional_fallible<Handler>(
         &self,
