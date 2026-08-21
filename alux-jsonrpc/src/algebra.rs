@@ -72,6 +72,18 @@ pub trait RpcErrorAlg {
     fn rpc_message(&self) -> String;
 }
 
+/// An error that cannot be constructed converts to nothing, so a method carrying one answers only
+/// with its value. This is how a method keeps the value path inside an ext that converts every error.
+impl RpcErrorAlg for core::convert::Infallible {
+    fn rpc_code(&self) -> i32 {
+        match *self {}
+    }
+
+    fn rpc_message(&self) -> String {
+        match *self {}
+    }
+}
+
 /// Compiles a typed JSON-RPC method whose error answers as a protocol error.
 ///
 /// A method registered here answers with its value or with a JSON-RPC error, so a domain that states
@@ -123,5 +135,19 @@ pub impl<This> This {
         Program: JsonRpcProgramAlg<This>,
     {
         program.compile_jsonrpc(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::RpcErrorAlg;
+    use core::convert::Infallible;
+
+    #[test]
+    fn an_error_that_cannot_be_constructed_states_the_conversion() {
+        fn converts<Error: RpcErrorAlg>() {}
+
+        // This is what keeps a total method on the value path inside an ext that converts.
+        converts::<Infallible>();
     }
 }
