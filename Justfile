@@ -32,10 +32,13 @@ package:
 # Run the whole gate, in the order CI runs it.
 ci: fmt build clippy doc test package
 
-# Every crate inherits `version.workspace`, so one release moves and publishes all of them.
-# Bump and publish the workspace with cargo-release; level is patch, minor, or major.
+# Bump and publish every crate in the workspace; level is patch, minor, or major.
 release level:
     cargo release --workspace {{level}} --execute
+
+# Bump and publish one crate; level is patch, minor, or major.
+release-crate package level:
+    cargo release --package {{package}} {{level}} --execute
 
 # Remove build artifacts.
 clean:
