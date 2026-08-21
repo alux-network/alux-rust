@@ -32,6 +32,57 @@ pub trait JsonRpcMethodAlg<Context, Args, Output> {
         Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
 }
 
+/// Names the two halves of an outcome, so a bound can speak of a failure without spelling it.
+///
+/// A declaration states failability; this is what lets an interpretation name the value it answers
+/// with and the failure it reports, given only the operation's output.
+pub trait OutcomeAlg {
+    /// The value a successful outcome carries.
+    type Value;
+    /// The failure an unsuccessful outcome states.
+    type Error;
+
+    /// Reads the outcome as one or the other.
+    ///
+    /// # Errors
+    ///
+    /// Answers with `Err` when the outcome is the failure the operation stated.
+    fn outcome(self) -> Result<Self::Value, Self::Error>;
+}
+
+impl<Value, Error> OutcomeAlg for Result<Value, Error> {
+    type Value = Value;
+    type Error = Error;
+
+    fn outcome(self) -> Self {
+        self
+    }
+}
+
+/// Compiles a typed JSON-RPC method whose operation can fail.
+///
+/// A method registered here answers with its value or with a JSON-RPC error, so a domain that states
+/// failure in its own vocabulary reaches a caller as a failed call rather than as a successful one
+/// carrying an error-shaped value.
+pub trait JsonRpcFallibleAlg<Context, Args, Output> {
+    /// Registers a fallible handler decoded from positional parameters.
+    fn finish_jsonrpc_positional_fallible<Handler>(&self, name: &'static str, handler: Handler) -> Self::Methods
+    where
+        Self: JsonRpcAlg,
+        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
+
+    /// Registers a fallible handler decoded from named parameters.
+    fn finish_jsonrpc_named_fallible<Handler>(
+        &self,
+        name: &'static str,
+        arg_names: &'static [&'static str],
+        handler: Handler,
+    ) -> Self::Methods
+    where
+        Self: JsonRpcAlg,
+        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
+}
+
 /// Interprets a named, defunctionalized JSON-RPC program with `Compiler`.
 pub trait JsonRpcProgramAlg<Compiler> {
     /// The method collection produced by `Compiler`.

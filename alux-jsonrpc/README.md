@@ -211,7 +211,14 @@ What that buys, and why it is not just tidiness:
   registers it never chooses a method name.
 
 Positional parameters are the default. `.named()` decodes a JSON object using the argument names
-retained by `alux-ext`.
+retained by `alux-ext`. An argument the request leaves out reads as absent, which only an optional
+argument accepts, so a positional array may stop short of the product and a parameter object may omit
+a name.
+
+`.fallible()` states that an operation can fail, so its `Result` answers with a value or with a
+JSON-RPC error rather than with a success carrying an error-shaped value. The domain keeps stating
+failure in its own vocabulary; only its statement of what that failure denotes at the boundary is
+transport-facing.
 
 [`alux-jsonrpc-jsonrpsee`](https://docs.rs/alux-jsonrpc-jsonrpsee) compiles the same program into
 jsonrpsee `Methods`.

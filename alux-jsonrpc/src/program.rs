@@ -1,4 +1,4 @@
-use crate::{JsonRpcAlg, JsonRpcApiAlg, JsonRpcMethodAlg, JsonRpcProgramAlg};
+use crate::{JsonRpcAlg, JsonRpcApiAlg, JsonRpcFallibleAlg, JsonRpcMethodAlg, JsonRpcProgramAlg};
 use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use core::marker::PhantomData;
 
@@ -33,6 +33,14 @@ pub struct Positional;
 /// Selects named JSON-RPC parameter decoding.
 #[derive(Debug, Default)]
 pub struct NamedParams;
+
+/// Selects positional decoding for a method whose operation can fail.
+#[derive(Debug, Default)]
+pub struct FalliblePositional;
+
+/// Selects named decoding for a method whose operation can fail.
+#[derive(Debug, Default)]
+pub struct FallibleNamed;
 
 /// Represents one named JSON-RPC method without choosing an interpreter.
 #[derive(Debug)]
@@ -96,18 +104,45 @@ impl<Program> JsonRpcProgram<Program> {
 }
 
 impl<Handler, Params> Operation<Handler, Params> {
+    /// Reads this declaration under another parameter or failure mode.
+    fn retyped<Mode>(self) -> Operation<Handler, Mode> {
+        Operation { handler: self.handler, marker: PhantomData }
+    }
+}
+
+impl<Handler> Operation<Handler, Positional> {
     /// Selects positional parameter decoding for this operation declaration.
     ///
     /// Positional decoding is already the default, so this modifier is useful
     /// when a declaration benefits from making the wire shape explicit.
-    pub fn positional(self) -> Operation<Handler> {
-        Operation { handler: self.handler, marker: PhantomData }
+    #[must_use]
+    pub fn positional(self) -> Self {
+        self
     }
 
     /// Selects named parameter decoding using the defunctionalized operation's
     /// source argument names.
     pub fn named(self) -> Operation<Handler, NamedParams> {
-        Operation { handler: self.handler, marker: PhantomData }
+        self.retyped()
+    }
+
+    /// States that the operation can fail, so its error answers as a JSON-RPC error.
+    pub fn fallible(self) -> Operation<Handler, FalliblePositional> {
+        self.retyped()
+    }
+}
+
+impl<Handler> Operation<Handler, NamedParams> {
+    /// States that the operation can fail, so its error answers as a JSON-RPC error.
+    pub fn fallible(self) -> Operation<Handler, FallibleNamed> {
+        self.retyped()
+    }
+}
+
+impl<Handler> Operation<Handler, FalliblePositional> {
+    /// Selects named parameter decoding, keeping the failure mode.
+    pub fn named(self) -> Operation<Handler, FallibleNamed> {
+        self.retyped()
     }
 }
 
@@ -147,59 +182,60 @@ where
     }
 }
 
-trait ParamsAlg {
-    fn finish<Compiler, Context, Args, Output, Handler>(
-        compiler: &Compiler,
-        name: &'static str,
-        arg_names: &'static [&'static str],
-        handler: Handler,
-    ) -> Compiler::Methods
-    where
-        Compiler: JsonRpcAlg + JsonRpcMethodAlg<Context, Args, Output>,
-        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
-}
-
-impl ParamsAlg for Positional {
-    fn finish<Compiler, Context, Args, Output, Handler>(
-        compiler: &Compiler,
-        name: &'static str,
-        _arg_names: &'static [&'static str],
-        handler: Handler,
-    ) -> Compiler::Methods
-    where
-        Compiler: JsonRpcAlg + JsonRpcMethodAlg<Context, Args, Output>,
-        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static,
-    {
-        compiler.finish_jsonrpc_positional_method(name, handler)
-    }
-}
-
-impl ParamsAlg for NamedParams {
-    fn finish<Compiler, Context, Args, Output, Handler>(
-        compiler: &Compiler,
-        name: &'static str,
-        arg_names: &'static [&'static str],
-        handler: Handler,
-    ) -> Compiler::Methods
-    where
-        Compiler: JsonRpcAlg + JsonRpcMethodAlg<Context, Args, Output>,
-        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static,
-    {
-        compiler.finish_jsonrpc_named_method(name, arg_names, handler)
-    }
-}
-
-impl<Compiler, Handler, Params, Handle> CompileJsonRpcProgram<Compiler> for Method<Handler, Params>
+// One implementation per mode, so each states the capability its registration needs and no mode is
+// reachable through another's bounds.
+impl<Compiler, Handler, Handle> CompileJsonRpcProgram<Compiler> for Method<Handler, Positional>
 where
     Compiler: JsonRpcApiAlg
         + HandlerContextAlg<Handler::Context, Handle = Handle>
         + JsonRpcMethodAlg<Handle, Handler::Args, Handler::Output>,
     Handler: OperationAlg + ApplyAlg<Handle, Handler::Args> + Send + Sync + 'static,
-    Params: ParamsAlg,
 {
     type Methods = Compiler::Methods;
 
     fn compile_jsonrpc_program(self, compiler: &Compiler) -> Self::Methods {
-        Params::finish(compiler, self.name, Handler::ARG_NAMES, self.handler)
+        compiler.finish_jsonrpc_positional_method(self.name, self.handler)
+    }
+}
+
+impl<Compiler, Handler, Handle> CompileJsonRpcProgram<Compiler> for Method<Handler, NamedParams>
+where
+    Compiler: JsonRpcApiAlg
+        + HandlerContextAlg<Handler::Context, Handle = Handle>
+        + JsonRpcMethodAlg<Handle, Handler::Args, Handler::Output>,
+    Handler: OperationAlg + ApplyAlg<Handle, Handler::Args> + Send + Sync + 'static,
+{
+    type Methods = Compiler::Methods;
+
+    fn compile_jsonrpc_program(self, compiler: &Compiler) -> Self::Methods {
+        compiler.finish_jsonrpc_named_method(self.name, Handler::ARG_NAMES, self.handler)
+    }
+}
+
+impl<Compiler, Handler, Handle> CompileJsonRpcProgram<Compiler> for Method<Handler, FalliblePositional>
+where
+    Compiler: JsonRpcApiAlg
+        + HandlerContextAlg<Handler::Context, Handle = Handle>
+        + JsonRpcFallibleAlg<Handle, Handler::Args, Handler::Output>,
+    Handler: OperationAlg + ApplyAlg<Handle, Handler::Args> + Send + Sync + 'static,
+{
+    type Methods = Compiler::Methods;
+
+    fn compile_jsonrpc_program(self, compiler: &Compiler) -> Self::Methods {
+        compiler.finish_jsonrpc_positional_fallible(self.name, self.handler)
+    }
+}
+
+impl<Compiler, Handler, Handle> CompileJsonRpcProgram<Compiler> for Method<Handler, FallibleNamed>
+where
+    Compiler: JsonRpcApiAlg
+        + HandlerContextAlg<Handler::Context, Handle = Handle>
+        + JsonRpcFallibleAlg<Handle, Handler::Args, Handler::Output>,
+    Handler: OperationAlg + ApplyAlg<Handle, Handler::Args> + Send + Sync + 'static,
+{
+    type Methods = Compiler::Methods;
+
+    fn compile_jsonrpc_program(self, compiler: &Compiler) -> Self::Methods {
+        compiler.finish_jsonrpc_named_fallible(self.name, Handler::ARG_NAMES, self.handler)
     }
 }

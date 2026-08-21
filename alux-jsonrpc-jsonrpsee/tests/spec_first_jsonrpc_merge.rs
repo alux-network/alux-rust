@@ -11,7 +11,7 @@ use alux_jsonrpc::{JsonRpcApiAlg, JsonRpcProgramExt, jsonrpc};
 use alux_jsonrpc_jsonrpsee::JsonrpseeImpl;
 use common::{
     App, ItemsAlg, JsonrpcItemsCurrentOperation, JsonrpcStatusAdjustedOperation, JsonrpcStatusCurrentOperation,
-    StatusAlg,
+    JsonrpcStatusHistoryOperation, JsonrpcStatusOffsetOperation, StatusAlg,
 };
 use expect::expect_example_rpc;
 
@@ -32,6 +32,10 @@ where
             .method("status_set_temp", self.op(Alg::jsonrpc_status_adjusted).positional())
             // The same operation, decoded from a JSON object using the authored argument names.
             .method("status_set_temp_named", self.op(Alg::jsonrpc_status_adjusted).named())
+            // An adjustment whose offset the caller may leave out.
+            .method("status_set_temp_offset", self.op(Alg::jsonrpc_status_offset))
+            // A reading that fails, so its error answers as a JSON-RPC error.
+            .method("status_history", self.op(Alg::jsonrpc_status_history).fallible())
     }
 }
 

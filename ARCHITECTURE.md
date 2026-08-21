@@ -225,7 +225,13 @@ composition; `CompileJsonRpcProgram` folds the result through `JsonRpcAlg` and `
 
 Positional parameters are the default. `.named()` selects object decoding using `ARG_NAMES` from the
 operation. Heterogeneous Rust argument products remain typed even though JSON-RPC positional input is
-a JSON array and named input is a JSON object.
+a JSON array and named input is a JSON object. An argument a request leaves out reads as absent, which
+only an optional argument accepts.
+
+`.fallible()` is the other distinction a method can carry: whether it can fail. It selects
+`JsonRpcFallibleAlg` instead of `JsonRpcMethodAlg`, so an operation's `Result` answers as a JSON-RPC
+error rather than as a success carrying an error-shaped value. Failability belongs to the program
+because it is part of what the surface promises, not an accident of a Rust type.
 
 `JsonrpseeImpl`, published as `alux-jsonrpc-jsonrpsee`, owns deserialization, method registration,
 context sharing, application, serialization, and boundary error conversion. These are jsonrpsee

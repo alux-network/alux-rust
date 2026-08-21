@@ -12,6 +12,10 @@ let rpc = JsonrpseeImpl::new(App::new());
 let methods = rpc.compile_jsonrpc(rpc.status_rpc::<App>())?;
 ```
 
+A method declared `.fallible()` answers with its value or with the error its `Result` carries, so the
+interpreter needs `Into<ErrorObjectOwned>` for that error. Every other method answers with any value
+`serde` can serialize.
+
 `RpcCtx` carries a semantic context when a native `#[rpc(server)]` trait is implemented instead, and
 `ResultToRpcExt` converts semantic errors at the boundary. A shared scenario in `tests/` runs one
 expectation against both the specification-first program and a native jsonrpsee service.

@@ -28,9 +28,17 @@ trait ExampleRpc {
     #[method(name = "status_set_temp_named", param_kind = map)]
     async fn set_temp_named(&self, temp: f32) -> RpcResult<u32>;
 
+    /// Answers `status_set_temp_offset` with an offset the caller may leave out.
+    #[method(name = "status_set_temp_offset")]
+    async fn set_temp_offset(&self, temp: f32, offset: Option<f32>) -> RpcResult<u32>;
+
     /// Answers `items_current` with every item the domain holds.
     #[method(name = "items_current")]
     async fn items(&self) -> RpcResult<Vec<String>>;
+
+    /// Answers `status_history` with the failure the domain states.
+    #[method(name = "status_history")]
+    async fn history(&self) -> RpcResult<u32>;
 }
 
 #[async_trait]
@@ -50,8 +58,16 @@ where
         Ok(self.jsonrpc_status_adjusted(temp).await)
     }
 
+    async fn set_temp_offset(&self, temp: f32, offset: Option<f32>) -> RpcResult<u32> {
+        Ok(self.jsonrpc_status_offset(temp, offset).await)
+    }
+
     async fn items(&self) -> RpcResult<Vec<String>> {
         Ok(self.jsonrpc_items_current().await)
+    }
+
+    async fn history(&self) -> RpcResult<u32> {
+        self.jsonrpc_status_history().await.map_err(Into::into)
     }
 }
 

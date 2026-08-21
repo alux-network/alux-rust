@@ -12,7 +12,28 @@
 #![allow(async_fn_in_trait)]
 
 use alux_ext::ext;
+use alux_jsonrpc_jsonrpsee::rpc_error;
+use core::fmt::{self, Display};
 use core::future::Future;
+use jsonrpsee::types::ErrorObjectOwned;
+
+/// The one reason this domain fails: it keeps no history.
+#[derive(Debug)]
+pub struct NoHistory;
+
+impl Display for NoHistory {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("the domain keeps no history")
+    }
+}
+
+/// The domain's one statement about a transport: which JSON-RPC error its failure denotes. Nothing
+/// else in this file names a transport.
+impl From<NoHistory> for ErrorObjectOwned {
+    fn from(failure: NoHistory) -> Self {
+        rpc_error(-32000, failure.to_string(), None::<()>)
+    }
+}
 
 /// Reads and adjusts the status of whatever the domain observes.
 pub trait StatusAlg {
@@ -48,6 +69,16 @@ where
     /// Returns the status after adjusting the temperature.
     async fn jsonrpc_status_adjusted(&self, temp: f32) -> This::Status {
         self.status_set_temp(temp).await
+    }
+
+    /// Returns the status after adjusting by an offset the caller may leave out.
+    async fn jsonrpc_status_offset(&self, temp: f32, offset: Option<f32>) -> This::Status {
+        self.status_set_temp(temp + offset.unwrap_or_default()).await
+    }
+
+    /// Returns the reading this domain does not keep, stating its own failure.
+    async fn jsonrpc_status_history(&self) -> Result<This::Status, NoHistory> {
+        Err(NoHistory)
     }
 }
 

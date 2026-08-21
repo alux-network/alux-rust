@@ -10,21 +10,41 @@ use crate::syntax::{Reified, lift_operation};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::visit_mut::{self, VisitMut};
-use syn::{ExprMethodCall, Ident, ImplItemFn, parse_quote};
+use syn::{Expr, ExprMethodCall, Ident, ImplItemFn, parse_quote};
 
 /// Interprets the shared lowering as a JSON-RPC method program.
 struct JsonRpcBackend;
 
+/// Carries one method's operation and whether the declaration says it can fail.
+struct MethodRequirement {
+    reified: Reified,
+    fallible: bool,
+}
+
+/// Reads whether a declaration selects the failure mode.
+fn is_fallible(declaration: &Expr) -> bool {
+    let mut current = declaration;
+    loop {
+        let Expr::MethodCall(call) = current else { return false };
+        if call.method == "fallible" {
+            return true;
+        }
+        current = &call.receiver;
+    }
+}
+
 /// Finds the method declarations of a JSON-RPC program.
-struct Methods<'a>(&'a mut Vec<Reified>);
+struct Methods<'a>(&'a mut Vec<MethodRequirement>);
 
 impl VisitMut for Methods<'_> {
     fn visit_expr_method_call_mut(&mut self, call: &mut ExprMethodCall) {
         if call.method == "method"
             && let Some(declaration) = call.args.iter_mut().nth(1)
-            && let Some(reified) = lift_operation(declaration)
         {
-            self.0.push(reified);
+            let fallible = is_fallible(declaration);
+            if let Some(reified) = lift_operation(declaration) {
+                self.0.push(MethodRequirement { reified, fallible });
+            }
         }
         visit_mut::visit_expr_method_call_mut(self, call);
     }
@@ -40,8 +60,8 @@ impl ProgramBackendAlg for JsonRpcBackend {
         let where_clause = method.sig.generics.make_where_clause();
         // One handle obligation per distinct domain, however many operations name it.
         let mut carriers: Vec<Ident> = Vec::new();
-        for reified in &operations {
-            let carrier = &reified.carrier;
+        for requirement in &operations {
+            let carrier = &requirement.reified.carrier;
             if !carriers.contains(carrier) {
                 carriers.push(carrier.clone());
             }
@@ -49,7 +69,7 @@ impl ProgramBackendAlg for JsonRpcBackend {
         for carrier in carriers {
             where_clause.predicates.push(parse_quote!(This: ::alux_ext::HandlerContextAlg<#carrier>));
         }
-        for Reified { operation, carrier } in operations {
+        for MethodRequirement { reified: Reified { operation, carrier }, fallible } in operations {
             where_clause.predicates.push(parse_quote! {
                 #operation: ::alux_ext::OperationAlg<Context = #carrier>
                     + ::alux_ext::ApplyAlg<
@@ -58,8 +78,15 @@ impl ProgramBackendAlg for JsonRpcBackend {
                     >
                     + Send + Sync + 'static
             });
+            // A fallible declaration answers with a value or a failure, so it needs the registration
+            // that can report one; every other method needs the registration that answers with a value.
+            let registration = if fallible {
+                quote!(::alux_jsonrpc::JsonRpcFallibleAlg)
+            } else {
+                quote!(::alux_jsonrpc::JsonRpcMethodAlg)
+            };
             where_clause.predicates.push(parse_quote! {
-                This: ::alux_jsonrpc::JsonRpcMethodAlg<
+                This: #registration<
                     <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
                     <#operation as ::alux_ext::OperationAlg>::Args,
                     <#operation as ::alux_ext::ApplyAlg<
