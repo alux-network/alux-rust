@@ -16,6 +16,9 @@ just clippy
 just doc
 ```
 
+`just ci` runs the whole gate, and the [`Justfile`](Justfile) holds the full command every recipe
+stands for.
+
 Dependencies belong in the root workspace manifest. Member crates inherit them with
 `dependency.workspace = true`. Framework dependencies must remain optional and disabled by default.
 
