@@ -1,6 +1,6 @@
 [package]
 name = "alux-http"
-version.workspace = true
+version = "0.1.1"
 description = "Composable, interpreter-independent HTTP programs for meaning-first Rust design"
 documentation = "https://docs.rs/alux-http"
 authors.workspace = true

@@ -1,0 +1,22 @@
+[package]
+name = "alux-http-text"
+version = "0.1.1"
+description = "Text and metadata interpretation of ALUX typed HTTP programs"
+documentation = "https://docs.rs/alux-http-text"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-http.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true

@@ -13,12 +13,14 @@ mod ext;
 mod http_program;
 mod jsonrpc_program;
 mod lower;
+mod shape_program;
 mod syntax;
 
 use ext::ext_internal;
 use http_program::http_program_defunc_internal;
 use jsonrpc_program::jsonrpc_program_defunc_internal;
 use proc_macro::TokenStream;
+use shape_program::shape_program_defunc_internal;
 
 /// Declares extension methods and optionally gives each method a first-order operation type.
 ///
@@ -146,4 +148,49 @@ pub fn http(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn jsonrpc(attr: TokenStream, item: TokenStream) -> TokenStream {
     jsonrpc_program_defunc_internal(attr.into(), item.into()).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Lowers extension methods into named, composable shape programs.
+///
+/// This is the shape backend that `alux_ext::ext(..., defunc(via = shape))` selects. `via = shape`
+/// resolves the name in the authoring scope, so a declaration imports it as `use alux_shape::shape`.
+/// Applying the attribute directly means the same thing.
+///
+/// Each method becomes a first-order shape program named after the method, with a `_shape` suffix
+/// dropped. An identifier in name position states the words that name a member, splitting on `_`; a
+/// string literal there states a name no identifier spells. The record the declaration opens is named
+/// and closed by the expansion, so no declaration writes a name for it, a closing call, or a return
+/// type. A call to another method of the same extension becomes a nested program.
+///
+/// A shape body applies no handler — it reads the algebra through the same `self` the author wrote —
+/// so the bounds the impl states are the whole requirement, and no per-member evidence is generated.
+///
+/// The expansion adds no imports, because a declaration's `use` list is the author's. So everything a
+/// body reads must already be in scope: the algebra, and any extension the body derives its vocabulary
+/// from — `ShapeTaggedExt` for a tagged encoding, whatever ext states a leaf vocabulary of its own.
+/// `shape` itself must be in scope too, or `defunc(via = shape)` resolves to nothing: neither
+/// attribute expands, the authored block reaches the compiler as written, and the errors read
+/// `visibility qualifiers are not permitted here` on the `pub impl` followed by `cannot find value`
+/// for every member name. Nothing in that points at the missing import.
+///
+/// ```ignore
+/// use alux_ext::ext;
+/// use alux_shape::{FieldAlg, ShapeAlg, shape};
+///
+/// #[ext(name = UserShapeExt, defunc(via = shape))]
+/// pub impl<This> This
+/// where
+///     This: ShapeAlg + FieldAlg,
+/// {
+///     /// A user, as a surface answers one.
+///     fn user_shape(&self) {
+///         self.record().field(display_name, self.text()).field(email, self.opt(self.text()))
+///     }
+/// }
+///
+/// // The expansion also defines `UserShapeProgram`.
+/// ```
+#[proc_macro_attribute]
+pub fn shape(attr: TokenStream, item: TokenStream) -> TokenStream {
+    shape_program_defunc_internal(attr.into(), item.into()).unwrap_or_else(syn::Error::into_compile_error).into()
 }

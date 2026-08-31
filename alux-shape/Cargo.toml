@@ -1,0 +1,22 @@
+[package]
+name = "alux-shape"
+version = "0.1.0"
+description = "Data shapes as a first-order program, independent of any encoder"
+documentation = "https://docs.rs/alux-shape"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Internal dependencies
+alux-shape-macros.workspace = true
+
+# External dependencies
+alux-ext.workspace = true

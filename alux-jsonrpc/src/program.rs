@@ -194,7 +194,7 @@ where
     type Methods = Compiler::Methods;
 
     fn compile_jsonrpc_program(self, compiler: &Compiler) -> Self::Methods {
-        compiler.finish_jsonrpc_positional_method(self.name, self.handler)
+        compiler.finish_jsonrpc_positional_method(self.name, Handler::ARG_NAMES, self.handler)
     }
 }
 
@@ -222,7 +222,7 @@ where
     type Methods = Compiler::Methods;
 
     fn compile_jsonrpc_program(self, compiler: &Compiler) -> Self::Methods {
-        compiler.finish_jsonrpc_positional_fallible(self.name, self.handler)
+        compiler.finish_jsonrpc_positional_fallible(self.name, Handler::ARG_NAMES, self.handler)
     }
 }
 

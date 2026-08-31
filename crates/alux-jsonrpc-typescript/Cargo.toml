@@ -1,0 +1,27 @@
+[package]
+name = "alux-jsonrpc-typescript"
+version = "0.1.0"
+description = "TypeScript client interpretation of ALUX typed JSON-RPC programs"
+documentation = "https://docs.rs/alux-jsonrpc-typescript"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Internal dependencies
+alux-shape.workspace = true
+alux-shape-typescript.workspace = true
+
+# External dependencies
+alux-ext.workspace = true
+alux-jsonrpc.workspace = true
+
+[dev-dependencies]
+serde.workspace = true

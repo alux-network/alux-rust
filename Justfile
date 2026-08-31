@@ -22,12 +22,26 @@ doc:
 # Check that each crate packages cleanly, listed in publication order.
 package:
     cargo package --list -p alux-ext-macros > /dev/null
+    cargo package --list -p alux-sdk-macros > /dev/null
     cargo package --list -p alux-ext > /dev/null
     cargo package --list -p alux-http > /dev/null
     cargo package --list -p alux-jsonrpc > /dev/null
+    cargo package --list -p alux-traversable > /dev/null
+    cargo package --list -p alux-sdk > /dev/null
+    cargo package --list -p alux-shape-macros > /dev/null
+    cargo package --list -p alux-shape > /dev/null
+    cargo package --list -p alux-shape-json > /dev/null
+    cargo package --list -p alux-shape-text > /dev/null
+    cargo package --list -p alux-shape-typescript > /dev/null
+    cargo package --list -p alux-shape-rust > /dev/null
+    cargo package --list -p alux-shape-term > /dev/null
+    cargo package --list -p alux-shape-morph > /dev/null
     cargo package --list -p alux-http-text > /dev/null
     cargo package --list -p alux-http-poem > /dev/null
+    cargo package --list -p alux-jsonrpc-direct > /dev/null
     cargo package --list -p alux-jsonrpc-jsonrpsee > /dev/null
+    cargo package --list -p alux-tokio > /dev/null
+    cargo package --list -p alux-jsonrpc-typescript > /dev/null
 
 # Run the whole gate, in the order CI runs it.
 ci: fmt build clippy doc test package

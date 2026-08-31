@@ -75,16 +75,16 @@ Do not begin with generated tokens or a framework callback merely because it is 
 The CI-equivalent commands are:
 
 ```sh
-cargo fmt --all -- --check
-cargo build --workspace --all-features --all-targets
-cargo clippy --workspace --all-features --all-targets -- -D warnings
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps
-cargo nextest run --workspace --all-features --no-fail-fast
-cargo test --workspace --all-features --doc
+just fmt
+just build
+just clippy
+just doc
+just test
+just package
 ```
 
-The `Justfile` provides these workflows. Run the narrowest relevant test during development and
-`just ci` before finishing.
+`just ci` runs all six in that order. The [`Justfile`](Justfile) holds the full command every recipe
+stands for. Run the narrowest relevant test during development and `just ci` before finishing.
 
 ## Design by Meaning
 

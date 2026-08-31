@@ -1,0 +1,27 @@
+[package]
+name = "alux-shape-term"
+version = "0.1.0"
+description = "Term interpretation of ALUX data shapes, folding a shape into itself"
+documentation = "https://docs.rs/alux-shape-term"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Internal dependencies
+alux-shape.workspace = true
+
+# External dependencies
+serde.workspace = true
+
+[dev-dependencies]
+alux-shape-json.workspace = true
+alux-shape-text.workspace = true
+serde_json.workspace = true

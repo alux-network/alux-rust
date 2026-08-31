@@ -1,0 +1,18 @@
+[package]
+name = "alux-traversable"
+description = "Traversable operations over Option and iterators, sequencing the Result effect"
+documentation = "https://docs.rs/alux-traversable"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[dependencies]
+alux-ext.workspace = true
+
+[lints]
+workspace = true

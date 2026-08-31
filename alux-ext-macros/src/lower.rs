@@ -97,6 +97,8 @@ where
     let program_type =
         if type_arguments.is_empty() { quote!(#program) } else { quote!(#program<#(#type_arguments),*>) };
     let marker = if type_arguments.is_empty() { quote!(()) } else { quote!(fn() -> (#(#type_arguments,)*)) };
+    // A declaration that introduces no parameter defines a plain type, not one with an empty list.
+    let parameters = if type_params.is_empty() { quote!() } else { quote!(<#(#type_params),*>) };
 
     // The authored method keeps its name and parameters but now returns the program value.
     let mut constructor = method.clone();
@@ -133,9 +135,9 @@ where
     let generated = quote! {
         #(#documentation)*
         #[doc(hidden)]
-        #visibility struct #program<#(#type_params),*>(core::marker::PhantomData<#marker>);
+        #visibility struct #program #parameters (core::marker::PhantomData<#marker>);
 
-        impl<#(#type_params),*> core::default::Default for #program_type {
+        impl #parameters core::default::Default for #program_type {
             fn default() -> Self {
                 Self(core::marker::PhantomData)
             }

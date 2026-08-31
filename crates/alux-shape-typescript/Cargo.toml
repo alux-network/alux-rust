@@ -1,0 +1,22 @@
+[package]
+name = "alux-shape-typescript"
+version = "0.1.0"
+description = "TypeScript interpretation of ALUX data shapes"
+documentation = "https://docs.rs/alux-shape-typescript"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Internal dependencies
+alux-shape.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
