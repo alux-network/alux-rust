@@ -1,6 +1,6 @@
 [package]
 name = "alux-ext-macros"
-version = "0.1.4"
+version = "0.1.5"
 description = "Procedural macros for ALUX first-order extension and transport programs"
 documentation = "https://docs.rs/alux-ext-macros"
 authors.workspace = true
