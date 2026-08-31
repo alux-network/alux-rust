@@ -22,9 +22,12 @@ doc:
 # Check that each crate packages cleanly, listed in publication order.
 package:
     cargo package --list -p alux-ext-macros > /dev/null
+    cargo package --list -p alux-sdk-macros > /dev/null
     cargo package --list -p alux-ext > /dev/null
     cargo package --list -p alux-http > /dev/null
     cargo package --list -p alux-jsonrpc > /dev/null
+    cargo package --list -p alux-traversable > /dev/null
+    cargo package --list -p alux-sdk > /dev/null
     cargo package --list -p alux-http-text > /dev/null
     cargo package --list -p alux-http-poem > /dev/null
     cargo package --list -p alux-jsonrpc-jsonrpsee > /dev/null

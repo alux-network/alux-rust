@@ -5,6 +5,9 @@ members = [
     "alux-ext-macros",
     "alux-http",
     "alux-jsonrpc",
+    "alux-sdk",
+    "alux-sdk-macros",
+    "alux-traversable",
 
     "crates/alux-http-poem",
     "crates/alux-http-text",
@@ -28,6 +31,9 @@ alux-http-poem = { path = "crates/alux-http-poem" }
 alux-http-text = { path = "crates/alux-http-text" }
 alux-jsonrpc = { version = "0.1", path = "alux-jsonrpc" }
 alux-jsonrpc-jsonrpsee = { path = "crates/alux-jsonrpc-jsonrpsee" }
+alux-sdk = { version = "0.1", path = "alux-sdk" }
+alux-sdk-macros = { version = "0.1", path = "alux-sdk-macros" }
+alux-traversable = { version = "0.1", path = "alux-traversable" }
 
 anyhow = "1"
 derive_more = { version = "2", features = ["deref", "deref_mut", "from"] }

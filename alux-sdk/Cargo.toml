@@ -1,0 +1,26 @@
+[package]
+name = "alux-sdk"
+description = "Domain-neutral Rust extensions for ALUX and downstream workspaces"
+documentation = "https://docs.rs/alux-sdk"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[dependencies]
+alux-ext.workspace = true
+alux-sdk-macros.workspace = true
+alux-traversable.workspace = true
+paste.workspace = true
+
+[dev-dependencies]
+mockall.workspace = true
+tokio = { workspace = true, features = ["macros", "rt", "sync"] }
+proptest.workspace = true
+
+[lints]
+workspace = true
