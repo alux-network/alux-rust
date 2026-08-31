@@ -1,0 +1,25 @@
+[package]
+name = "alux-jsonrpc-direct"
+version = "0.1.0"
+description = "Direct JSON-RPC 2.0 interpretation of ALUX typed JSON-RPC programs"
+documentation = "https://docs.rs/alux-jsonrpc-direct"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-jsonrpc.workspace = true
+derive-new.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
