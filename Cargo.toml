@@ -39,7 +39,7 @@ alux-ext-macros = { version = "0.1", path = "alux-ext-macros" }
 alux-http = { version = "0.1", path = "alux-http" }
 alux-http-poem = { path = "crates/alux-http-poem" }
 alux-http-text = { path = "crates/alux-http-text" }
-alux-jsonrpc = { version = "0.1", path = "alux-jsonrpc" }
+alux-jsonrpc = { version = "0.2", path = "alux-jsonrpc" }
 alux-jsonrpc-direct = { path = "crates/alux-jsonrpc-direct" }
 alux-jsonrpc-jsonrpsee = { path = "crates/alux-jsonrpc-jsonrpsee" }
 alux-jsonrpc-typescript = { path = "crates/alux-jsonrpc-typescript" }

@@ -1,6 +1,6 @@
 [package]
 name = "alux-jsonrpc"
-version = "0.1.2"
+version = "0.2.0"
 description = "Composable, interpreter-independent JSON-RPC programs for meaning-first Rust design"
 documentation = "https://docs.rs/alux-jsonrpc"
 authors.workspace = true
