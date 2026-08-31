@@ -15,7 +15,16 @@ pub trait JsonRpcAlg {
 /// Compiles a typed JSON-RPC method declaration supported by an interpreter.
 pub trait JsonRpcMethodAlg<Context, Args, Output> {
     /// Registers a first-order handler decoded from positional parameters.
-    fn finish_jsonrpc_positional_method<Handler>(&self, name: &'static str, handler: Handler) -> Self::Methods
+    ///
+    /// The argument names are stated even though positional decoding reads by position, because they
+    /// are part of what the method promises: an interpretation that describes or generates a client
+    /// can name the parameters a caller passes, whichever way the wire carries them.
+    fn finish_jsonrpc_positional_method<Handler>(
+        &self,
+        name: &'static str,
+        arg_names: &'static [&'static str],
+        handler: Handler,
+    ) -> Self::Methods
     where
         Self: JsonRpcAlg,
         Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
@@ -92,7 +101,14 @@ impl RpcErrorAlg for core::convert::Infallible {
 /// [`RpcErrorAlg`] says what the failing half denotes.
 pub trait JsonRpcFallibleAlg<Context, Args, Output> {
     /// Registers a fallible handler decoded from positional parameters.
-    fn finish_jsonrpc_positional_fallible<Handler>(&self, name: &'static str, handler: Handler) -> Self::Methods
+    ///
+    /// The argument names are stated for the same reason as on [`JsonRpcMethodAlg`].
+    fn finish_jsonrpc_positional_fallible<Handler>(
+        &self,
+        name: &'static str,
+        arg_names: &'static [&'static str],
+        handler: Handler,
+    ) -> Self::Methods
     where
         Self: JsonRpcAlg,
         Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
