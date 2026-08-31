@@ -29,11 +29,11 @@ level of the repository.
 
 | Crate | | Responsibility |
 | --- | --- | --- |
-| [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs, independent of a web framework |
-| [`alux-jsonrpc`](alux-jsonrpc) | [![crates.io][v-rpc]][c-rpc] [![docs.rs][d-rpc]][r-rpc] | JSON-RPC programs, independent of an RPC framework |
-| [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, independent of any encoder<br>The derive reading a shape out of a layout |
-| [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and the macros that lower it |
-| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](alux-sdk-macros)<br>[`alux-traversable`](alux-traversable) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros]<br>[![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | Transformations kept as expressions<br>The macros it exports<br>`traverse` over `Option` and iterators, re-exported by `alux-sdk` |
+| [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs, no web framework |
+| [`alux-jsonrpc`](alux-jsonrpc) | [![crates.io][v-rpc]][c-rpc] [![docs.rs][d-rpc]][r-rpc] | JSON-RPC programs, no RPC framework |
+| [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, no encoder<br>The derive reading one out of a layout |
+| [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
+| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](alux-sdk-macros)<br>[`alux-traversable`](alux-traversable) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros]<br>[![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | Transformations kept as expressions<br>The macros it exports<br>`traverse` over `Option` and iterators |
 
 ## Interpretations
 
@@ -48,9 +48,9 @@ specification never names one of these, which is what lets the same statement ha
 | [`alux-http-poem`](crates/alux-http-poem) | [![crates.io][v-poem]][c-poem] [![docs.rs][d-poem]][r-poem] | executable Poem routes |
 | [`alux-http-text`](crates/alux-http-text) | [![crates.io][v-text]][c-text] [![docs.rs][d-text]][r-text] | documentation or metadata |
 | [`alux-jsonrpc-jsonrpsee`](crates/alux-jsonrpc-jsonrpsee) | [![crates.io][v-rpsee]][c-rpsee] [![docs.rs][d-rpsee]][r-rpsee] | jsonrpsee `Methods` |
-| [`alux-jsonrpc-direct`](crates/alux-jsonrpc-direct) | [![crates.io][v-direct]][c-direct] [![docs.rs][d-direct]][r-direct] | a JSON-RPC 2.0 message handler, with no framework |
+| [`alux-jsonrpc-direct`](crates/alux-jsonrpc-direct) | [![crates.io][v-direct]][c-direct] [![docs.rs][d-direct]][r-direct] | a message handler, no framework |
 | [`alux-jsonrpc-typescript`](crates/alux-jsonrpc-typescript) | [![crates.io][v-rpc-ts]][c-rpc-ts] [![docs.rs][d-rpc-ts]][r-rpc-ts] | a TypeScript client module |
-| [`alux-tokio`](crates/alux-tokio) | [![crates.io][v-tokio]][c-tokio] [![docs.rs][d-tokio]][r-tokio] | delivery over bounded Tokio channels |
+| [`alux-tokio`](crates/alux-tokio) | [![crates.io][v-tokio]][c-tokio] [![docs.rs][d-tokio]][r-tokio] | bounded Tokio channels |
 
 ### Of a data shape
 
@@ -61,7 +61,7 @@ specification never names one of these, which is what lets the same statement ha
 | [`alux-shape-json`](crates/alux-shape-json) | [![crates.io][v-shape-json]][c-shape-json] [![docs.rs][d-shape-json]][r-shape-json] | a decision about a JSON value |
 | [`alux-shape-text`](crates/alux-shape-text) | [![crates.io][v-shape-text]][c-shape-text] [![docs.rs][d-shape-text]][r-shape-text] | a readable description |
 | [`alux-shape-term`](crates/alux-shape-term) | [![crates.io][v-shape-term]][c-shape-term] [![docs.rs][d-shape-term]][r-shape-term] | the term itself |
-| [`alux-shape-morph`](crates/alux-shape-morph) | [![crates.io][v-shape-morph]][c-shape-morph] [![docs.rs][d-shape-morph]][r-shape-morph] | another shape, by standing between |
+| [`alux-shape-morph`](crates/alux-shape-morph) | [![crates.io][v-shape-morph]][c-shape-morph] [![docs.rs][d-shape-morph]][r-shape-morph] | another shape |
 
 ## Semantic shape
 
