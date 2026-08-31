@@ -1,0 +1,22 @@
+[package]
+name = "alux-shape-macros"
+version = "0.1.0"
+description = "Procedural macros reading a shape out of a Rust layout"
+documentation = "https://docs.rs/alux-shape-macros"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+# External dependencies
+proc-macro2.workspace = true
+quote.workspace = true
+syn = { workspace = true, features = ["full", "visit", "visit-mut"] }

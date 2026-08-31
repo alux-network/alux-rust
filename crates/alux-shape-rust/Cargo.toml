@@ -1,0 +1,30 @@
+[package]
+name = "alux-shape-rust"
+version = "0.1.0"
+description = "Rust layout interpretation of ALUX data shapes"
+documentation = "https://docs.rs/alux-shape-rust"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Internal dependencies
+alux-shape.workspace = true
+
+# External dependencies
+serde.workspace = true
+
+[dev-dependencies]
+alux-shape-text.workspace = true
+serde_json.workspace = true
+
+# External dependencies
+alux-ext.workspace = true
+serde.workspace = true

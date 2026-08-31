@@ -7,11 +7,19 @@ members = [
     "alux-jsonrpc",
     "alux-sdk",
     "alux-sdk-macros",
+    "alux-shape",
+    "alux-shape-macros",
     "alux-traversable",
 
     "crates/alux-http-poem",
     "crates/alux-http-text",
     "crates/alux-jsonrpc-jsonrpsee",
+    "crates/alux-shape-json",
+    "crates/alux-shape-morph",
+    "crates/alux-shape-rust",
+    "crates/alux-shape-term",
+    "crates/alux-shape-text",
+    "crates/alux-shape-typescript",
 ]
 
 [workspace.package]
@@ -33,6 +41,14 @@ alux-jsonrpc = { version = "0.1", path = "alux-jsonrpc" }
 alux-jsonrpc-jsonrpsee = { path = "crates/alux-jsonrpc-jsonrpsee" }
 alux-sdk = { version = "0.1", path = "alux-sdk" }
 alux-sdk-macros = { version = "0.1", path = "alux-sdk-macros" }
+alux-shape = { version = "0.1", path = "alux-shape" }
+alux-shape-json = { version = "0.1", path = "crates/alux-shape-json" }
+alux-shape-macros = { version = "0.1", path = "alux-shape-macros" }
+alux-shape-morph = { path = "crates/alux-shape-morph" }
+alux-shape-rust = { path = "crates/alux-shape-rust" }
+alux-shape-term = { path = "crates/alux-shape-term" }
+alux-shape-text = { version = "0.1", path = "crates/alux-shape-text" }
+alux-shape-typescript = { version = "0.1", path = "crates/alux-shape-typescript" }
 alux-traversable = { version = "0.1", path = "alux-traversable" }
 
 anyhow = "1"
