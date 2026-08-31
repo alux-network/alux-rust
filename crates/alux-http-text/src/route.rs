@@ -1,66 +1,7 @@
-//! Interprets typed HTTP programs as readable route and type descriptions.
-//!
-//! The text interpretation executes no handler. It records the selectors, extractor roles, argument
-//! product, handler result, and output conversion each endpoint denotes, which makes it the neutral
-//! witness that an HTTP program means a surface rather than a framework callback.
+//! Records the selectors a route composes, and renders the surface they describe.
 
-use alux_ext::{ApplyAlg, HandlerContextAlg};
-use alux_http::{
-    FileOutAlg, HandlerAlg, HandlerEndpointAlg, HttpInputAlg, HttpSelectorAlg, JsonOutAlg, OutputAlg, OutputKindAlg,
-    RouteAlg, SelectorAlg, append_path,
-};
-use core::any::type_name;
-use core::marker::PhantomData;
-use std::sync::Arc;
-
-/// Carries interpreted endpoint type information.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TextEndpoint {
-    handler: &'static str,
-    inputs: &'static str,
-    args: &'static str,
-    result: &'static str,
-    transform: &'static str,
-    output: &'static str,
-}
-
-/// Identifies an HTTP input role in text output.
-pub struct TextInputRole<Role, Input>(PhantomData<fn(Role) -> Input>);
-
-/// Identifies path extraction in text descriptions.
-pub struct PathRole;
-/// Identifies query extraction in text descriptions.
-pub struct QueryRole;
-/// Identifies request-body extraction in text descriptions.
-pub struct BodyRole;
-/// Identifies header extraction in text descriptions.
-pub struct HeaderRole;
-/// Identifies authentication extraction in text descriptions.
-pub struct AuthRole;
-/// Identifies request-context extraction in text descriptions.
-pub struct ContextRole;
-
-/// Interprets JSON output selection in text descriptions.
-pub struct TextJsonOutput;
-
-impl<From> OutputAlg<From> for TextJsonOutput {
-    type Output = From;
-
-    fn output(from: From) -> From {
-        from
-    }
-}
-
-/// Interprets streamed-file output selection in text descriptions.
-pub struct TextFileOutput;
-
-impl<From> OutputAlg<From> for TextFileOutput {
-    type Output = From;
-
-    fn output(from: From) -> From {
-        from
-    }
-}
+use crate::{TextEndpoint, TextHandlerImpl};
+use alux_http::{HttpSelectorAlg, RouteAlg, SelectorAlg, append_path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TextSelectorPart {
@@ -159,41 +100,6 @@ impl TextSelector {
     }
 }
 
-/// Interprets typed APIs as text descriptions.
-#[derive(Debug, Default)]
-pub struct TextHandlerImpl;
-
-impl HandlerAlg for TextHandlerImpl {
-    type Endpoint = TextEndpoint;
-}
-
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Context, Inputs, Args, Transform, Output>
-    for TextHandlerImpl
-where
-    Transform: OutputKindAlg<TextHandlerImpl, Output>,
-{
-    fn finish_handler<Handler>(&self, _handler: Handler) -> TextEndpoint
-    where
-        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static,
-    {
-        TextEndpoint {
-            handler: type_name::<Handler>(),
-            inputs: type_name::<Inputs>(),
-            args: type_name::<Args>(),
-            result: type_name::<Output>(),
-            transform: type_name::<<Transform as OutputKindAlg<Self, Output>>::Transform>(),
-            output: type_name::<<<Transform as OutputKindAlg<Self, Output>>::Transform as OutputAlg<Output>>::Output>(),
-        }
-    }
-}
-
-impl<Context> HandlerContextAlg<Context> for TextHandlerImpl
-where
-    Context: Send + Sync + 'static,
-{
-    type Handle = Arc<Context>;
-}
-
 impl SelectorAlg for TextHandlerImpl {
     type Selector = TextSelector;
 
@@ -231,23 +137,6 @@ impl RouteAlg for TextHandlerImpl {
     fn lift(&self, endpoint: TextEndpoint) -> TextRoute {
         TextRoute { entries: vec![TextRouteEntry { selector: self.identity(), endpoint }] }
     }
-}
-
-impl HttpInputAlg for TextHandlerImpl {
-    type Path<Input> = TextInputRole<PathRole, Input>;
-    type Query<Input> = TextInputRole<QueryRole, Input>;
-    type Body<Input> = TextInputRole<BodyRole, Input>;
-    type Header<Input> = TextInputRole<HeaderRole, Input>;
-    type Auth<Input> = TextInputRole<AuthRole, Input>;
-    type Context<Input> = TextInputRole<ContextRole, Input>;
-}
-
-impl JsonOutAlg for TextHandlerImpl {
-    type Json<From> = TextJsonOutput;
-}
-
-impl FileOutAlg for TextHandlerImpl {
-    type File<From> = TextFileOutput;
 }
 
 impl HttpSelectorAlg for TextHandlerImpl {

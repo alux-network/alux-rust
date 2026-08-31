@@ -2,6 +2,7 @@ use crate::args::JsonrpseeArgs;
 use crate::result::RpcErrorExt;
 use alux_ext::{ApplyAlg, HandlerContextAlg};
 use alux_jsonrpc::{JsonRpcAlg, JsonRpcFallibleAlg, JsonRpcMethodAlg, OutcomeAlg, RpcErrorAlg};
+use derive_new::new as New;
 use jsonrpsee::Methods;
 use jsonrpsee::core::RegisterMethodError;
 use jsonrpsee::core::server::ResponsePayload;
@@ -11,16 +12,13 @@ use serde::Serialize;
 use std::sync::Arc;
 
 /// Interprets typed JSON-RPC programs as `jsonrpsee` method collections.
+#[derive(New)]
 pub struct JsonrpseeImpl<Context> {
+    #[new(into)]
     context: Arc<Context>,
 }
 
 impl<Context> JsonrpseeImpl<Context> {
-    /// Creates an interpreter around a semantic context.
-    pub fn new(context: Context) -> Self {
-        Self { context: Arc::new(context) }
-    }
-
     /// Creates an interpreter from an already shared semantic context.
     pub fn from_arc(context: Arc<Context>) -> Self {
         Self { context }
@@ -120,6 +118,7 @@ where
     fn finish_jsonrpc_positional_method<Handler>(
         &self,
         name: &'static str,
+        _arg_names: &'static [&'static str],
         handler: Handler,
     ) -> <Self as JsonRpcAlg>::Methods
     where
@@ -152,6 +151,7 @@ where
     fn finish_jsonrpc_positional_fallible<Handler>(
         &self,
         name: &'static str,
+        _arg_names: &'static [&'static str],
         handler: Handler,
     ) -> <Self as JsonRpcAlg>::Methods
     where

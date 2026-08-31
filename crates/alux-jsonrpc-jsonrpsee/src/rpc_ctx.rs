@@ -1,12 +1,12 @@
 use derive_more::{Deref, DerefMut, From};
-use derive_new::new;
+use derive_new::new as New;
 
 /// Carries a semantic context while interpreting it as a JSON-RPC service.
 ///
 /// The transparent newtype provides a local target for implementations of
 /// generated `jsonrpsee` server traits. The inner context remains the actual
 /// interpreter of the domain algebra.
-#[derive(Debug, Clone, Deref, DerefMut, From, new)]
+#[derive(Debug, Clone, Deref, DerefMut, From, New)]
 #[repr(transparent)]
 pub struct RpcCtx<Context>(Context);
 
