@@ -1,6 +1,6 @@
 [package]
 name = "alux-http-poem"
-version.workspace = true
+version = "0.1.1"
 description = "Poem interpretation of ALUX typed HTTP programs"
 documentation = "https://docs.rs/alux-http-poem"
 authors.workspace = true

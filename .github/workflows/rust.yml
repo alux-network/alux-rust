@@ -1,4 +1,4 @@
-name: ALUX Rust CI
+name: 🔧 ALUX Rust CI
 
 on:
   push:

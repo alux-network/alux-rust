@@ -26,7 +26,6 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.1"
 authors = ["Tomislav Grospic <grospic@gmail.com>"]
 edition = "2024"
 homepage = "https://alux.network"
