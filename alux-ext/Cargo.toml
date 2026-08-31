@@ -1,6 +1,6 @@
 [package]
 name = "alux-ext"
-version = "0.1.1"
+version = "0.1.2"
 description = "Meaning-first Rust extensions with first-order operation defunctionalization"
 documentation = "https://docs.rs/alux-ext"
 authors.workspace = true
