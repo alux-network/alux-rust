@@ -62,7 +62,7 @@ derive-new = "0.7"
 extend = "1"
 futures = "0.3"
 jsonrpsee = { version = "0.26", features = ["server", "macros"] }
-mockall = "0.14"
+mockall = "0.15"
 paste = "1"
 poem = "3"
 poem-openapi = "5"
