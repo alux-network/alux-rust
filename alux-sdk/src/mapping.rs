@@ -61,12 +61,17 @@ macro_rules! case_mapping {
         $crate::paste::paste! {
             #[doc = concat!("States what each `", stringify!($ty), "` maps to, and reads it back.")]
             pub mod [<$ty:snake>] {
+                // A mapped value is written as the caller writes it. Local items win over a glob, so
+                // `ALL`, `to` and `from` are unaffected, and a mapping to literals imports nothing.
+                #[allow(unused_imports)]
+                use super::*;
+
                 /// States every case this mapping covers, in the order they are stated.
                 pub const ALL: &[super::$ty] = &[$(super::$ty::$variant),*];
 
                 /// States the value one case maps to.
                 #[must_use]
-                pub const fn to(case: super::$ty) -> $value {
+                pub fn to(case: super::$ty) -> $value {
                     match case {
                         $(super::$ty::$variant => $stated,)*
                     }
@@ -138,13 +143,18 @@ macro_rules! case_mapping_partial {
         $crate::paste::paste! {
             #[doc = concat!("States what some `", stringify!($ty), "` cases map to, and reads them back.")]
             pub mod [<$ty:snake>] {
+                // A mapped value is written as the caller writes it. Local items win over a glob, so
+                // `ALL`, `to` and `from` are unaffected, and a mapping to literals imports nothing.
+                #[allow(unused_imports)]
+                use super::*;
+
                 /// States every case this mapping maps, in the order they are stated.
                 pub const ALL: &[super::$ty] = &[$(super::$ty::$variant),*];
 
                 /// States the value one case maps to, when it maps to one.
                 #[must_use]
                 #[allow(unreachable_patterns)]
-                pub const fn to(case: super::$ty) -> Option<$value> {
+                pub fn to(case: super::$ty) -> Option<$value> {
                     match case {
                         $(super::$ty::$variant => Some($stated),)*
                         _ => None,
@@ -205,6 +215,33 @@ mod tests {
         Loudness, u8,
             Loud  <=> 2,
             Quiet <=> 1,
+    }
+
+    /// A token carries payloads, so it has drop glue, and `to` may not be a `const fn` if a mapping
+    /// like this one is to be stateable at all.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub enum Token {
+        Plus,
+        Ident(String),
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Operator {
+        Add,
+    }
+
+    // The mapped value is written as a caller writes it, with no path of its own.
+    case_mapping! {
+        Operator, Token as Token,
+            Add <=> Token::Plus,
+    }
+
+    #[test]
+    fn a_mapped_type_may_own_what_it_carries() {
+        assert_eq!(operator::to(Operator::Add), Token::Plus);
+        assert_eq!(operator::from(Token::Plus), Some(Operator::Add));
+        assert_eq!(operator::from(Token::Ident("x".to_owned())), None);
+        assert_eq!(operator::ALL, &[Operator::Add]);
     }
 
     #[test]
