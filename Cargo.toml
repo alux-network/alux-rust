@@ -20,7 +20,7 @@ alux-jsonrpc = { version = "0.2", path = "alux-jsonrpc" }
 alux-jsonrpc-direct = { path = "crates/alux-jsonrpc-direct" }
 alux-jsonrpc-jsonrpsee = { path = "crates/alux-jsonrpc-jsonrpsee" }
 alux-jsonrpc-typescript = { path = "crates/alux-jsonrpc-typescript" }
-alux-sdk = { version = "0.2", path = "alux-sdk" }
+alux-sdk = { version = "0.3", path = "alux-sdk" }
 alux-sdk-macros = { version = "0.1", path = "alux-sdk-macros" }
 alux-shape = { version = "0.1", path = "alux-shape" }
 alux-shape-json = { version = "0.1", path = "crates/alux-shape-json" }

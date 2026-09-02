@@ -2,7 +2,7 @@
 name = "alux-sdk"
 description = "Domain-neutral Rust extensions for ALUX and downstream workspaces"
 documentation = "https://docs.rs/alux-sdk"
-version = "0.2.1"
+version = "0.3.0"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
