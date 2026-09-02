@@ -1,29 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "alux-ext",
-    "alux-ext-macros",
-    "alux-http",
-    "alux-jsonrpc",
-    "alux-sdk",
-    "alux-sdk-macros",
-    "alux-shape",
-    "alux-shape-macros",
-    "alux-traversable",
-
-    "crates/alux-http-poem",
-    "crates/alux-http-text",
-    "crates/alux-jsonrpc-direct",
-    "crates/alux-jsonrpc-jsonrpsee",
-    "crates/alux-jsonrpc-typescript",
-    "crates/alux-shape-json",
-    "crates/alux-shape-morph",
-    "crates/alux-shape-rust",
-    "crates/alux-shape-term",
-    "crates/alux-shape-text",
-    "crates/alux-shape-typescript",
-    "crates/alux-tokio",
-]
+members = ["alux-*", "crates/alux-*"]
 
 [workspace.package]
 authors = ["Tomislav Grospic <grospic@gmail.com>"]
