@@ -64,6 +64,7 @@ pub(crate) fn trait_algebra_internal(attribute: TokenStream, definition: &ItemTr
         Err(error) => return error,
     };
     let (proxied, attributes) = split_proxy(attributes);
+    let (carrier, attributes) = split_transport(attributes);
     let algebra = Algebra::from_definition(definition);
     let names = Names::for_trait(&definition.ident);
     let syntax = render_syntax(definition, &attributes, &algebra, &names);
@@ -71,6 +72,8 @@ pub(crate) fn trait_algebra_internal(attribute: TokenStream, definition: &ItemTr
     let operation = render_operation(definition, &algebra, &names);
     let reply = render_reply(definition, &algebra, &names);
     let proxy = if proxied { render_proxy(definition, &algebra, &names) } else { TokenStream::new() };
+    let transport =
+        carrier.map_or_else(TokenStream::new, |carrier| render_transport(definition, &algebra, &names, &carrier));
 
     quote! {
         #definition
@@ -79,6 +82,7 @@ pub(crate) fn trait_algebra_internal(attribute: TokenStream, definition: &ItemTr
         #operation
         #reply
         #proxy
+        #transport
     }
 }
 
@@ -386,6 +390,88 @@ fn parse_attributes(attribute: TokenStream) -> Result<Vec<Meta>, TokenStream> {
         .parse2(attribute)
         .map(|attributes| attributes.into_iter().collect())
         .map_err(|error| error.to_compile_error())
+}
+
+/// Separates the carrier a transport impl is stated for from the attributes the enums carry.
+///
+/// The carrier is named by the author and resolved in the author's scope, so this crate names no
+/// transport of its own: what it emits speaks only `AlgebraCall` and `AlgebraSend`.
+fn split_transport(attributes: Vec<Meta>) -> (Option<syn::Path>, Vec<Meta>) {
+    let mut carrier = None;
+    let mut kept = Vec::new();
+    for attribute in attributes {
+        match &attribute {
+            Meta::NameValue(stated) if stated.path.is_ident("transport") => match &stated.value {
+                syn::Expr::Path(path) => carrier = Some(path.path.clone()),
+                _ => kept.push(attribute),
+            },
+            _ => kept.push(attribute),
+        }
+    }
+
+    (carrier, kept)
+}
+
+/// States the trait for one carrier that reaches an interpreter elsewhere.
+///
+/// A method stating a value asks and unwraps: no answer means nobody will ever answer, which for an
+/// interpreter meant to outlive its callers is a bug rather than a state to handle. A method stating
+/// none sends and does not stay, which is what makes an algebra of such methods a feed.
+fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, carrier: &syn::Path) -> TokenStream {
+    let contract = &definition.ident;
+    let Names { operation, reply, .. } = names;
+    if !algebra.associated_types.is_empty() {
+        return syn::Error::new_spanned(
+            contract,
+            "a transport states the trait itself, so it cannot be stated while the algebra's \
+             carriers are still open",
+        )
+        .to_compile_error();
+    }
+    if let Some(stated) = algebra.methods.iter().find(|method| !method.is_async) {
+        return syn::Error::new_spanned(
+            &stated.ident,
+            "a transport carries an operation to an interpreter elsewhere, so every method it \
+             states is asynchronous",
+        )
+        .to_compile_error();
+    }
+    let methods = algebra.methods.iter().map(|method| {
+        let ident = &method.ident;
+        let arguments = &method.arguments;
+        let argument_types = &method.argument_types;
+        method.return_type.as_ref().map_or_else(
+            || {
+                quote! {
+                    async fn #ident(&self, #(#arguments: #argument_types),*) {
+                        let _unheard = ::alux_sdk::AlgebraSend::send(
+                            self,
+                            #operation::#ident(#(#arguments),*),
+                        )
+                        .await;
+                    }
+                }
+            },
+            |output| {
+                let into = format_ident!("into_{}", ident);
+                let gone = format!("`{contract}::{ident}`: the interpreter answered nothing, so it is gone");
+                quote! {
+                    async fn #ident(&self, #(#arguments: #argument_types),*) -> #output {
+                        ::alux_sdk::AlgebraCall::ask(self, #operation::#ident(#(#arguments),*))
+                            .await
+                            .expect(#gone)
+                            .#into()
+                    }
+                }
+            },
+        )
+    });
+
+    quote! {
+        impl #contract for #carrier<#operation, #reply> {
+            #(#methods)*
+        }
+    }
 }
 
 /// Separates the request for a proxy from the attributes the generated enums carry.

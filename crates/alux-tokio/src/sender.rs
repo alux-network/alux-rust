@@ -1,5 +1,5 @@
 use crate::AlgebraMessage;
-use alux_sdk::AlgebraCall;
+use alux_sdk::{AlgebraCall, AlgebraSend};
 use futures::stream::AbortHandle;
 use std::fmt::{self, Debug, Formatter};
 use tokio::sync::{mpsc, oneshot};
@@ -59,6 +59,12 @@ impl<Operation, Reply> Clone for BoundedAlgebraSender<Operation, Reply> {
 impl<Operation, Reply> Debug for BoundedAlgebraSender<Operation, Reply> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("BoundedAlgebraSender").finish_non_exhaustive()
+    }
+}
+
+impl<Operation, Reply> AlgebraSend<Operation> for BoundedAlgebraSender<Operation, Reply> {
+    async fn send(&self, operation: Operation) -> Option<()> {
+        self.put(AlgebraMessage::unheard(operation)).await
     }
 }
 

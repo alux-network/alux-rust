@@ -10,7 +10,7 @@ mod mapping;
 mod option;
 mod result;
 
-pub use crate::call::AlgebraCall;
+pub use crate::call::{AlgebraCall, AlgebraSend};
 pub use crate::collection::*;
 pub use crate::conversion::*;
 pub use crate::iterator::*;
