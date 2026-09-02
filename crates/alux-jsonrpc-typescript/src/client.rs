@@ -7,6 +7,8 @@ use alux_shape::{ShapeOf, Spelling, words_of};
 use alux_shape_typescript::{TsShape, TsType};
 use std::collections::BTreeMap;
 
+/// The package that interprets a program: what turns one into a client, installed once.
+///
 /// A generated module imports `method` from here rather than restating it, so a surface and what
 /// reads a surface are upgraded separately — which is the whole reason a program is a value.
 pub const RUNTIME_PACKAGE: &str = "@alux-network/api";

@@ -7,7 +7,5 @@
 mod client;
 mod params;
 
-/// The package that interprets a program: what turns one into a client, installed once.
-///
 pub use client::*;
 pub use params::*;
