@@ -2,7 +2,7 @@
 name = "alux-tokio"
 description = "Tokio interpreters for domain-neutral ALUX Rust capabilities"
 documentation = "https://docs.rs/alux-tokio"
-version = "0.2.0"
+version = "0.3.0"
 authors.workspace = true
 edition.workspace = true
 homepage.workspace = true
