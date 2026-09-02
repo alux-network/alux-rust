@@ -69,8 +69,40 @@ use syn::{ItemTrait, parse_macro_input};
 /// # }
 /// ```
 ///
-/// Transport is a separate interpretation. `alux-tokio` can carry the generated operation and
-/// reply types over a bounded channel while leaving stream consumption to the application.
+/// # Transports
+///
+/// `transport` states the trait itself for whatever carries its operations to an interpreter
+/// elsewhere: a method stating a value asks and takes the value out of the reply, and a method
+/// stating none sends and does not stay. Both spellings emit the same bodies, and differ in who is
+/// allowed to name a type.
+///
+/// `transport = <Carrier>` names one carrier, resolved in the author's scope, and states
+/// `impl Trait for Carrier<TraitOp, TraitReply>`. It is the right form where the crate that owns the
+/// carrier states the impl.
+///
+/// Bare `transport`, or `transport = capability`, names none and states the impl for every witness
+/// of the capabilities:
+///
+/// ```ignore
+/// impl<Carrier> Counter for Carrier
+/// where
+///     Carrier: AlgebraCall<CounterOp, CounterReply> + AlgebraSend<CounterOp> + Send + Sync,
+/// ```
+///
+/// It is the right form where the trait's own crate states the impl, which the orphan rule makes
+/// every case where the trait is declared in a layer that must not know a transport. Only the
+/// capabilities the algebra needs are asked for: `AlgebraCall` where any method states a value, and
+/// `AlgebraSend` where any states none. `Send + Sync` is asked for because the impl reaches the
+/// carrier through a reference, which is also what lets the trait state that its calls may be
+/// awaited in another task, as `#[trait_variant::make(Send)]` does.
+///
+/// Since both capabilities forward through `&` and `Arc`, a borrow and a share of a carrier are the
+/// algebra too, so the trait needs no `auto_impl` of its own, and carrying one would conflict with
+/// the blanket impl.
+///
+/// Either way, transport is stated only for an algebra whose carriers are all chosen and whose
+/// methods are all asynchronous. `alux-tokio` carries the generated operation and reply types over
+/// a bounded channel while leaving stream consumption to the application.
 #[proc_macro_attribute]
 pub fn trait_algebra(attribute: TokenStream, item: TokenStream) -> TokenStream {
     let definition = parse_macro_input!(item as ItemTrait);

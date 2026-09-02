@@ -172,10 +172,44 @@ Where the operations go is stated by `AlgebraCall`: one operation stated, one re
 ```rust
 pub trait AlgebraCall<Operation, Reply> {
     /// Sends one operation and waits for the reply it is answered with.
-    async fn ask(&self, operation: Operation) -> Option<Reply>;
+    fn ask(&self, operation: Operation) -> impl Future<Output = Option<Reply>> + Send;
 }
 ```
+
+The waiting is stated as a `Send` future, because an interpreter reached this way is elsewhere, and what is elsewhere is another task. An `async fn` in a trait states a future nobody can name, so nobody outside the capability could ask for that: it is stated where the capability is, or not at all.
 
 Interpreting an operation always states something — the value the method states, or the unit reply of a method that states none — so a caller holding a reply knows the operation ran. Nothing is stated where the interpreter is gone, which is an ordinary ending and not a failure: a method stating no value returns, and one stating a value panics, having promised a value that never came.
 
 A transport may also carry an operation nobody stays for; `alux-tokio` states that on the channel itself, for producers like a progress stream that nobody waits on.
+
+### Transports
+
+A proxy is a value that *has* the trait. `transport` goes one step further and states that a carrier *is* the trait, so a caller holds the carrier and calls the vocabulary on it directly. A method stating a value asks and takes the value out of the reply; a method stating none sends and does not stay.
+
+Two spellings, differing only in who is allowed to name a type:
+
+```rust,ignore
+// The crate that owns the carrier states the impl, and names it.
+#[trait_algebra(transport = BoundedAlgebraSender)]
+trait Counter { /* … */ }
+
+// The crate that declares the trait states the impl, and names nothing.
+#[trait_algebra(transport)]
+trait Counter { /* … */ }
+```
+
+The first states `impl Counter for BoundedAlgebraSender<CounterOp, CounterReply>`, resolving the carrier in your own scope. The second names no type at all:
+
+```rust,ignore
+impl<Carrier> Counter for Carrier
+where
+    Carrier: AlgebraCall<CounterOp, CounterReply> + AlgebraSend<CounterOp> + Send + Sync,
+```
+
+This is what a layer whose job is *stating* capabilities needs, because the orphan rule puts `impl Counter for <carrier>` in the carrier's crate or the trait's, and a contract layer that must not know a transport has only the second option.
+
+Only the capabilities the algebra asks for appear: `AlgebraCall` where a method states a value, `AlgebraSend` where one states none. `Send + Sync` appears because the impl calls the carrier through a reference from wherever the algebra is held, and an algebra whose futures are `Send` cannot be stated by a carrier that is not. That is also what makes this spelling work under `#[trait_variant::make(Send)]`, which is how a vocabulary says its calls may be awaited in another task.
+
+Both capabilities forward through `&` and `Arc`, so a borrow and a share of a carrier are the algebra too. That is why the trait needs no `auto_impl` of its own — and why it must not carry one, since a blanket impl and `#[auto_impl(&, Arc)]` on the same trait conflict. A local type that forwards the capabilities is the algebra by the same impl; one that states the trait itself still may, because it witnesses no capability and nothing downstream can make it.
+
+Either spelling requires an algebra whose carriers are all chosen and whose methods are all asynchronous, since a carrier that *is* the trait can leave nothing open.

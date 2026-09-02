@@ -62,13 +62,23 @@ impl<Operation, Reply> Debug for BoundedAlgebraSender<Operation, Reply> {
     }
 }
 
-impl<Operation, Reply> AlgebraSend<Operation> for BoundedAlgebraSender<Operation, Reply> {
+/// Both halves travel to another task, which is what the capability's `Send` future is stated for.
+impl<Operation, Reply> AlgebraSend<Operation> for BoundedAlgebraSender<Operation, Reply>
+where
+    Operation: Send,
+    Reply: Send,
+{
     async fn send(&self, operation: Operation) -> Option<()> {
         self.put(AlgebraMessage::unheard(operation)).await
     }
 }
 
-impl<Operation, Reply> AlgebraCall<Operation, Reply> for BoundedAlgebraSender<Operation, Reply> {
+/// Both halves travel to another task, which is what the capability's `Send` future is stated for.
+impl<Operation, Reply> AlgebraCall<Operation, Reply> for BoundedAlgebraSender<Operation, Reply>
+where
+    Operation: Send,
+    Reply: Send,
+{
     async fn ask(&self, operation: Operation) -> Option<Reply> {
         let (answering, answer) = oneshot::channel();
         self.put(AlgebraMessage::new(operation, answering)).await;

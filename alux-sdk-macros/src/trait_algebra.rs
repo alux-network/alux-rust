@@ -18,6 +18,14 @@
 //! parameter of `<Trait>Reply`. `<Trait>Interpreter` redeclares the associated types, and `interpret` binds
 //! the syntax carriers through the interpreter's associated types.
 //!
+//! Transport is a separate interpretation, asked for by `transport`, and the two spellings differ in
+//! who names a type. `transport = <Carrier>` states the trait for one carrier the author names, and
+//! belongs to the crate that owns that carrier. Bare `transport`, or `transport = capability`, names
+//! none: the impl is headed by `AlgebraCall` and `AlgebraSend`, so it is stated for whatever
+//! witnesses them, which is what the trait's own crate can state while knowing no transport at all.
+//! It is headed by `Send + Sync` as well, since it reaches the carrier through a reference, and that
+//! is what lets an algebra whose calls may be awaited elsewhere be stated this way.
+//!
 //! Stream transport is a separate interpretation. `alux-tokio` envelopes the generated operation
 //! and reply types in a bounded channel while keeping the receiver available as a stream.
 
@@ -47,6 +55,14 @@ struct Algebra {
     methods: Vec<Method>,
 }
 
+/// States who names the type a transport impl is stated for.
+enum Transport {
+    /// The author names one carrier, and the impl is stated for it.
+    Carrier(syn::Path),
+    /// The author names none, and the impl is stated for whatever witnesses the capabilities.
+    Capability,
+}
+
 /// Holds the public names derived from the annotated trait name.
 struct Names {
     operation: Ident,
@@ -64,7 +80,7 @@ pub(crate) fn trait_algebra_internal(attribute: TokenStream, definition: &ItemTr
         Err(error) => return error,
     };
     let (proxied, attributes) = split_proxy(attributes);
-    let (carrier, attributes) = split_transport(attributes);
+    let (stated, attributes) = split_transport(attributes);
     let algebra = Algebra::from_definition(definition);
     let names = Names::for_trait(&definition.ident);
     let syntax = render_syntax(definition, &attributes, &algebra, &names);
@@ -73,7 +89,7 @@ pub(crate) fn trait_algebra_internal(attribute: TokenStream, definition: &ItemTr
     let reply = render_reply(definition, &algebra, &names);
     let proxy = if proxied { render_proxy(definition, &algebra, &names) } else { TokenStream::new() };
     let transport =
-        carrier.map_or_else(TokenStream::new, |carrier| render_transport(definition, &algebra, &names, &carrier));
+        stated.map_or_else(TokenStream::new, |stated| render_transport(definition, &algebra, &names, &stated));
 
     quote! {
         #definition
@@ -392,32 +408,40 @@ fn parse_attributes(attribute: TokenStream) -> Result<Vec<Meta>, TokenStream> {
         .map_err(|error| error.to_compile_error())
 }
 
-/// Separates the carrier a transport impl is stated for from the attributes the enums carry.
+/// Separates how a transport impl is stated from the attributes the enums carry.
 ///
-/// The carrier is named by the author and resolved in the author's scope, so this crate names no
-/// transport of its own: what it emits speaks only `AlgebraCall` and `AlgebraSend`.
-fn split_transport(attributes: Vec<Meta>) -> (Option<syn::Path>, Vec<Meta>) {
-    let mut carrier = None;
+/// Both spellings are transport interpretations, and they differ in who is allowed to name a type.
+/// `transport = <Carrier>` names one carrier, resolved in the author's scope, and belongs to the
+/// crate that owns it. Bare `transport`, or `transport = capability`, names none: the impl is stated
+/// for whatever witnesses the capabilities, which is what a crate declaring the trait can state
+/// while knowing no transport at all. Either way this crate names none of its own, and what it
+/// emits speaks only `AlgebraCall` and `AlgebraSend`.
+fn split_transport(attributes: Vec<Meta>) -> (Option<Transport>, Vec<Meta>) {
+    let mut stated = None;
     let mut kept = Vec::new();
     for attribute in attributes {
         match &attribute {
-            Meta::NameValue(stated) if stated.path.is_ident("transport") => match &stated.value {
-                syn::Expr::Path(path) => carrier = Some(path.path.clone()),
+            Meta::Path(path) if path.is_ident("transport") => stated = Some(Transport::Capability),
+            Meta::NameValue(named) if named.path.is_ident("transport") => match &named.value {
+                syn::Expr::Path(path) if path.path.is_ident("capability") => stated = Some(Transport::Capability),
+                syn::Expr::Path(path) => stated = Some(Transport::Carrier(path.path.clone())),
                 _ => kept.push(attribute),
             },
             _ => kept.push(attribute),
         }
     }
 
-    (carrier, kept)
+    (stated, kept)
 }
 
-/// States the trait for one carrier that reaches an interpreter elsewhere.
+/// States the trait for whatever reaches an interpreter elsewhere.
 ///
 /// A method stating a value asks and unwraps: no answer means nobody will ever answer, which for an
 /// interpreter meant to outlive its callers is a bug rather than a state to handle. A method stating
-/// none sends and does not stay, which is what makes an algebra of such methods a feed.
-fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, carrier: &syn::Path) -> TokenStream {
+/// none sends and does not stay, which is what makes an algebra of such methods a feed. The bodies
+/// are the same however the impl is headed, because what a carrier is asked for is the capability
+/// and not the type.
+fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, transport: &Transport) -> TokenStream {
     let contract = &definition.ident;
     let Names { operation, reply, .. } = names;
     if !algebra.associated_types.is_empty() {
@@ -428,9 +452,9 @@ fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, ca
         )
         .to_compile_error();
     }
-    if let Some(stated) = algebra.methods.iter().find(|method| !method.is_async) {
+    if let Some(synchronous) = algebra.methods.iter().find(|method| !method.is_async) {
         return syn::Error::new_spanned(
-            &stated.ident,
+            &synchronous.ident,
             "a transport carries an operation to an interpreter elsewhere, so every method it \
              states is asynchronous",
         )
@@ -467,8 +491,30 @@ fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, ca
         )
     });
 
+    let header = match transport {
+        Transport::Carrier(carrier) => quote!(impl #contract for #carrier<#operation, #reply>),
+        Transport::Capability => {
+            let asking = algebra
+                .methods
+                .iter()
+                .any(|method| method.return_type.is_some())
+                .then(|| quote!(::alux_sdk::AlgebraCall<#operation, #reply>));
+            let sending = algebra
+                .methods
+                .iter()
+                .any(|method| method.return_type.is_none())
+                .then(|| quote!(::alux_sdk::AlgebraSend<#operation>));
+            let stated = asking.into_iter().chain(sending);
+            quote! {
+                impl<Carrier> #contract for Carrier
+                where
+                    Carrier: #(#stated +)* ::core::marker::Send + ::core::marker::Sync,
+            }
+        }
+    };
+
     quote! {
-        impl #contract for #carrier<#operation, #reply> {
+        #header {
             #(#methods)*
         }
     }

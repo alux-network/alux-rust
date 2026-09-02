@@ -13,9 +13,11 @@ Every operation goes onto the channel carrying **the name it is answered on**. I
 ```rust
 pub trait AlgebraCall<Operation, Reply> {
     /// Sends one operation and waits for the reply it is answered with.
-    async fn ask(&self, operation: Operation) -> Option<Reply>;
+    fn ask(&self, operation: Operation) -> impl Future<Output = Option<Reply>> + Send;
 }
 ```
+
+Both halves travel to another task, so this crate states either capability for an operation and a reply that are `Send`.
 
 A reply is the interpreter's own value, and only interpreting the operation produces one, so holding a reply is **evidence the operation ran** — including the unit reply of a method that states no value. Nothing is stated once the interpreter is gone, which is an ordinary ending and not a failure.
 
