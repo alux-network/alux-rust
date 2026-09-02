@@ -1,4 +1,5 @@
 use alux_ext::{ApplyAlg, ext};
+use trait_set::trait_set;
 
 /// Describes the capability to build typed handler endpoints.
 pub trait HandlerAlg {
@@ -95,36 +96,21 @@ pub trait HttpSelectorAlg {
     fn http_prefix(&self, prefix: &str) -> Self::Selector;
 }
 
-/// Combines the capabilities required to interpret HTTP route composition.
-///
-/// The alias states that HTTP selectors, route composition, and selector composition are witnessed
-/// by one interpreter using a single selector representation.
-pub trait HttpRouteAlg:
-    SelectorAlg
-    + HttpSelectorAlg<Selector = <Self as SelectorAlg>::Selector>
-    + RouteAlg<Selector = <Self as SelectorAlg>::Selector>
-{
-}
+trait_set! {
+    /// Combines the capabilities required to interpret HTTP route composition.
+    ///
+    /// The alias states that HTTP selectors, route composition, and selector composition are
+    /// witnessed by one interpreter using a single selector representation.
+    pub trait HttpRouteAlg = SelectorAlg
+        + HttpSelectorAlg<Selector = <Self as SelectorAlg>::Selector>
+        + RouteAlg<Selector = <Self as SelectorAlg>::Selector>;
 
-impl<This> HttpRouteAlg for This where
-    This: SelectorAlg
-        + HttpSelectorAlg<Selector = <This as SelectorAlg>::Selector>
-        + RouteAlg<Selector = <This as SelectorAlg>::Selector>
-{
-}
-
-/// Combines the capabilities required to interpret a typed HTTP API.
-///
-/// The alias states that endpoints built by the handler capability are the endpoints lifted into
-/// composed routes.
-pub trait HttpApiAlg:
-    HandlerAlg + HttpInputAlg + HttpRouteAlg + RouteAlg<Endpoint = <Self as HandlerAlg>::Endpoint>
-{
-}
-
-impl<This> HttpApiAlg for This where
-    This: HandlerAlg + HttpInputAlg + HttpRouteAlg + RouteAlg<Endpoint = <This as HandlerAlg>::Endpoint>
-{
+    /// Combines the capabilities required to interpret a typed HTTP API.
+    ///
+    /// The alias states that endpoints built by the handler capability are the endpoints lifted
+    /// into composed routes.
+    pub trait HttpApiAlg =
+        HandlerAlg + HttpInputAlg + HttpRouteAlg + RouteAlg<Endpoint = <Self as HandlerAlg>::Endpoint>;
 }
 
 /// Carries a fluent route composition over an interpreter.

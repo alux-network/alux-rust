@@ -1,4 +1,5 @@
 use alux_ext::{ApplyAlg, ext};
+use trait_set::trait_set;
 
 /// Describes construction and composition of JSON-RPC method collections.
 pub trait JsonRpcAlg {
@@ -134,13 +135,13 @@ pub trait JsonRpcProgramAlg<Compiler> {
     fn compile_jsonrpc(self, compiler: &Compiler) -> Self::Methods;
 }
 
-/// Combines the capabilities required to interpret JSON-RPC programs.
-///
-/// Method registration is stated per operation signature, so composing a program surface needs only
-/// the empty collection and its merge.
-pub trait JsonRpcApiAlg: JsonRpcAlg {}
-
-impl<This> JsonRpcApiAlg for This where This: JsonRpcAlg {}
+trait_set! {
+    /// Combines the capabilities required to interpret JSON-RPC programs.
+    ///
+    /// Method registration is stated per operation signature, so composing a program surface needs
+    /// only the empty collection and its merge.
+    pub trait JsonRpcApiAlg = JsonRpcAlg;
+}
 
 /// Compiles defunctionalized JSON-RPC programs with an interpreter.
 #[ext(name = JsonRpcProgramExt)]
