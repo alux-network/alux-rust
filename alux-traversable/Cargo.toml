@@ -12,7 +12,7 @@ rust-version.workspace = true
 readme = "README.md"
 
 [dependencies]
-alux-ext.workspace = true
+extend.workspace = true
 
 [lints]
 workspace = true

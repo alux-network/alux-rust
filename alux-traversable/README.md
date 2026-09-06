@@ -91,7 +91,7 @@ Read it as one layer coming off at a time. `raw(key)?` leaves an `Option<Raw>`; 
 The example is a spec rather than an executable program: the store is stated over abstract types, nothing is implemented behind it, and nothing runs. That is the denotational style this workspace is written in, and it is also the shortest way to show a traversal without first inventing a database. That style is what the ALUX programming guidelines are about: [Denotations](https://alux-network.github.io/alux-programming/denotational-design/denotations.html) and [Laws and interpretations](https://alux-network.github.io/alux-programming/denotational-design/laws-and-interpretations.html).
 
 ```rust
-use alux_ext::ext;
+use extend::ext;
 use alux_traversable::*;
 
 trait Store {
