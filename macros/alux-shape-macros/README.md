@@ -1,7 +1,7 @@
 # alux-shape-macros
 
 `alux-shape-macros` reads a shape out of a Rust layout. It states one edge of
-[`alux-shape`](../alux-shape): a type that already carries `serde` attributes states its term through
+[`alux-shape`](../../alux-shape): a type that already carries `serde` attributes states its term through
 them, so nothing is written twice.
 
 ```rust ignore

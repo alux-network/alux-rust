@@ -25,15 +25,16 @@ one or the other: it states what something means, or it makes something of that 
 ## Specifications
 
 What a surface means, with no interpreter in it. These depend only on `alux-ext` and sit at the top
-level of the repository.
+level of the repository. The attribute or derive that goes with one is a separate crate, because a
+procedural macro has to be, and those live under [`macros/`](macros).
 
 | Crate | | Responsibility |
 | --- | --- | --- |
 | [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs, no web framework |
 | [`alux-jsonrpc`](alux-jsonrpc) | [![crates.io][v-rpc]][c-rpc] [![docs.rs][d-rpc]][r-rpc] | JSON-RPC programs, no RPC framework |
-| [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, no encoder<br>The derive reading one out of a layout |
-| [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
-| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](alux-sdk-macros)<br>[`alux-traversable`](alux-traversable) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros]<br>[![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | Transformations kept as expressions<br>The macros it exports<br>`traverse` over `Option` and iterators |
+| [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](macros/alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, no encoder<br>The derive reading one out of a layout |
+| [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](macros/alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
+| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros)<br>[`alux-traversable`](alux-traversable) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros]<br>[![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | Transformations kept as expressions<br>The macros it exports<br>`traverse` over `Option` and iterators |
 
 ## Interpretations
 

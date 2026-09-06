@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["alux-*", "crates/alux-*"]
+members = ["alux-*", "crates/alux-*", "macros/alux-*"]
 
 [workspace.package]
 authors = ["Tomislav Grospic <grospic@gmail.com>"]
@@ -12,7 +12,7 @@ rust-version = "1.97"
 
 [workspace.dependencies]
 alux-ext = { version = "0.1", path = "alux-ext" }
-alux-ext-macros = { version = "0.1", path = "alux-ext-macros" }
+alux-ext-macros = { version = "0.1", path = "macros/alux-ext-macros" }
 alux-http = { version = "0.1", path = "alux-http" }
 alux-http-poem = { path = "crates/alux-http-poem" }
 alux-http-text = { path = "crates/alux-http-text" }
@@ -21,10 +21,10 @@ alux-jsonrpc-direct = { path = "crates/alux-jsonrpc-direct" }
 alux-jsonrpc-jsonrpsee = { path = "crates/alux-jsonrpc-jsonrpsee" }
 alux-jsonrpc-typescript = { path = "crates/alux-jsonrpc-typescript" }
 alux-sdk = { version = "0.3", path = "alux-sdk" }
-alux-sdk-macros = { version = "0.1", path = "alux-sdk-macros" }
+alux-sdk-macros = { version = "0.1", path = "macros/alux-sdk-macros" }
 alux-shape = { version = "0.1", path = "alux-shape" }
 alux-shape-json = { version = "0.1", path = "crates/alux-shape-json" }
-alux-shape-macros = { version = "0.1", path = "alux-shape-macros" }
+alux-shape-macros = { version = "0.1", path = "macros/alux-shape-macros" }
 alux-shape-morph = { path = "crates/alux-shape-morph" }
 alux-shape-rust = { path = "crates/alux-shape-rust" }
 alux-shape-term = { path = "crates/alux-shape-term" }

@@ -40,7 +40,7 @@ one and refers to it; one that types structurally may spell the shape at each us
 ## Two ways in
 
 A type that already exists states its term through `#[derive(Shape)]`, re-exported here and
-implemented by [`alux-shape-macros`](../alux-shape-macros): it reads the `serde` attributes already
+implemented by [`alux-shape-macros`](../macros/alux-shape-macros): it reads the `serde` attributes already
 present, so the shape and the serialization are two readings of one annotation. A shape with no
 layout behind it is declared over the algebra instead.
 

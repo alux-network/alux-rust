@@ -2,7 +2,7 @@
 
 `alux-shape-rust` interprets an [`alux-shape`](../../alux-shape) term as a Rust layout.
 
-The derive in [`alux-shape-macros`](../../alux-shape-macros) reads a term out of a layout; this reads a
+The derive in [`alux-shape-macros`](../../macros/alux-shape-macros) reads a term out of a layout; this reads a
 layout out of a term. Neither direction is privileged, which is what it means for a struct to be a
 carrier for a shape rather than its source — so a shape stated with no layout behind it can be given
 one when domain code wants a value to hold.
