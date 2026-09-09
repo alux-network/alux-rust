@@ -27,6 +27,7 @@ package:
     cargo package --list -p alux-http > /dev/null
     cargo package --list -p alux-jsonrpc > /dev/null
     cargo package --list -p alux-traversable > /dev/null
+    cargo package --list -p alux-monad > /dev/null
     cargo package --list -p alux-sdk > /dev/null
     cargo package --list -p alux-shape-macros > /dev/null
     cargo package --list -p alux-shape > /dev/null

@@ -1,0 +1,18 @@
+[package]
+name = "alux-monad"
+description = "Monad composition over Option, Result, and iterators"
+documentation = "https://docs.rs/alux-monad"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[dependencies]
+alux-ext.workspace = true
+
+[lints]
+workspace = true

@@ -25,6 +25,7 @@ assert_eq!(converted, 42_u64);
 | When you need to | Use |
 | --- | --- |
 | Compose fallible transformations over an `Option` or iterator | [Traversable](#traversable) |
+| Compose dependent optional, fallible, or sequence computations | [Monad](#monad) |
 | Collect fallible values or pairs | `try_collect_vec`, `try_unzip` |
 | Require an exact iterator cardinality | `collect_exact` |
 | Borrow a slice prefix as an array | `try_to_const`, `try_to_const_mut` |
@@ -45,6 +46,21 @@ let doubled: Result<Vec<_>, ()> = [1, 2, 3].into_iter().traverse(|value| Ok(valu
 assert_eq!(doubled, Ok(vec![2, 4, 6]));
 
 assert_eq!(Some(Ok::<_, ()>(42)).sequence(), Ok(Some(42)));
+```
+
+## Monad
+
+`alux-monad` supplies `bind` and `join`, re-exported here. `bind` runs a dependent
+step within the same effect; `join` removes one nested layer. Iterators stay lazy
+and preserve order. `Some`, `Ok`, and `core::iter::once` provide the unit operations.
+
+```rust
+use alux_sdk::*;
+
+assert_eq!(Some(21).bind(|x| Some(x * 2)), Some(42));
+assert_eq!(Ok::<_, ()>(Ok(42)).join(), Ok(42));
+let values: Vec<_> = [1, 2].into_iter().bind(|x| [x, x * 10]).collect();
+assert_eq!(values, [1, 10, 2, 20]);
 ```
 
 ## Trait algebras

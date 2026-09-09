@@ -13,6 +13,7 @@ readme = "README.md"
 
 [dependencies]
 alux-ext.workspace = true
+alux-monad.workspace = true
 alux-sdk-macros.workspace = true
 alux-traversable.workspace = true
 paste.workspace = true

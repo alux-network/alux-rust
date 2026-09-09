@@ -63,6 +63,14 @@ rather than the implementation crate.
 
 ## Boundary with downstream specifications
 
+`alux-monad` provides dependent composition (`bind`) and flattening (`join`) for
+`Option`, `Result` with a fixed error type, and lazy ordered iterators. Like
+`alux-traversable`, it names operations on concrete Rust instances. Standard
+constructors supply the monadic unit. It depends only on `alux-ext`, and `alux-sdk`
+re-exports its extensions. Identity, associativity, and the relation between bind
+and join are checked through the public surface; iterator equality observes yielded
+values. No first-order syntax is needed for this ordinary method composition.
+
 This workspace does not own `StatusAlg`, `ConsensusAlg`, `StorageAlg`, or any other application/domain
 capability. A downstream specification defines its primitive meaning and derives operations:
 

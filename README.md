@@ -36,6 +36,10 @@ procedural macro has to be, and those live under [`macros/`](macros).
 | [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](macros/alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
 | [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros)<br>[`alux-traversable`](alux-traversable) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros]<br>[![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | Transformations kept as expressions<br>The macros it exports<br>`traverse` over `Option` and iterators |
 
+[`alux-monad`](alux-monad) supplies `bind` and `join` over `Option`, `Result`, and
+iterators, with the same concrete-instance approach as `alux-traversable`.
+Both are re-exported by `alux-sdk`.
+
 ## Interpretations
 
 What a library makes of a specification. Each is published separately and lives under
@@ -106,7 +110,7 @@ to update between dependent packages:
 
 1. `alux-ext-macros`, `alux-sdk-macros`, and `alux-shape-macros` in any order
 2. `alux-ext`
-3. `alux-http`, `alux-jsonrpc`, `alux-shape`, and `alux-traversable` in any order
+3. `alux-http`, `alux-jsonrpc`, `alux-shape`, `alux-traversable`, and `alux-monad` in any order
 4. `alux-sdk`, `alux-shape-json`, `alux-shape-text`, and `alux-shape-typescript` in any order
 5. `alux-http-text`, `alux-http-poem`, `alux-jsonrpc-jsonrpsee`, `alux-jsonrpc-direct`,
    `alux-jsonrpc-typescript`, `alux-shape-rust`, `alux-shape-term`, `alux-shape-morph`, and

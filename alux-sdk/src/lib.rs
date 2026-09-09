@@ -16,6 +16,7 @@ pub use crate::conversion::*;
 pub use crate::iterator::*;
 pub use crate::option::*;
 pub use crate::result::*;
+pub use alux_monad::*;
 pub use alux_sdk_macros::trait_algebra;
 pub use alux_traversable::*;
 
