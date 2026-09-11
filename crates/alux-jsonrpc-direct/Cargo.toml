@@ -1,6 +1,6 @@
 [package]
 name = "alux-jsonrpc-direct"
-version = "0.1.0"
+version = "0.2.0"
 description = "Direct JSON-RPC 2.0 interpretation of ALUX typed JSON-RPC programs"
 documentation = "https://docs.rs/alux-jsonrpc-direct"
 authors.workspace = true
