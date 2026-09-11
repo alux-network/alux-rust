@@ -13,7 +13,7 @@ rust-version = "1.97"
 [workspace.dependencies]
 alux-ext = { version = "0.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.1", path = "macros/alux-ext-macros" }
-alux-http = { version = "0.1", path = "alux-http" }
+alux-http = { version = "0.2", path = "alux-http" }
 alux-http-poem = { path = "crates/alux-http-poem" }
 alux-http-text = { path = "crates/alux-http-text" }
 alux-jsonrpc = { version = "0.3", path = "alux-jsonrpc" }
