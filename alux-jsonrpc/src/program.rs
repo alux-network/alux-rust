@@ -104,6 +104,15 @@ impl<Program> JsonRpcProgram<Program> {
 }
 
 impl<Handler, Params> Operation<Handler, Params> {
+    /// Declares this operation under one method name, with no program around it.
+    ///
+    /// A program that states many methods composes their registrations rather than their types, so
+    /// it needs each method on its own. `JsonRpcProgram::method` states the same thing inside a
+    /// composition, and is what an author writes.
+    pub fn declare(self, name: &'static str) -> Method<Handler, Params> {
+        Method { name, handler: self.handler, marker: PhantomData }
+    }
+
     /// Reads this declaration under another parameter or failure mode.
     fn retyped<Mode>(self) -> Operation<Handler, Mode> {
         Operation { handler: self.handler, marker: PhantomData }

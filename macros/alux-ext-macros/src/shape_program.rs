@@ -6,7 +6,7 @@
 //! directly — so it needs no per-operation evidence. Everything shared with other backends lives in
 //! [`crate::lower`] and [`crate::syntax`].
 
-use crate::lower::{LoweredProgram, ProgramBackendAlg, expand_program};
+use crate::lower::{Chain, LoweredProgram, ProgramBackendAlg, expand_program};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::visit_mut::{self, VisitMut};
@@ -92,8 +92,15 @@ impl ProgramBackendAlg for ShapeBackend {
         }
     }
 
+    /// A shape states one record rather than a composition, so it declares no chain of leaves.
+    fn read_link(_call: &ExprMethodCall) -> Option<TokenStream> {
+        None
+    }
+
     fn compile_program(lowered: &LoweredProgram) -> TokenStream {
-        let LoweredProgram { program_type, compiler_params, predicates, body } = lowered;
+        let LoweredProgram { program_type, compiler_params, predicates, chain } = lowered;
+        let Chain { leading, root, .. } = chain;
+        let body = quote!({ #(#leading)* #root });
         quote! {
             impl<This, #compiler_params> ::alux_shape::ShapeProgramAlg<This> for #program_type
             where

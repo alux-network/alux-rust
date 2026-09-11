@@ -200,6 +200,17 @@ pub type WithInput<Handler, Inputs, Args, Transform, Extractor, Arg> =
 pub type WithEndpoint<Program, Method, Handler, Inputs, Args, Transform> =
     RouteProgram<Merge<Program, Endpoint<Method, Handler, Inputs, Args, Transform>>>;
 
+impl<Handler, Inputs, Args, Transform> Operation<Handler, Inputs, Args, Transform> {
+    /// Declares this operation at one path under one method selector, with no program around it.
+    ///
+    /// A program that states many endpoints composes their routes rather than their types, so it
+    /// needs each endpoint on its own. `RouteProgram::get` and `RouteProgram::post` state the same
+    /// thing inside a composition, and are what an author writes.
+    pub fn declare<Method>(self, path: &str) -> Endpoint<Method, Handler, Inputs, Args, Transform> {
+        Endpoint { path: path.into(), handler: self.handler, marker: PhantomData }
+    }
+}
+
 impl<Handler, Inputs, Args, Transform> Operation<Handler, Inputs, Args, Transform>
 where
     Inputs: WithAlg,
@@ -266,6 +277,15 @@ where
 }
 
 impl<Program> RouteProgram<Program> {
+    /// Reads this program below an HTTP path prefix, with no program around it.
+    ///
+    /// A program that states many nestings composes their routes rather than their types, so it
+    /// needs each nesting on its own. `RouteProgram::nest` states the same thing inside a
+    /// composition, and is what an author writes.
+    pub fn under(self, prefix: &str) -> Nest<Program> {
+        Nest { prefix: prefix.into(), program: self.0 }
+    }
+
     /// Records the categorical coproduct of two typed route programs.
     ///
     /// Neither side is interpreted, so both complete program types remain

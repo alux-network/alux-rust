@@ -13,7 +13,10 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::visit_mut::VisitMut;
-use syn::{Block, GenericParam, Ident, ImplItem, ImplItemFn, Token, Visibility, WherePredicate, parse_quote};
+use syn::{
+    Block, Expr, ExprMethodCall, GenericParam, Ident, ImplItem, ImplItemFn, Stmt, Token, Visibility, WherePredicate,
+    parse_quote,
+};
 
 /// Carries the parts of a lowered program that no backend chooses.
 pub(crate) struct LoweredProgram {
@@ -23,8 +26,51 @@ pub(crate) struct LoweredProgram {
     pub(crate) compiler_params: Punctuated<GenericParam, Token![,]>,
     /// Every obligation the declaration implies, in declaration order.
     pub(crate) predicates: Vec<TokenStream>,
-    /// The rewritten body, building the first-order program from a builder named `builder`.
-    pub(crate) body: Block,
+    /// The rewritten body, read as the program it starts from and what it declares on top.
+    pub(crate) chain: Chain,
+}
+
+/// A program body read as one program and the declarations applied to it.
+///
+/// A declaration is written as a chain, and a chain read as a type nests: `n` declarations make a
+/// type of depth `n` whose interpretation proves one obligation per prefix. Read as this instead,
+/// every declaration is one leaf of fixed size, and interpreting the program is a fold over the
+/// leaves rather than over the nesting. That is the difference between a declaration costing its
+/// method count and costing the square of it.
+pub(crate) struct Chain {
+    /// Whatever the body states before the program it ends with.
+    pub(crate) leading: Vec<Stmt>,
+    /// The program the chain starts from, which no link was recognized under.
+    pub(crate) root: Expr,
+    /// Each recognized declaration, as the leaf program it denotes, in authored order.
+    pub(crate) leaves: Vec<TokenStream>,
+}
+
+/// Reads a program body as its root program and the leaves declared on top of it.
+///
+/// Descending stops at the first call the backend does not recognize, so an unrecognized body is
+/// interpreted exactly as it was before: as one nested program. Nothing depends on recognizing
+/// every shape an author can write.
+fn split_chain<Backend>(block: &Block) -> syn::Result<Chain>
+where
+    Backend: ProgramBackendAlg,
+{
+    let Some((Stmt::Expr(program, None), leading)) = block.stmts.split_last() else {
+        return Err(syn::Error::new_spanned(
+            block,
+            "a program declaration states the program it declares, so its body ends in that program",
+        ));
+    };
+    let mut root = program;
+    let mut leaves = Vec::new();
+    while let Expr::MethodCall(call) = root {
+        let Some(leaf) = Backend::read_link(call) else { break };
+        leaves.push(leaf);
+        root = &call.receiver;
+    }
+    leaves.reverse();
+
+    Ok(Chain { leading: leading.to_vec(), root: root.clone(), leaves })
 }
 
 /// Describes what one transport contributes to the shared program lowering.
@@ -43,6 +89,9 @@ pub(crate) trait ProgramBackendAlg {
 
     /// States the obligation carried by a nested program value.
     fn require_subprogram(program: &TokenStream) -> TokenStream;
+
+    /// Reads one chain call as the leaf program it declares, or nothing where it declares none.
+    fn read_link(call: &ExprMethodCall) -> Option<TokenStream>;
 
     /// Emits the compilation meaning of one lowered program.
     fn compile_program(lowered: &LoweredProgram) -> TokenStream;
@@ -126,7 +175,7 @@ where
         program_type,
         compiler_params: compiler.sig.generics.params.clone(),
         predicates: obligations,
-        body: compiler.block,
+        chain: split_chain::<Backend>(&compiler.block)?,
     };
     let compile = Backend::compile_program(&lowered);
     let program_type = &lowered.program_type;

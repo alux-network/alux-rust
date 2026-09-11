@@ -5,7 +5,7 @@
 //! compiled through `JsonRpcProgramAlg`. Everything shared with other transports lives in
 //! [`crate::lower`] and [`crate::syntax`].
 
-use crate::lower::{LoweredProgram, ProgramBackendAlg, expand_program};
+use crate::lower::{Chain, LoweredProgram, ProgramBackendAlg, expand_program};
 use crate::syntax::{Reified, lift_operation};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -143,8 +143,20 @@ impl ProgramBackendAlg for JsonRpcBackend {
         }
     }
 
+    fn read_link(call: &ExprMethodCall) -> Option<TokenStream> {
+        let arguments = call.args.iter().collect::<Vec<_>>();
+        match (call.method.to_string().as_str(), arguments.as_slice()) {
+            // A declared method is one method on its own, under the name it answers to.
+            ("method", [name, declaration]) => Some(quote!(#declaration.declare(#name))),
+            // A merged program is already one program, so it states itself.
+            ("merge", [program]) => Some(quote!(#program.into_program())),
+            _ => None,
+        }
+    }
+
     fn compile_program(lowered: &LoweredProgram) -> TokenStream {
-        let LoweredProgram { program_type, compiler_params, predicates, body } = lowered;
+        let LoweredProgram { program_type, compiler_params, predicates, chain } = lowered;
+        let Chain { leading, root, leaves } = chain;
         quote! {
             impl<This, #compiler_params> ::alux_jsonrpc::JsonRpcProgramAlg<This> for #program_type
             where
@@ -155,9 +167,20 @@ impl ProgramBackendAlg for JsonRpcBackend {
                 fn compile_jsonrpc(self, compiler: &This) -> Self::Methods {
                     let _ = self;
                     let builder = ::alux_jsonrpc::JsonRpcProgramBuilder;
-                    let program = (#body).into_program();
+                    #(#leading)*
+                    // Every method is merged into the one collection the interpreter states, so no
+                    // type here grows with how many methods the declaration has.
+                    let methods =
+                        ::alux_jsonrpc::CompileJsonRpcProgram::compile_jsonrpc_program((#root).into_program(), compiler);
+                    #(
+                        let methods = ::alux_jsonrpc::JsonRpcAlg::jsonrpc_merge(
+                            compiler,
+                            methods,
+                            ::alux_jsonrpc::CompileJsonRpcProgram::compile_jsonrpc_program(#leaves, compiler),
+                        );
+                    )*
 
-                    ::alux_jsonrpc::CompileJsonRpcProgram::compile_jsonrpc_program(program, compiler)
+                    methods
                 }
             }
         }
@@ -204,6 +227,10 @@ mod tests {
         assert!(output.contains("StatusCurrentOperation < Alg >"));
         assert!(output.contains("StatusForPathOperation < Alg >"));
         assert!(output.contains("CompileJsonRpcProgram :: compile_jsonrpc_program"));
+        // One registration per method, merged into the collection, and no nested program type.
+        assert_eq!(output.matches("jsonrpc_merge").count(), 2);
+        assert_eq!(output.matches("declare").count(), 2);
+        assert!(!output.contains("let program ="), "the methods were left as one nested type");
     }
 
     #[test]

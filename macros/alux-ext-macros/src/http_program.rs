@@ -5,7 +5,7 @@
 //! compiled through `HttpProgramAlg`. Everything shared with other transports lives in
 //! [`crate::lower`] and [`crate::syntax`].
 
-use crate::lower::{LoweredProgram, ProgramBackendAlg, expand_program};
+use crate::lower::{Chain, LoweredProgram, ProgramBackendAlg, expand_program};
 use crate::syntax::{Reified, lift_operation};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -136,8 +136,22 @@ impl ProgramBackendAlg for HttpBackend {
         }
     }
 
+    fn read_link(call: &ExprMethodCall) -> Option<TokenStream> {
+        let arguments = call.args.iter().collect::<Vec<_>>();
+        match (call.method.to_string().as_str(), arguments.as_slice()) {
+            // A declared endpoint is one endpoint on its own, at the path and verb it answers on.
+            ("get", [path, operation]) => Some(quote!(#operation.declare::<::alux_http::Get>(#path))),
+            ("post", [path, operation]) => Some(quote!(#operation.declare::<::alux_http::Post>(#path))),
+            // A nested program is one program below a prefix, and a merged one states itself.
+            ("nest", [prefix, program]) => Some(quote!(#program.under(#prefix))),
+            ("merge", [program]) => Some(quote!(#program.into_program())),
+            _ => None,
+        }
+    }
+
     fn compile_program(lowered: &LoweredProgram) -> TokenStream {
-        let LoweredProgram { program_type, compiler_params, predicates, body } = lowered;
+        let LoweredProgram { program_type, compiler_params, predicates, chain } = lowered;
+        let Chain { leading, root, leaves } = chain;
         quote! {
             impl<This, #compiler_params> ::alux_http::HttpProgramAlg<This> for #program_type
             where
@@ -148,9 +162,20 @@ impl ProgramBackendAlg for HttpBackend {
                 fn compile_http(self, compiler: &This) -> Self::Route {
                     let _ = self;
                     let builder = ::alux_http::HttpProgramBuilder;
-                    let program = (#body).into_program();
+                    #(#leading)*
+                    // Every endpoint joins the one route the interpreter states, so no type here
+                    // grows with how many endpoints the declaration has.
+                    let route =
+                        ::alux_http::CompileRouteProgram::compile_route((#root).into_program(), compiler);
+                    #(
+                        let route = ::alux_http::RouteAlg::coproduct(
+                            compiler,
+                            route,
+                            ::alux_http::CompileRouteProgram::compile_route(#leaves, compiler),
+                        );
+                    )*
 
-                    ::alux_http::CompileRouteProgram::compile_route(program, compiler)
+                    route
                 }
             }
         }
@@ -193,6 +218,10 @@ mod tests {
         assert!(output.contains("StatusCurrentOperation < Alg >"));
         assert!(output.contains("default"));
         assert!(output.contains("CompileRouteProgram :: compile_route"));
+        // One route per endpoint, joined into the interpreter's route, and no nested program type.
+        assert_eq!(output.matches("coproduct").count(), 1);
+        assert_eq!(output.matches("declare :: < :: alux_http :: Get >").count(), 1);
+        assert!(!output.contains("let program ="), "the endpoints were left as one nested type");
     }
 
     #[test]
