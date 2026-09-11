@@ -1,6 +1,6 @@
 [package]
 name = "alux-http-text"
-version = "0.1.1"
+version = "0.2.0"
 description = "Text and metadata interpretation of ALUX typed HTTP programs"
 documentation = "https://docs.rs/alux-http-text"
 authors.workspace = true
