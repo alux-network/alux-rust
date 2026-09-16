@@ -1,6 +1,6 @@
 //! Records what one endpoint means: the handler it names and the types it relates.
 
-use alux_ext::{ApplyAlg, HandlerContextAlg};
+use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use alux_http::{HandlerAlg, HandlerEndpointAlg, OutputAlg, OutputKindAlg};
 use core::any::type_name;
 use std::sync::Arc;
@@ -28,10 +28,11 @@ impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Context, Input
     for TextHandlerImpl
 where
     Transform: OutputKindAlg<TextHandlerImpl, Output>,
+    Transform::Transform: OutputAlg<Output>,
 {
     fn finish_handler<Handler>(&self, _handler: Handler) -> TextEndpoint
     where
-        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static,
+        Handler: OperationAlg + ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static,
     {
         TextEndpoint {
             handler: type_name::<Handler>(),

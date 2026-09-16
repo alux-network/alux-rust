@@ -19,4 +19,5 @@ alux-ext.workspace = true
 alux-http.workspace = true
 
 [dev-dependencies]
+alux-http-conformance.workspace = true
 tokio.workspace = true

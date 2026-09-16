@@ -1,9 +1,8 @@
 # alux-http-text
 
 `alux-http-text` interprets an [`alux-http`](https://docs.rs/alux-http) program as a readable
-description of its route surface. It executes no handler, so it witnesses that a typed HTTP program
-denotes selectors, extractor roles, arguments, results, and output conversions rather than framework
-callbacks.
+description of its routes and types. It executes no handler; it lists the methods, paths, input
+roles, arguments, results, and output conversions declared by the program.
 
 ```rust ignore
 use alux_http::HttpProgramExt;
@@ -16,5 +15,6 @@ assert_eq!(routes.labels(), ["GET /status"]);
 println!("{}", routes.lines().join("\n"));
 ```
 
-The same program value compiles through any other interpreter, such as
+The same program value can be compiled by any other interpreter, such as
 [`alux-http-poem`](https://docs.rs/alux-http-poem), without restating its routes.
+
