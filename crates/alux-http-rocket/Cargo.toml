@@ -1,0 +1,33 @@
+[package]
+name = "alux-http-rocket"
+version = "0.1.0"
+description = "Rocket interpretation of ALUX typed HTTP programs"
+documentation = "https://docs.rs/alux-http-rocket"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-http.workspace = true
+alux-http-parts.workspace = true
+bytes.workspace = true
+futures.workspace = true
+rocket.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_urlencoded.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+alux-http-conformance.workspace = true
+alux-http-direct.workspace = true
+alux-http-text.workspace = true
+tokio.workspace = true
