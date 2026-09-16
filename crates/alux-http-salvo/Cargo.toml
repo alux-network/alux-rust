@@ -1,0 +1,31 @@
+[package]
+name = "alux-http-salvo"
+version = "0.1.0"
+description = "Salvo interpretation of ALUX typed HTTP programs"
+documentation = "https://docs.rs/alux-http-salvo"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-http.workspace = true
+alux-http-parts.workspace = true
+futures.workspace = true
+salvo.workspace = true
+serde.workspace = true
+serde_urlencoded.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+alux-http-conformance.workspace = true
+alux-http-direct.workspace = true
+alux-http-text.workspace = true
+tokio.workspace = true
