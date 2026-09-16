@@ -1,9 +1,9 @@
 # alux-jsonrpc-direct
 
 `alux-jsonrpc-direct` interprets an [`alux-jsonrpc`](https://docs.rs/alux-jsonrpc) program as a
-JSON-RPC 2.0 message handler. It implements the specification rather than delegating to a framework:
-name dispatch, parameter decoding, response rendering, batches, notifications, and the protocol's own
-error codes. Its only dependencies are `serde` and `serde_json`.
+JSON-RPC 2.0 message handler. It performs method-name dispatch, parameter decoding, response
+rendering, batch handling, notification handling, and protocol error reporting without a framework.
+Its only dependencies are `serde` and `serde_json`.
 
 ```rust ignore
 use alux_jsonrpc::JsonRpcProgramExt;
@@ -26,8 +26,8 @@ same domain compile through either interpretation unchanged.
 
 ## What it owns, and what it does not
 
-It owns the message layer: a `MethodTable` maps a name to a decoded, applied, rendered answer, and
-composes with another table by `merge`, which is defined exactly when the two name different methods.
+It owns the message layer: a `MethodTable` maps each method name to its decoded, applied, and rendered
+answer. Two tables can be combined with `merge` when they contain different method names.
 
 It owns no transport and no runtime. A surface answers one request document and says nothing about how
 that document arrived, so serving it over HTTP, a WebSocket, a pipe, or a test harness is a separate
@@ -40,3 +40,4 @@ than bundled in here.
 - Protocol errors are stated by this crate rather than by a framework, so their codes and messages are
   part of its observable behavior and are covered by its tests.
 - `merge` reports a duplicated method name as `DuplicateMethod` rather than a framework error.
+

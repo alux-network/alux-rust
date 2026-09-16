@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 //! Interprets typed JSON-RPC programs as a JSON-RPC 2.0 message handler.
 //!
 //! This interpretation implements the specification itself rather than delegating to a framework: it
