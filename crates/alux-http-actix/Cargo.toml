@@ -1,0 +1,30 @@
+[package]
+name = "alux-http-actix"
+version = "0.1.0"
+description = "actix-web interpretation of ALUX typed HTTP programs"
+documentation = "https://docs.rs/alux-http-actix"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+actix-web.workspace = true
+alux-ext.workspace = true
+alux-http.workspace = true
+alux-http-parts.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_urlencoded.workspace = true
+
+[dev-dependencies]
+alux-http-conformance.workspace = true
+alux-http-direct.workspace = true
+alux-http-text.workspace = true
+tokio.workspace = true
