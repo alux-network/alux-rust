@@ -19,3 +19,4 @@ error into a protocol error, so the interpreter needs `RpcErrorAlg` for that err
 `RpcCtx` carries a semantic context when a native `#[rpc(server)]` trait is implemented instead, and
 `ResultToRpcExt` and `RpcErrorExt` convert semantic errors at the boundary. A shared scenario in `tests/` runs one
 expectation against both the specification-first program and a native jsonrpsee service.
+
