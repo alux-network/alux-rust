@@ -49,3 +49,4 @@ What the mode changes is the request document, which is the second argument of e
 decoded from a parameter object lists its names there, `["user_id"]`, and the client sends an object. A
 method decoded from an array lists none, `[]`, and the client sends the values in order. The label is
 for whoever writes the call; the list is what goes on the wire.
+
