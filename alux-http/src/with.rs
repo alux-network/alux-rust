@@ -2,39 +2,38 @@
 ///
 /// Each recorded input role extends the endpoint's extractor product and its handler argument
 /// product in the same position, so declaration order is the application order.
+///
+/// A declaration reaching the widest product stated here can still state what it answers with,
+/// because accumulation is what the output declarations are written over. One role beyond it
+/// accumulates into a product nothing interprets, which is where a declaration stops.
 pub trait WithAlg {
     /// The product formed by appending `Input` to this product.
     type With<Input>;
 }
 
-impl WithAlg for () {
-    type With<Input> = (Input,);
+/// States the accumulation for one product width.
+macro_rules! with_products {
+    ($($input:ident),* $(,)?) => {
+        impl<$($input),*> WithAlg for ($($input,)*) {
+            type With<Input> = ($($input,)* Input,);
+        }
+    };
 }
 
-impl<A0> WithAlg for (A0,) {
-    type With<Input> = (A0, Input);
-}
-
-impl<A0, B0> WithAlg for (A0, B0) {
-    type With<Input> = (A0, B0, Input);
-}
-
-impl<A0, B0, C0> WithAlg for (A0, B0, C0) {
-    type With<Input> = (A0, B0, C0, Input);
-}
-
-impl<A0, B0, C0, D0> WithAlg for (A0, B0, C0, D0) {
-    type With<Input> = (A0, B0, C0, D0, Input);
-}
-
-impl<A0, B0, C0, D0, E0> WithAlg for (A0, B0, C0, D0, E0) {
-    type With<Input> = (A0, B0, C0, D0, E0, Input);
-}
-
-impl<A0, B0, C0, D0, E0, F0> WithAlg for (A0, B0, C0, D0, E0, F0) {
-    type With<Input> = (A0, B0, C0, D0, E0, F0, Input);
-}
-
-impl<A0, B0, C0, D0, E0, F0, G0> WithAlg for (A0, B0, C0, D0, E0, F0, G0) {
-    type With<Input> = (A0, B0, C0, D0, E0, F0, G0, Input);
-}
+with_products!();
+with_products!(A1);
+with_products!(A1, A2);
+with_products!(A1, A2, A3);
+with_products!(A1, A2, A3, A4);
+with_products!(A1, A2, A3, A4, A5);
+with_products!(A1, A2, A3, A4, A5, A6);
+with_products!(A1, A2, A3, A4, A5, A6, A7);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15);
+with_products!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15, A16);

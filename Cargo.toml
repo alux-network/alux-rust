@@ -14,8 +14,19 @@ rust-version = "1.97"
 alux-ext = { version = "0.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.1", path = "macros/alux-ext-macros" }
 alux-http = { version = "0.2", path = "alux-http" }
+alux-http-actix = { path = "crates/alux-http-actix" }
+alux-http-axum = { path = "crates/alux-http-axum" }
+alux-http-conformance = { path = "crates/alux-http-conformance" }
+alux-http-direct = { path = "crates/alux-http-direct" }
+alux-http-hyper = { path = "crates/alux-http-hyper" }
+alux-http-openapi = { path = "crates/alux-http-openapi" }
+alux-http-parts = { path = "crates/alux-http-parts" }
 alux-http-poem = { path = "crates/alux-http-poem" }
+alux-http-rocket = { path = "crates/alux-http-rocket" }
+alux-http-salvo = { path = "crates/alux-http-salvo" }
 alux-http-text = { path = "crates/alux-http-text" }
+alux-http-typescript = { path = "crates/alux-http-typescript" }
+alux-http-warp = { path = "crates/alux-http-warp" }
 alux-jsonrpc = { version = "0.3", path = "alux-jsonrpc" }
 alux-jsonrpc-direct = { path = "crates/alux-jsonrpc-direct" }
 alux-jsonrpc-jsonrpsee = { path = "crates/alux-jsonrpc-jsonrpsee" }
@@ -24,6 +35,7 @@ alux-sdk = { version = "0.3", path = "alux-sdk" }
 alux-sdk-macros = { version = "0.1", path = "macros/alux-sdk-macros" }
 alux-shape = { version = "0.1", path = "alux-shape" }
 alux-shape-json = { version = "0.1", path = "crates/alux-shape-json" }
+alux-shape-jsonschema = { path = "crates/alux-shape-jsonschema" }
 alux-shape-macros = { version = "0.1", path = "macros/alux-shape-macros" }
 alux-shape-morph = { path = "crates/alux-shape-morph" }
 alux-shape-rust = { path = "crates/alux-shape-rust" }
@@ -33,26 +45,38 @@ alux-shape-typescript = { version = "0.1", path = "crates/alux-shape-typescript"
 alux-tokio = { path = "crates/alux-tokio" }
 alux-traversable = { version = "0.1", path = "alux-traversable" }
 
+actix-web = "4"
 anyhow = "1"
+axum = { version = "0.8", features = ["multipart"] }
+bytes = "1"
+http-body-util = "0.1"
+hyper = "1"
 derive_more = { version = "2", features = ["deref", "deref_mut", "from"] }
 derive-new = "0.7"
 extend = "1"
 futures = "0.3"
 jsonrpsee = { version = "0.26", features = ["server", "macros"] }
 mockall = "0.14"
+multer = "3"
 paste = "1"
-poem = "3"
+poem = { version = "3", features = ["multipart"] }
 poem-openapi = "5"
 proc-macro2 = "1"
 proptest = "1"
 quote = "1"
+rocket = "0.5"
+salvo = "0.96"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_urlencoded = "0.7"
 syn = { version = "3", features = ["full", "visit", "visit-mut"] }
 thiserror = "2"
 trait-set = "0.3"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tokio-stream = "0.1"
+tokio-util = { version = "0.7", features = ["io"] }
+tower = { version = "0.5", features = ["util"] }
+warp = { version = "0.4", default-features = false, features = ["server"] }
 
 [workspace.lints.rust]
 missing_docs = "warn"

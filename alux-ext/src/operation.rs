@@ -25,6 +25,20 @@ pub trait OperationAlg {
     /// The product of arguments accepted by the operation.
     type Args;
 
+    /// The documentation the operation was declared with, as the author wrote it.
+    ///
+    /// An interpretation that describes a surface to a reader has nowhere else to read what an
+    /// operation is for. The first line is its summary and the rest is its description, which is
+    /// what a doc comment already means.
+    const DOC: &'static str;
+
+    /// The source-level name this operation was declared under.
+    ///
+    /// An interpretation that names operations to a reader, rather than only applying them, has no
+    /// other place to read one from: a type name states where the operation lives, not what it was
+    /// called.
+    const NAME: &'static str;
+
     /// The source-level argument names, in declaration order.
     const ARG_NAMES: &'static [&'static str];
 }
@@ -52,6 +66,7 @@ mod tests {
     where
         This: ValueAlg,
     {
+        /// Adds `increment` to the value.
         async fn value_plus(&self, increment: u32) -> u32 {
             self.value() + increment
         }
@@ -73,6 +88,8 @@ mod tests {
 
         assert_eq!(value.value_plus(2).await, 42);
         assert_eq!(ValuePlusOperation::<Value>::default().apply(value, (2,)).await, 42);
+        assert_eq!(<ValuePlusOperation<Value> as OperationAlg>::NAME, "value_plus");
+        assert_eq!(<ValuePlusOperation<Value> as OperationAlg>::DOC, "Adds `increment` to the value.");
         assert_eq!(<ValuePlusOperation<Value> as OperationAlg>::ARG_NAMES, &["increment"]);
     }
 

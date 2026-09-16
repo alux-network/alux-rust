@@ -1,11 +1,14 @@
 # alux-http
 
-`alux-http` describes typed HTTP programs independently of a web framework.
+`alux-http` lets you declare an HTTP API once, as an ordinary value, and then run that same
+declaration on any web framework. The same declaration also reads as an [`OpenAPI 3.1`](https://spec.openapis.org/oas/v3.1.0)
+document or a typed TypeScript client, so the API is never written a second time.
 
-The crate is a specification. It carries no interpreter and depends only on
-[`alux-ext`](https://docs.rs/alux-ext): an HTTP surface is described here as first-order syntax plus
-the capability algebras an interpreter must witness. Domain specifications provide their own algebras
-and compose first-order operations into routes.
+This crate holds only the declaration: which routes exist, where each handler argument comes from,
+and what each endpoint answers with. It contains no web framework and depends only on
+[`alux-ext`](https://docs.rs/alux-ext). A separate crate then *interprets* the declaration: one turns
+it into Poem routes, another into an axum router, another into an `OpenAPI` document. Adding one
+never changes the declaration.
 
 ```rust
 use alux_ext::{OperationAlg, ext};
@@ -81,6 +84,103 @@ let _nested = builder.routes().nest("/api", builder.program(program)).into_progr
 // Argument names and order survive from the authored method into the program.
 assert_eq!(<StatusForIdOperation<App> as OperationAlg>::ARG_NAMES, ["id"]);
 ```
+
+## Methods
+
+Declare the method an endpoint answers on with `.get`, `.post`, `.put`, `.patch`, `.delete`,
+`.head`, `.options`, `.trace`, or `.connect`. Use `.method` to take the method as a type parameter
+instead.
+
+A method is a value of `HttpMethod`, not a trait method, so an interpreter handles all nine in one
+place and a tenth would cost it nothing.
+
+## Inputs
+
+Every handler argument says where it comes from: `.path()`, `.query()`, `.body()` for JSON,
+`.form()`, `.raw_body()`, `.multipart()`, `.in_header()`, `.cookie()`, `.auth()`, and `.context()` when
+you want the framework's own extractor. `.with()` takes a value the interpreter supplies directly.
+
+Arguments are filled in the order you declare them. The declaration parses nothing itself: each
+interpreter does that with its framework's extractors.
+
+**Query strings, headers and cookies hold names and values**, so the type you read one into has to be
+a struct rather than a single value. Say so by implementing [`NamedValuesAlg`](NamedValuesAlg):
+
+```rust ignore
+#[derive(Deserialize)]
+struct Filters {
+    since: u64,
+    limit: Option<u32>,
+}
+
+impl NamedValuesAlg for Filters {}
+
+// `?since=…&limit=…`, and `limit` is optional because the field is.
+self.routes().get("/readings", self.op(Alg::search).query::<Filters>().json())
+```
+
+`.query::<String>()` does not compile, because a lone `String` has no name for a caller to send it
+under. Header names are converted for you, so a `User-Agent` header arrives in a `user_agent` field.
+
+**`.multipart::<T>()`** reads a body that arrives as parts. Your type implements
+[`FromPartsAlg`](FromPartsAlg), which says how to build it from a reader of parts, and each
+interpreter supplies whichever reader its framework has. A reader of parts is a
+[`ChunksAlg`](ChunksAlg), which is a sequence you take one item at a time. Its items are
+[`PartAlg`](PartAlg), and a part's own content is another such sequence.
+
+## Outputs
+
+Declare what an endpoint answers with: `.json()`, `.text()`, `.html()`, `.bytes()`, `.file()`,
+`.empty()`, `.redirect()`, or `.stream()`. Your handler's return type is inferred, so you never
+repeat it just to pick a format.
+
+Not every kind accepts every result, and that is checked when you compile. `.empty()` takes a handler
+returning `()` and rejects one returning data, so you cannot quietly throw a value away.
+
+`.stream()` answers with a body produced over time. Your handler returns a type implementing
+[`ChunksAlg`](ChunksAlg), which says what a chunk is and how to take the next one, so you are not
+committed to any particular stream type.
+
+Three kinds wrap the one before them:
+
+- **`.status::<201>()`** sets the status code. Which code a created resource answers with belongs to
+  the endpoint, not the handler.
+- **`.result()`** handles a handler returning `Result`. Success answers with the kind you already
+  chose; a failure answers with the status and message its `HttpErrorAlg` impl gives.
+- **`.out_header::<CacheControl>()`** adds a response header. The handler returns `(value, body)`,
+  because only the handler knows an `ETag` or a cache lifetime.
+
+A header is just a name, so one this crate does not already ship is three lines of your own and no
+interpreter changes:
+
+```rust ignore
+use alux_http::HeaderNameAlg;
+
+/// States the `x-request-id` header an answer carries.
+struct RequestId;
+
+impl HeaderNameAlg for RequestId {
+    const HEADER_NAME: &'static str = "x-request-id";
+}
+```
+
+```rust ignore
+self.routes()
+    // A recording, which creates something and says so.
+    .post("/record", self.op(Alg::record).body::<u32>().json().status::<201>())
+    // One identified reading, or what its failure means.
+    .get("/find/{id}", self.op(Alg::find).path::<u32>().json().result())
+```
+
+## Paths
+
+Paths are parsed into segments when you declare them, so you do not write them for one particular
+router. `:id` and `{id}` both mean one segment bound as `id`; `*rest` and `{*rest}` both mean
+everything left over. Anything else matches literally.
+
+Each interpreter then renders those segments the way its own router wants: Poem gets `:id`, axum and
+actix-web get `{id}`, Rocket gets `<id>`. Every interpreter *describes* the path the same way though,
+so two interpretations of one declaration can be compared.
 
 ## Composing surfaces
 
@@ -203,7 +303,28 @@ What that buys, and why it is not just tidiness:
 - **The surface is closed under composition.** A merged program is a program, so it can be merged or
   nested again without a special case.
 
-A program declared this way compiles through any crate that witnesses its algebras:
+## Running a declaration
 
-- [`alux-http-text`](https://docs.rs/alux-http-text) describes the surface as documentation or metadata.
-- [`alux-http-poem`](https://docs.rs/alux-http-poem) compiles the same program into executable Poem routes.
+These crates serve the same declaration, without changing it:
+
+- [`alux-http-poem`](https://docs.rs/alux-http-poem) serves it with Poem.
+- [`alux-http-axum`](https://docs.rs/alux-http-axum) serves it with axum.
+- [`alux-http-actix`](https://docs.rs/alux-http-actix) serves it with actix-web.
+- [`alux-http-salvo`](https://docs.rs/alux-http-salvo) serves it with Salvo.
+- [`alux-http-warp`](https://docs.rs/alux-http-warp) serves it with warp.
+- [`alux-http-rocket`](https://docs.rs/alux-http-rocket) serves it with Rocket.
+- [`alux-http-direct`](https://docs.rs/alux-http-direct) serves it with no web framework at all: it
+  matches the request against the routes and calls the handler itself.
+  [`alux-http-hyper`](https://docs.rs/alux-http-hyper) carries the bytes for it over hyper.
+
+These read the same declaration instead of serving it:
+
+- [`alux-http-openapi`](https://docs.rs/alux-http-openapi) generates an `OpenAPI` document for it.
+- [`alux-http-typescript`](https://docs.rs/alux-http-typescript) generates a typed TypeScript client
+  for it.
+- [`alux-http-text`](https://docs.rs/alux-http-text) prints its routes and types, which is useful in
+  tests and documentation.
+
+[`alux-http-conformance`](https://docs.rs/alux-http-conformance) is a shared test suite: one declared
+API, plus the requests and expected responses every crate above is checked against. It is how the
+project knows they all behave the same.

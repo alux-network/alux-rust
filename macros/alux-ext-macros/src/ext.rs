@@ -6,7 +6,7 @@
 //! attribute-macro backend while retaining the same extension surface.
 
 use crate::http_program::http_program_defunc_internal;
-use crate::syntax::{ExtensionImpl, documentation, operation_ident};
+use crate::syntax::{ExtensionImpl, doc_text, documentation, operation_ident};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
@@ -14,7 +14,7 @@ use syn::punctuated::Punctuated;
 use syn::visit_mut::VisitMut;
 use syn::{
     ExprMethodCall, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path, ReceiverKind, ReturnType, Token,
-    Type, Visibility,
+    Type, Visibility, parse_quote,
 };
 
 enum Defunc {
@@ -108,11 +108,11 @@ fn defunctionalize(
     where_clause: Option<&syn::WhereClause>,
 ) -> syn::Result<TokenStream> {
     let operation = operation_ident(&method.sig.ident);
+    // A method that writes no return type returns nothing, which is a result like any other: it is
+    // what an endpoint stating no body answers with.
     let mut output = match &method.sig.output {
         ReturnType::Type(_, output) => output.as_ref().clone(),
-        ReturnType::Default => {
-            return Err(syn::Error::new_spanned(&method.sig, "defunctionalized method needs a return type"));
-        }
+        ReturnType::Default => parse_quote!(()),
     };
     let context = format_ident!("__context");
     RenameThis.visit_type_mut(&mut output);
@@ -150,6 +150,7 @@ fn defunctionalize(
     let call = quote!(#receiver.#method_name(#(#arguments),*));
     let application = if method.sig.asyncness.is_some() { quote!(#call.await) } else { call };
     let documentation = documentation(&method.attrs);
+    let doc = doc_text(&method.attrs);
 
     Ok(quote! {
         #(#documentation)*
@@ -168,6 +169,8 @@ fn defunctionalize(
             type Context = Context;
             type Args = #args;
 
+            const DOC: &'static str = #doc;
+            const NAME: &'static str = stringify!(#method_name);
             const ARG_NAMES: &'static [&'static str] = &[#(stringify!(#arguments)),*];
         }
 
