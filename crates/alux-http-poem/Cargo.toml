@@ -17,10 +17,14 @@ workspace = true
 [dependencies]
 alux-ext.workspace = true
 alux-http.workspace = true
+futures.workspace = true
 poem.workspace = true
 serde.workspace = true
+serde_urlencoded.workspace = true
 
 [dev-dependencies]
+alux-http-conformance.workspace = true
+alux-http-direct.workspace = true
 alux-http-text.workspace = true
 anyhow.workspace = true
 poem-openapi.workspace = true

@@ -24,7 +24,10 @@ where
 {
     expect_endpoint(app, Request::builder().uri_str("/status").finish(), 40_u32).await?;
     expect_endpoint(app, Request::builder().uri_str("/status/2").finish(), 42_u32).await?;
-    expect_endpoint(app, post_json("/set_temp", "2.0"), 42_u32).await?;
+    expect_endpoint(app, json_request(Method::POST, "/set_temp", "2.0"), 42_u32).await?;
+    expect_endpoint(app, json_request(Method::PUT, "/status", "7"), 7_u32).await?;
+    expect_endpoint(app, json_request(Method::PATCH, "/status", "2"), 42_u32).await?;
+    expect_endpoint(app, Request::builder().method(Method::DELETE).uri_str("/status/8").finish(), 32_u32).await?;
 
     expect_download(app, "/download", "data.bin", "data").await
 }
@@ -71,8 +74,8 @@ where
     Ok(())
 }
 
-fn post_json(path: &str, body: &'static str) -> Request {
-    Request::builder().method(Method::POST).uri_str(path).content_type("application/json").body(body)
+fn json_request(method: Method, path: &str, body: &'static str) -> Request {
+    Request::builder().method(method).uri_str(path).content_type("application/json").body(body)
 }
 
 async fn call<E>(app: &E, request: Request) -> Result<Response>

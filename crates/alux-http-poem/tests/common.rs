@@ -27,6 +27,12 @@ pub trait StatusAlg {
     fn status_at(&self, id: u32) -> impl Future<Output = Self::Status> + Send;
     /// Applies `temp` and returns the resulting status.
     fn status_set_temp(&self, temp: f32) -> impl Future<Output = Self::Status> + Send;
+    /// Replaces the status with `status` and returns the result.
+    fn status_put(&self, status: u32) -> impl Future<Output = Self::Status> + Send;
+    /// Moves the status by `delta` and returns the result.
+    fn status_by(&self, delta: i32) -> impl Future<Output = Self::Status> + Send;
+    /// Clears the reading recorded for `id` and returns what remains.
+    fn status_clear(&self, id: u32) -> impl Future<Output = Self::Status> + Send;
 }
 
 /// Offers one file for download.
@@ -61,6 +67,21 @@ where
     /// Returns the status after adjusting the temperature.
     async fn status_adjusted(&self, temp: f32) -> This::Status {
         self.status_set_temp(temp).await
+    }
+
+    /// Returns the status after replacing it wholesale.
+    async fn status_replaced(&self, status: u32) -> This::Status {
+        self.status_put(status).await
+    }
+
+    /// Returns the status after moving it by a delta.
+    async fn status_moved(&self, delta: i32) -> This::Status {
+        self.status_by(delta).await
+    }
+
+    /// Returns what remains after clearing one identified reading.
+    async fn status_cleared(&self, id: u32) -> This::Status {
+        self.status_clear(id).await
     }
 }
 
@@ -97,6 +118,20 @@ impl StatusAlg for App {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     async fn status_set_temp(&self, temp: f32) -> Self::Status {
         self.0 as u32 + temp as u32
+    }
+
+    async fn status_put(&self, status: u32) -> Self::Status {
+        status
+    }
+
+    #[allow(clippy::cast_sign_loss)]
+    async fn status_by(&self, delta: i32) -> Self::Status {
+        (i32::from(self.0) + delta) as u32
+    }
+
+    #[allow(clippy::cast_sign_loss)]
+    async fn status_clear(&self, id: u32) -> Self::Status {
+        self.0 as u32 - id
     }
 }
 

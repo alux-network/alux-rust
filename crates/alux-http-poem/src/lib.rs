@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 //! Interprets typed HTTP programs as executable Poem routes.
 //!
 //! The interpretation chooses Poem's extractors for input roles, its responses for output kinds, and
@@ -9,9 +11,11 @@
 mod handler;
 mod input;
 mod output;
+mod parts;
 mod route;
 
 pub use handler::*;
 pub use input::*;
 pub use output::*;
+pub use parts::*;
 pub use route::*;

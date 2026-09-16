@@ -40,6 +40,24 @@ where
         Json(self.0.status_adjusted(*adj_temp).await)
     }
 
+    /// Replaces the reading wholesale, its value taken from the request body.
+    #[oai(path = "/status", method = "put")]
+    async fn put_status(&self, status: Json<u32>) -> Json<u32> {
+        Json(self.0.status_replaced(*status).await)
+    }
+
+    /// Moves the reading by a delta taken from the request body.
+    #[oai(path = "/status", method = "patch")]
+    async fn patch_status(&self, delta: Json<i32>) -> Json<u32> {
+        Json(self.0.status_moved(*delta).await)
+    }
+
+    /// Clears one identified reading, its id taken from the path.
+    #[oai(path = "/status/:id", method = "delete")]
+    async fn delete_status(&self, id: Path<u32>) -> Json<u32> {
+        Json(self.0.status_cleared(*id).await)
+    }
+
     /// Sends the file under the name the domain offers it as.
     #[oai(path = "/download", method = "get")]
     async fn download_file(&self) -> Attachment<Body> {
