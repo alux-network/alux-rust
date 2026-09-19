@@ -21,35 +21,36 @@ which is why the roles here read a gathered request rather than a framework extr
 
 ## A body produced over time
 
-`.stream()` does not compile against this interpretation, and it compiles against every other one.
-The reason is warp's, not the specification's, and there is no way around it from outside warp.
+warp streams response bodies. It does not expose a way to build one.
 
-A warp reply is `warp::reply::Response`, an `http::Response` over a body type warp keeps in a
-private module. Every public way to make one takes bytes that are already in hand: `From<Bytes>`,
-`From<String>`, `From<Vec<u8>>`, `From<&'static str>`, `From<&'static [u8]>`, and
-`From<Option<Bytes>>`. The two constructors that would take a stream, `wrap` and `wrap_stream`, are
-crate-private. So a reply whose body arrives a piece at a time cannot be built by anyone but warp.
+`warp::reply::Response` is `http::Response<BodyT>`, and `BodyT` lives in warp's private `mod bodyt`.
+Its two constructors that take a stream are `pub(crate)`:
 
-The HTTP program still declares streaming through `ChunksAlg`. This interpreter does not implement
-the corresponding `StreamOutAlg`, so a declaration using `.stream()` fails to compile for warp while
-it compiles for the other interpreters. This makes the limitation visible at compile time instead of
-silently changing the response body.
+```rust ignore
+// warp 0.4.3, src/bodyt.rs
+pub(crate) fn wrap<B>(body: B) -> Self
+where B: http_body::Body + Send + Sync + 'static;
 
-Two things look like a way around it and are not:
+pub(crate) fn wrap_stream<S, B, E>(stream: S) -> Self
+where S: Stream<Item = Result<B, E>> + Send + Sync + 'static, B: Into<Bytes>;
+```
 
-- `warp::sse::reply` really does build a streaming body, but frames it as server-sent events. That
-  is a different thing on the wire from the bytes `.stream()` states, so answering with it would make
-  this interpretation disagree with the others about what the same program means.
-- Implementing `warp::Reply` for a type of one's own does not help either. `Reply::into_response`
-  answers with `warp::reply::Response`, so the same unconstructible body is still what has to be
-  made.
+The public routes to a `Response` all take bytes already in hand: `From<Bytes>`, `From<String>`,
+`From<Vec<u8>>`, `From<&'static str>`, `From<&'static [u8]>`, `From<Option<Bytes>>`. Implementing
+`warp::Reply` does not help, because `into_response` must answer with the same `Response`.
 
-This is a consequence of warp 0.4 moving to `hyper` 1 and `http-body` 1. Where warp 0.3 re-exported
-hyper's own body type, which could be built from a stream, warp 0.4 defines its own over
-`http_body_util::combinators::BoxBody` and keeps it private.
+So this crate does not implement `StreamOutAlg`, and `.stream()` fails to compile here while it
+compiles for every other interpreter. The alternative is to collect the body first, which would make
+this interpretation answer differently from the others for the same program.
 
+`warp::sse::reply` does build a streaming body, but frames it as server-sent events: `data:` lines
+and blank-line terminators. That is a different response body from the bytes `.stream()` states.
+
+warp 0.3 re-exported hyper 0.14's `Body`, which was publicly constructible from a stream. warp 0.4
+moved to hyper 1 and `http-body` 1, defined `BodyT` over
+[`BoxBody`](https://docs.rs/http-body-util/0.1/http_body_util/combinators/struct.BoxBody.html), and
+kept it private.
+
+- [`wrap_stream`](https://github.com/seanmonstar/warp/blob/v0.4.3/src/bodyt.rs#L59), the constructor
 - [`warp::reply::Response`](https://docs.rs/warp/0.4.3/warp/reply/type.Response.html)
 - [`warp::Reply`](https://docs.rs/warp/0.4.3/warp/reply/trait.Reply.html)
-- [warp source](https://github.com/seanmonstar/warp), where `mod bodyt` is private
-- [`BoxBody`](https://docs.rs/http-body-util/0.1/http_body_util/combinators/struct.BoxBody.html)
-
