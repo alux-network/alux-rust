@@ -3,6 +3,7 @@
 //! This is user code, written once. Every interpretation compiles this same declaration, which is
 //! what makes their agreement evidence rather than coincidence.
 
+use crate::SETTLE;
 use alux_ext::ext;
 use alux_http::{
     BytesOutAlg, CacheControl, ChunksAlg, ChunksExt, EmptyOutAlg, FromPartsAlg, HeaderOutAlg, HtmlOutAlg, HttpApiAlg,
@@ -12,8 +13,10 @@ use alux_shape::Shape;
 use core::convert::Infallible;
 use core::fmt::Display;
 use core::future::Future;
+use core::time::Duration;
 use serde::{Deserialize, Serialize};
 use std::io::{Error as IoError, ErrorKind};
+use tokio::time::sleep;
 
 /// Who a caller says they are, sent as cookies.
 #[derive(Debug, Serialize, Deserialize, Shape)]
@@ -389,6 +392,102 @@ where
         Alg: TicksAlg,
     {
         self.routes().get("/ticks", self.op(Alg::shop_ticks).stream())
+    }
+}
+
+/// How long after a close begins the slow endpoint would answer.
+///
+/// Far longer than any drain an interpretation states, so a caller waiting on it is a caller whose
+/// connection outlives the close rather than one the close waits out.
+pub const ANSWERS_LATE: Duration = Duration::from_secs(30);
+
+/// How long after a close begins the pausing endpoint answers.
+///
+/// Shorter than any drain an interpretation states, so a caller waiting on it is answered while the
+/// server is closing rather than cut off by it.
+pub const ANSWERS_SOON: Duration = Duration::from_secs(1);
+
+/// How long the slow endpoint takes to answer.
+pub const SLOW: Duration = ANSWERS_LATE.saturating_add(SETTLE);
+
+/// How long the pausing endpoint takes to answer.
+///
+/// Both endpoints carry [`SETTLE`], the wait between sending a request and beginning the close, so
+/// each answers the stated time after the close begins rather than after the request. That is what
+/// lets a measurement be read against the drain directly.
+pub const PAUSE: Duration = ANSWERS_SOON.saturating_add(SETTLE);
+
+/// Answers after taking some time, which is how a caller holds a request in flight.
+pub trait SlowAlg {
+    /// Returns what the domain has to say, once it has taken longer than any drain.
+    fn slow(&self) -> impl Future<Output = String> + Send;
+
+    /// Returns what the domain has to say, once it has paused for less than any drain.
+    fn pause(&self) -> impl Future<Output = String> + Send;
+}
+
+impl SlowAlg for Shop {
+    async fn slow(&self) -> String {
+        sleep(SLOW).await;
+        "waited".to_owned()
+    }
+
+    async fn pause(&self) -> String {
+        sleep(PAUSE).await;
+        "paused".to_owned()
+    }
+}
+
+/// Derives the one operation the slow surface exposes.
+#[ext(name = SlowOperationExt, defunc)]
+pub impl<This> This
+where
+    This: SlowAlg,
+{
+    /// Answers slowly enough that the caller is still waiting when the server closes.
+    ///
+    /// Takes longer to answer than any interpretation waits before closing anyway, so a caller
+    /// asking for this holds a connection the server is still producing an answer on. It exists for
+    /// the lifecycle scenario, which needs a connection that outlives a close.
+    async fn shop_slow(&self) -> String {
+        self.slow().await
+    }
+
+    /// Answers while the server is closing, rather than after it has closed.
+    ///
+    /// Takes less time to answer than any interpretation waits before closing anyway, so a caller
+    /// asking for this is answered by a server that is already shutting down. It is the other half
+    /// of what the lifecycle scenario needs: a request in flight that a close does not cut off.
+    async fn shop_pause(&self) -> String {
+        self.pause().await
+    }
+}
+
+/// Declares the surface the lifecycle scenario serves.
+///
+/// Three endpoints and nothing else. One answers at once, so a caller can state that a server is
+/// serving. The other two take time, which is how a caller holds a request in flight across a
+/// close: one takes longer than any drain, the other less. None can fail, because being busy is not
+/// a failure.
+#[ext(name = LifecycleApiExt, defunc(via = http))]
+pub impl<This> This
+where
+    This: HttpApiAlg + JsonOutAlg + TextOutAlg,
+{
+    /// Declares one endpoint answering at once and one taking longer than any drain.
+    fn lifecycle_api<Alg>(&self)
+    where
+        Alg: ShopAlg + SlowAlg,
+    {
+        self.routes()
+            // Something answered at once, which is how a caller states that a server is serving.
+            .get("/items", self.op(Alg::shop_items).json())
+            // Something not answered in any useful time, which is how a caller holds a connection
+            // that outlives the close.
+            .get("/slow", self.op(Alg::shop_slow).text())
+            // Something answered after a moment, which is how a caller holds a request the close
+            // has time to finish.
+            .get("/pause", self.op(Alg::shop_pause).text())
     }
 }
 

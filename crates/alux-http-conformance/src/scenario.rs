@@ -4,7 +4,7 @@
 //! what they must be answered with, so anything exposing the surface can be held to it.
 
 use alux_http::{HttpMethod, HttpStatus};
-use alux_http_direct::{DirectRequest, DirectResponse, DirectRoute};
+use alux_http_parts::{DirectRequest, DirectResponse};
 use core::future::Future;
 
 /// Answers a stated request, however the interpretation under test answers one.
@@ -14,12 +14,6 @@ use core::future::Future;
 pub trait AnswerAlg {
     /// Answers one request.
     fn answer(&self, request: DirectRequest) -> impl Future<Output = DirectResponse> + Send;
-}
-
-impl AnswerAlg for DirectRoute {
-    fn answer(&self, request: DirectRequest) -> impl Future<Output = DirectResponse> + Send {
-        Self::answer(self, request)
-    }
 }
 
 /// One exchange: a request, and what answering it must produce.

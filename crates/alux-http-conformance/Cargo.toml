@@ -16,7 +16,9 @@ workspace = true
 
 [dependencies]
 alux-ext.workspace = true
+alux-http-parts.workspace = true
 alux-http.workspace = true
-alux-http-direct.workspace = true
 alux-shape.workspace = true
+derive-new.workspace = true
 serde.workspace = true
+tokio = { workspace = true, features = ["io-util"] }
