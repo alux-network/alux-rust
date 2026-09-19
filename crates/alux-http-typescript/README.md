@@ -26,6 +26,14 @@ export const program = {
 } as const
 ```
 
+## One call per operation
+
+Each call is named after the operation it calls. Declare the same operation on two endpoints and the
+module has one call, the last one declared. Give each endpoint its own operation to get two calls.
+
+A server still answers both paths, and [`alux-http-text`](https://docs.rs/alux-http-text) and
+[`alux-http-openapi`](https://docs.rs/alux-http-openapi) still describe both.
+
 The method, the path template, and where each argument goes are read from the declaration. A
 described path is already a template, so nothing is spelled a second way for a caller. `endpoint`
 comes from the runtime package, so a surface and what makes a surface's requests are upgraded

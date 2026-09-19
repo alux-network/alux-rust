@@ -1,6 +1,6 @@
 //! The compiled surface, as a route hyper can serve.
 
-use crate::message::{HyperAnswer, answered, asked};
+use crate::message::{BODY_LIMIT, HyperAnswer, answered, asked};
 use alux_http_direct::DirectRoute;
 use bytes::Bytes;
 use core::convert::Infallible;
@@ -19,9 +19,22 @@ use hyper::service::Service;
 #[derive(Clone, New)]
 pub struct HyperRoute {
     surface: DirectRoute,
+    #[new(value = "BODY_LIMIT")]
+    reading: usize,
 }
 
 impl HyperRoute {
+    /// Reads a request body of at most `bytes`, answering `413` for one larger than that.
+    ///
+    /// What a service accepts is the service's to state. The default is a sane bound rather than a
+    /// policy, so anything serving callers it does not control states its own.
+    #[must_use]
+    pub const fn reading(mut self, bytes: usize) -> Self {
+        self.reading = bytes;
+
+        self
+    }
+
     /// Answers one request, whatever carried it here.
     ///
     /// A request that cannot be read is answered rather than dropped, because a caller that sent
@@ -31,7 +44,7 @@ impl HyperRoute {
         Sent: Body<Data = Bytes>,
         Sent::Error: Display,
     {
-        match asked(request).await {
+        match asked(request, self.reading).await {
             Ok(asked) => answered(self.surface.answer(asked).await),
             Err(answer) => answered(answer),
         }

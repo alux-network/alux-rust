@@ -9,7 +9,6 @@ use bytes::Bytes;
 use core::future::Future;
 use core::pin::Pin;
 use futures::TryStreamExt;
-use rocket::data::Capped;
 use rocket::data::{ByteUnit, Data};
 use rocket::http::{HeaderMap, Method, Status};
 use rocket::response::Response;
@@ -18,6 +17,19 @@ use rocket::{Build, Request, Rocket, async_trait};
 use std::io::Cursor;
 use std::sync::Arc;
 use tokio_util::io::StreamReader;
+
+/// How many bytes of a request body are read before the request is refused.
+///
+/// Rocket hands a body over capped rather than whole, so a limit is stated here rather than
+/// inherited. A service accepting larger uploads states its own by mounting a data limit in its
+/// `rocket::Config`, which is where production sets one.
+const READS: ByteUnit = ByteUnit::Mebibyte(8);
+
+/// The status a body larger than what is read is answered with.
+const TOO_LARGE: Status = Status { code: 413 };
+
+/// The status a body that could not be read at all is answered with.
+const UNREADABLE: Status = Status { code: 400 };
 
 /// Spells route parameters the way Rocket's router reads them.
 struct RocketPath;
@@ -194,7 +206,17 @@ impl Handler for Reaching {
         for header in request.headers().iter() {
             headers.add_raw(header.name().to_string(), header.value().to_string());
         }
-        let body = data.open(ByteUnit::Mebibyte(8)).into_bytes().await.map(Capped::into_inner).unwrap_or_default();
+        let body = match data.open(READS).into_bytes().await {
+            // A body larger than what is read would reach the endpoint as a different, well formed
+            // request, so it is refused rather than truncated.
+            Ok(read) if !read.is_complete() => {
+                return Outcome::Success(refused(TOO_LARGE, "the body is larger than this service reads"));
+            }
+            Ok(read) => read.into_inner(),
+            Err(error) => {
+                return Outcome::Success(refused(UNREADABLE, &format!("the body could not be read: {error}")));
+            }
+        };
         let answered = (self.endpoint.0)(RocketRequest { captures, query, headers, body }).await;
 
         Outcome::Success(respond(answered))
@@ -202,6 +224,17 @@ impl Handler for Reaching {
 }
 
 /// Builds the response Rocket answers with from what an endpoint stated.
+/// Answers a request whose body this service will not read, saying which it is.
+fn refused<'r>(status: Status, message: &str) -> Response<'r> {
+    let said = message.to_owned();
+    let mut response = Response::build();
+    response.status(status);
+    response.raw_header("content-type", "text/plain; charset=utf-8");
+    response.sized_body(said.len(), Cursor::new(said));
+
+    response.finalize()
+}
+
 fn respond<'r>(answered: RocketAnswer) -> Response<'r> {
     let mut response = Response::build();
     response.status(Status::new(answered.status.code()));

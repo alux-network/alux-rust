@@ -10,6 +10,12 @@ use alux_shape_jsonschema::{JsonSchema, JsonSchemaShape};
 use core::marker::PhantomData;
 use serde_json::Value;
 
+/// The media type a body of bytes is written as, whatever produced the bytes.
+const BYTES: &str = "application/octet-stream";
+
+/// The header a redirect carries, naming where the caller is sent.
+const LOCATION: &str = "location";
+
 /// One answer an endpoint states, as a document describes it.
 #[derive(Debug, Clone)]
 pub struct OpenApiAnswer {
@@ -71,12 +77,65 @@ macro_rules! openapi_outputs {
 }
 
 openapi_outputs! {
-    OpenApiJsonOutput   => "application/json", "JSON",
-    OpenApiTextOutput   => "text/plain", "plain-text",
-    OpenApiHtmlOutput   => "text/html", "HTML",
-    OpenApiBytesOutput  => "application/octet-stream", "raw-byte",
-    OpenApiFileOutput   => "application/octet-stream", "streamed-file",
-    OpenApiStreamOutput => "application/octet-stream", "streamed",
+    OpenApiJsonOutput => "application/json", "JSON",
+    OpenApiTextOutput => "text/plain", "plain-text",
+    OpenApiHtmlOutput => "text/html", "HTML",
+}
+
+macro_rules! openapi_bytes {
+    ($($output:ident => $meaning:literal),+ $(,)?) => {
+        $(
+            #[doc = concat!("Describes ", $meaning, " answers in a document.")]
+            pub struct $output;
+
+            impl<From> OutputAlg<From> for $output {
+                type Output = From;
+
+                fn output(from: From) -> From {
+                    from
+                }
+            }
+        )+
+    };
+}
+
+openapi_bytes! {
+    OpenApiBytesOutput  => "raw-byte",
+    OpenApiFileOutput   => "streamed-file",
+    OpenApiStreamOutput => "streamed",
+}
+
+/// Describes the bytes an endpoint answers with, whatever produced them.
+///
+/// What a caller receives is bytes, so the document says so: a shape would describe the value the
+/// handler answered with rather than the body it becomes, and a body produced over time has no
+/// shape to describe at all.
+impl<From> OpenApiOutputAlg<From> for OpenApiBytesOutput {
+    fn answers(_schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
+        vec![OpenApiAnswer::content(HttpStatus::OK, BYTES, binary())]
+    }
+}
+
+impl<From> OpenApiOutputAlg<From> for OpenApiStreamOutput {
+    fn answers(_schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
+        vec![OpenApiAnswer::content(HttpStatus::OK, BYTES, binary())]
+    }
+}
+
+/// Describes a download: the bytes it answers with, and what reading the file can fail as.
+///
+/// A file handler answers with the file it read and the name to offer it under, so the failure is
+/// stated by the file rather than by a `.result()` around the endpoint. Both halves are described
+/// here: the successful body is bytes, and the failure states its own statuses.
+impl<File, Error> OpenApiOutputAlg<(Result<File, Error>, String)> for OpenApiFileOutput
+where
+    Error: HttpErrorAlg,
+{
+    fn answers(_schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
+        let failures = Error::HTTP_STATUSES.iter().map(|status| OpenApiAnswer::content(*status, "text/plain", text()));
+
+        core::iter::once(OpenApiAnswer::content(HttpStatus::OK, BYTES, binary())).chain(failures).collect()
+    }
 }
 
 /// Describes an answer with no body in a document.
@@ -109,7 +168,9 @@ impl<From> OutputAlg<From> for OpenApiRedirectOutput {
 
 impl<From> OpenApiOutputAlg<From> for OpenApiRedirectOutput {
     fn answers(_schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
-        vec![OpenApiAnswer::bodiless(HttpStatus::SEE_OTHER)]
+        // Where a caller is sent is what a redirect answers, and it is carried by this header, so
+        // a document that omits it describes an answer no interpretation produces.
+        vec![OpenApiAnswer { headers: vec![LOCATION], ..OpenApiAnswer::bodiless(HttpStatus::SEE_OTHER) }]
     }
 }
 
@@ -200,6 +261,11 @@ where
 /// The schema a stated failure carries, which is the message it answers with.
 fn text() -> Value {
     serde_json::json!({ "type": "string" })
+}
+
+/// The schema a body of bytes carries, which a document states rather than describes.
+fn binary() -> Value {
+    serde_json::json!({ "type": "string", "format": "binary" })
 }
 
 macro_rules! openapi_kinds {
