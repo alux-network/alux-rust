@@ -23,7 +23,7 @@ trait StatusAlg {
     fn status_at(&self, id: u32) -> impl Future<Output = Self::Status> + Send;
 }
 
-/// Derived operations become first-order values that preserve their argument names.
+/// A derived method becomes a value an endpoint can be declared with, argument names included.
 #[ext(name = StatusOperationExt, defunc)]
 impl<This> This
 where
@@ -90,9 +90,6 @@ assert_eq!(<StatusForIdOperation<App> as OperationAlg>::ARG_NAMES, ["id"]);
 Declare the method an endpoint answers on with `.get`, `.post`, `.put`, `.patch`, `.delete`,
 `.head`, `.options`, `.trace`, or `.connect`. Use `.method` to take the method as a type parameter
 instead.
-
-A method is a value of `HttpMethod`, not a trait method, so an interpreter handles all nine in one
-place and a tenth would cost it nothing.
 
 ## Inputs
 
@@ -184,9 +181,9 @@ so two interpretations of one declaration can be compared.
 
 ## Composing surfaces
 
-The reason to keep a surface first-order is that programs compose before anything interprets them. Two
-crates that know nothing about each other can each declare part of a service, and a third can state
-the whole of it — no shared route table, no registry, no framework in the picture yet.
+A declaration is a value, so it composes before anything runs it. Two crates that know nothing about
+each other can each declare part of a service, and a third can declare the whole of it, with no
+shared route table, no registry, and no framework in the picture yet.
 
 ```rust
 use alux_ext::ext;
@@ -243,7 +240,7 @@ where
     }
 }
 
-/// Another fragment, declared independently — plausibly in another crate.
+/// Another fragment, declared independently, plausibly in another crate.
 #[ext(name = ItemsApiExt, defunc(via = http))]
 impl<This> This
 where
@@ -259,7 +256,7 @@ where
     }
 }
 
-/// The whole service: a coproduct of both fragments, with one of them under a path prefix.
+/// The whole service: both fragments, with one of them under a path prefix.
 #[ext(name = ServiceApiExt, defunc(via = http))]
 impl<This> This
 where
@@ -271,39 +268,34 @@ where
         Alg: StatusAlg + ItemsAlg,
     {
         self.routes()
-            // Merge forms the route coproduct.
+            // Both fragments, side by side.
             .merge(self.status_api::<Alg>())
-            // Nesting precomposes a prefix over an entire subtree.
+            // The whole items fragment, under one prefix.
             .nest("/v1", self.items_api::<Alg>())
     }
 }
 ```
 
-Two things there are worth pausing on, because the authored text is not what runs:
+Write no return type on a declaration: calling it hands back the declared API, and the type is
+generated for you. Inside the body, `merge` puts two declarations beside each other and `nest` puts
+one under a prefix, including a declaration from another crate.
 
-- **The declarations look like they return nothing.** They do return something. The macro replaces the
-  written signature with `-> ServiceApiProgram<Alg>` and the written body with
-  `ServiceApiProgram::default()`, so calling `service_api` hands back a zero-sized program value.
-  Writing no return type is the convention: the type is generated, and naming it by hand would only
-  repeat the macro.
-- **`merge` and `nest` are not receiving routes.** The authored body is read as a description rather
-  than executed, and a call to a sibling declaration is lifted into a nested program — the emitted body
-  reads `builder.merge(builder.program(builder.status_api::<Alg>()))`. That is what type-checks, and it
-  is why one fragment composes with another without either knowing how the other was declared.
+That gives you:
 
-What that buys, and why it is not just tidiness:
+- **Fragments that state their own needs.** `status_api` requires `JsonOutAlg`; a fragment answering
+  with a file requires `FileOutAlg` instead. Neither imposes its needs on the other, and
+  `service_api` requires exactly the union.
+- **One surface everywhere.** `service_api` is a value, so the served API, the `OpenAPI` document and
+  the generated client are the same merged surface and cannot drift apart.
+- **No special cases.** A merged declaration is a declaration, so it can be merged or nested again.
 
-- **Fragments state their own dependencies.** `status_api` requires `JsonOutAlg`; a fragment returning a
-  file would require `FileOutAlg` instead. Neither imposes its needs on the other, and `service_api`
-  inherits exactly the union.
-- **Nesting is selector precomposition**, not a router feature — so `/v1/items` arises from composing
-  `/v1` with a subtree that never mentions it.
-- **Composition happens before interpretation.** `service_api` is a value; every interpreter sees the
-  same merged surface, so documentation and execution cannot drift apart.
-- **The surface is closed under composition.** A merged program is a program, so it can be merged or
-  nested again without a special case.
+## Servers and lifecycle
 
-## Running a declaration
+`HttpServerAlg` specifies what it means to open, close and end one framework's executable route
+surface. Closing releases the address; ending waits for what was already being served as well, up to
+the interpreter's own drain. Each crate that serves chooses the surface, open handle and error types it needs. `.lifecycle(commands)`
+turns a sequence of open and close commands into the events they produce, so an application can run one
+server or switch between several without the declaration knowing anything about a runtime.
 
 These crates serve the same declaration, without changing it:
 

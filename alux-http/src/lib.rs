@@ -13,6 +13,7 @@ mod output;
 mod parts;
 mod path;
 mod program;
+mod server;
 mod status;
 mod with;
 
@@ -28,5 +29,6 @@ pub use output::*;
 pub use parts::*;
 pub use path::*;
 pub use program::*;
+pub use server::*;
 pub use status::*;
 pub use with::*;
