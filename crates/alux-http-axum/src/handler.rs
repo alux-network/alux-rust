@@ -56,20 +56,20 @@ impl<Context> HttpInputAlg for AxumHandlerImpl<Context> {
     type Context<I> = AxumPartsInput<I>;
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output>
-    for AxumHandlerImpl<Context>
+impl<Context, Inputs, Args, Transform, Answering, Answered, Output>
+    HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output> for AxumHandlerImpl<Context>
 where
     Context: Send + Sync + 'static,
     Inputs: AxumInputsAlg<Args> + Send + 'static,
     Args: Send + 'static,
     Output: Send + 'static,
-    Transform: OutputKindAlg<Self, Output> + Send + 'static,
-    <Transform as OutputKindAlg<Self, Output>>::Transform: OutputAlg<Output>,
-    <<Transform as OutputKindAlg<Self, Output>>::Transform as OutputAlg<Output>>::Output: IntoResponse,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering> + Send + 'static,
+    Answering: OutputAlg<Output, Output = Answered>,
+    Answered: IntoResponse,
 {
-    fn finish_handler<H>(&self, handler: H) -> <Self as HandlerAlg>::Endpoint
+    fn finish_handler<Handler>(&self, handler: Handler) -> <Self as HandlerAlg>::Endpoint
     where
-        H: OperationAlg + ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
+        Handler: OperationAlg + ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
     {
         let context = Arc::clone(&self.context);
         let handler = Arc::new(handler);
@@ -85,7 +85,7 @@ where
                 };
                 let output = handler.apply(context, inputs).await;
 
-                Ok(<Transform as OutputKindAlg<Self, Output>>::Transform::output(output).into_response())
+                Ok(Answering::output(output).into_response())
             }
         }))
     }

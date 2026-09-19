@@ -54,20 +54,20 @@ impl<Context> HttpInputAlg for PoemHandlerImpl<Context> {
     type Context<I> = PoemRequestInput<I>;
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output>
-    for PoemHandlerImpl<Context>
+impl<Context, Inputs, Args, Transform, Answering, Answered, Output>
+    HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output> for PoemHandlerImpl<Context>
 where
     Context: Send + Sync + 'static,
     Inputs: PoemInputsAlg<Args>,
     Args: Send + 'static,
     Output: Send + 'static,
-    Transform: OutputKindAlg<Self, Output>,
-    <Transform as OutputKindAlg<Self, Output>>::Transform: OutputAlg<Output>,
-    <<Transform as OutputKindAlg<Self, Output>>::Transform as OutputAlg<Output>>::Output: IntoResponse,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering>,
+    Answering: OutputAlg<Output, Output = Answered>,
+    Answered: IntoResponse,
 {
-    fn finish_handler<H>(&self, handler: H) -> <Self as HandlerAlg>::Endpoint
+    fn finish_handler<Handler>(&self, handler: Handler) -> <Self as HandlerAlg>::Endpoint
     where
-        H: OperationAlg + ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
+        Handler: OperationAlg + ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
     {
         let context = Arc::clone(&self.context);
         let handler = Arc::new(handler);
@@ -78,9 +78,7 @@ where
                 let (request, mut body) = request.split();
                 let inputs = Inputs::extract(&request, &mut body).await?;
                 let output = handler.apply(context, inputs).await;
-                Ok::<Response, poem::Error>(
-                    <Transform as OutputKindAlg<Self, Output>>::Transform::output(output).into_response(),
-                )
+                Ok::<Response, poem::Error>(Answering::output(output).into_response())
             }
         }))
     }

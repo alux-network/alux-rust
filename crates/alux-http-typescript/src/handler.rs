@@ -65,12 +65,12 @@ impl HttpInputAlg for TsHttpClient {
     type Context<I> = TsUnstatedInput<I>;
 }
 
-impl<Handle, Inputs, Args, Transform, Output> HandlerEndpointAlg<Handle, Inputs, Args, Transform, Output>
+impl<Handle, Inputs, Args, Transform, Answering, Output> HandlerEndpointAlg<Handle, Inputs, Args, Transform, Output>
     for TsHttpClient
 where
     Inputs: TsInputsAlg,
-    Transform: OutputKindAlg<Self, Output>,
-    <Transform as OutputKindAlg<Self, Output>>::Transform: TsOutputAlg<Output>,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering>,
+    Answering: TsOutputAlg<Output>,
 {
     fn finish_handler<Handler>(&self, _handler: Handler) -> TsCall
     where
@@ -85,7 +85,7 @@ where
             name: self.members.spell(&words_of(Handler::NAME)),
             doc: Handler::DOC,
             parameters,
-            answer: <Transform as OutputKindAlg<Self, Output>>::Transform::answer(&self.shapes),
+            answer: Answering::answer(&self.shapes),
         }
     }
 }

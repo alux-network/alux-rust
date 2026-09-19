@@ -94,27 +94,21 @@ where
     }
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output>
-    for SalvoHandlerImpl<Context>
+impl<Context, Inputs, Args, Transform, Answering, Output>
+    HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output> for SalvoHandlerImpl<Context>
 where
     Context: Send + Sync + 'static,
     Inputs: SalvoInputsAlg<Args> + Send + Sync + 'static,
     Args: Send + 'static,
     Output: Send + 'static,
-    Transform: OutputKindAlg<Self, Output>,
-    <Transform as OutputKindAlg<Self, Output>>::Transform: OutputAlg<Output, Output = Response> + Send + Sync + 'static,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering>,
+    Answering: OutputAlg<Output, Output = Response> + Send + Sync + 'static,
 {
     fn finish_handler<Handler>(&self, handler: Handler) -> <Self as HandlerAlg>::Endpoint
     where
         Handler: OperationAlg + ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
     {
-        SalvoEndpoint::new(Reaching::<
-            Context,
-            Handler,
-            Inputs,
-            Args,
-            <Transform as OutputKindAlg<Self, Output>>::Transform,
-        > {
+        SalvoEndpoint::new(Reaching::<Context, Handler, Inputs, Args, Answering> {
             context: Arc::clone(&self.context),
             handler: Arc::new(handler),
             marker: PhantomData,

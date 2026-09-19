@@ -61,15 +61,15 @@ impl<Context> HttpInputAlg for ActixHandlerImpl<Context> {
     type Context<I> = ActixRequestInput<I>;
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output>
-    for ActixHandlerImpl<Context>
+impl<Context, Inputs, Args, Transform, Answering, Output>
+    HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output> for ActixHandlerImpl<Context>
 where
     Context: Send + Sync + 'static,
     Inputs: ActixInputsAlg<Args> + 'static,
     Args: 'static,
     Output: 'static,
-    Transform: OutputKindAlg<Self, Output> + 'static,
-    <Transform as OutputKindAlg<Self, Output>>::Transform: OutputAlg<Output, Output = HttpResponse>,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering> + 'static,
+    Answering: OutputAlg<Output, Output = HttpResponse>,
 {
     fn finish_handler<Handler>(&self, handler: Handler) -> <Self as HandlerAlg>::Endpoint
     where
@@ -95,7 +95,7 @@ where
                     };
                     let output = handler.apply(context, inputs).await;
 
-                    <Transform as OutputKindAlg<Self, Output>>::Transform::output(output)
+                    Answering::output(output)
                 }
             })
         })

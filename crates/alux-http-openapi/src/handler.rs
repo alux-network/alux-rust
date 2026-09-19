@@ -85,13 +85,13 @@ impl<Context> HttpInputAlg for OpenApiHandlerImpl<Context> {
     type Context<I> = OpenApiUnstatedInput<I>;
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output>
-    for OpenApiHandlerImpl<Context>
+impl<Context, Inputs, Args, Transform, Answering, Output>
+    HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output> for OpenApiHandlerImpl<Context>
 where
     Context: Send + Sync + 'static,
     Inputs: OpenApiInputsAlg,
-    Transform: OutputKindAlg<Self, Output>,
-    <Transform as OutputKindAlg<Self, Output>>::Transform: OpenApiOutputAlg<Output>,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering>,
+    Answering: OpenApiOutputAlg<Output>,
 {
     fn finish_handler<Handler>(&self, _handler: Handler) -> <Self as HandlerAlg>::Endpoint
     where
@@ -105,7 +105,7 @@ where
             operation: Handler::NAME,
             doc: Handler::DOC,
             arguments,
-            answers: <Transform as OutputKindAlg<Self, Output>>::Transform::answers(&self.schema),
+            answers: Answering::answers(&self.schema),
         }
     }
 }

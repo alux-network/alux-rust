@@ -57,15 +57,15 @@ impl<Context> HttpInputAlg for DirectHandlerImpl<Context> {
     type Context<I> = DirectHeadInput<I>;
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output>
-    for DirectHandlerImpl<Context>
+impl<Context, Inputs, Args, Transform, Answering, Output>
+    HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output> for DirectHandlerImpl<Context>
 where
     Context: Send + Sync + 'static,
     Inputs: DirectInputsAlg<Args> + Send + 'static,
     Args: Send + 'static,
     Output: Send + 'static,
-    Transform: OutputKindAlg<Self, Output> + Send + 'static,
-    <Transform as OutputKindAlg<Self, Output>>::Transform: OutputAlg<Output, Output = DirectResponse>,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering> + Send + 'static,
+    Answering: OutputAlg<Output, Output = DirectResponse>,
 {
     fn finish_handler<Handler>(&self, handler: Handler) -> <Self as HandlerAlg>::Endpoint
     where
@@ -83,7 +83,7 @@ where
                 };
                 let output = handler.apply(context, inputs).await;
 
-                <Transform as OutputKindAlg<Self, Output>>::Transform::output(output)
+                Answering::output(output)
             })
         })
     }

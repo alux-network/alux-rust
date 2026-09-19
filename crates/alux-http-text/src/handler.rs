@@ -24,11 +24,11 @@ impl HandlerAlg for TextHandlerImpl {
     type Endpoint = TextEndpoint;
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Context, Inputs, Args, Transform, Output>
-    for TextHandlerImpl
+impl<Context, Inputs, Args, Transform, Answering, Answered, Output>
+    HandlerEndpointAlg<Context, Inputs, Args, Transform, Output> for TextHandlerImpl
 where
-    Transform: OutputKindAlg<TextHandlerImpl, Output>,
-    Transform::Transform: OutputAlg<Output>,
+    Transform: OutputKindAlg<TextHandlerImpl, Output, Transform = Answering>,
+    Answering: OutputAlg<Output, Output = Answered>,
 {
     fn finish_handler<Handler>(&self, _handler: Handler) -> TextEndpoint
     where
@@ -39,8 +39,8 @@ where
             inputs: type_name::<Inputs>(),
             args: type_name::<Args>(),
             result: type_name::<Output>(),
-            transform: type_name::<<Transform as OutputKindAlg<Self, Output>>::Transform>(),
-            output: type_name::<<<Transform as OutputKindAlg<Self, Output>>::Transform as OutputAlg<Output>>::Output>(),
+            transform: type_name::<Answering>(),
+            output: type_name::<Answered>(),
         }
     }
 }
