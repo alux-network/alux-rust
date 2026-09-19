@@ -6,14 +6,14 @@
 //! kinds, and `Arc` for the runtime handle of a semantic context. It also states an endpoint as what
 //! makes one, because actix-web configures its routes again for every worker.
 
-#![allow(async_fn_in_trait)]
-
 mod handler;
 mod input;
 mod output;
 mod route;
+mod server;
 
 pub use handler::*;
 pub use input::*;
 pub use output::*;
 pub use route::*;
+pub use server::*;

@@ -22,6 +22,7 @@ alux-http-parts.workspace = true
 futures.workspace = true
 serde.workspace = true
 serde_urlencoded.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 alux-http-conformance.workspace = true
