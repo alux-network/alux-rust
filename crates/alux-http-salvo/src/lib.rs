@@ -6,14 +6,14 @@
 //! `Arc` for the runtime handle of a semantic context. A Salvo handler writes into the response it
 //! is given, so every output kind here answers with one.
 
-#![allow(async_fn_in_trait)]
-
 mod handler;
 mod input;
 mod output;
 mod route;
+mod server;
 
 pub use handler::*;
 pub use input::*;
 pub use output::*;
 pub use route::*;
+pub use server::*;

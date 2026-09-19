@@ -22,6 +22,7 @@ futures.workspace = true
 salvo.workspace = true
 serde.workspace = true
 serde_urlencoded.workspace = true
+tokio.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
