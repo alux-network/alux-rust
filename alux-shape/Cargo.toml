@@ -1,6 +1,6 @@
 [package]
 name = "alux-shape"
-version = "0.1.0"
+version = "0.1.1"
 description = "Data shapes as a first-order program, independent of any encoder"
 documentation = "https://docs.rs/alux-shape"
 authors.workspace = true

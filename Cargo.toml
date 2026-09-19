@@ -13,47 +13,47 @@ rust-version = "1.97"
 
 [workspace.dependencies]
 alux-bench = { version = "0.1", path = "alux-bench" }
-alux-bench-criterion = { path = "crates/alux-bench-criterion" }
-alux-bench-direct = { path = "crates/alux-bench-direct" }
+alux-bench-criterion = { version = "0.1", path = "crates/alux-bench-criterion" }
+alux-bench-direct = { version = "0.1", path = "crates/alux-bench-direct" }
 alux-ext = { version = "0.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.1", path = "macros/alux-ext-macros" }
-alux-http = { version = "0.2", path = "alux-http" }
-alux-http-actix = { path = "crates/alux-http-actix" }
-alux-http-axum = { path = "crates/alux-http-axum" }
-alux-http-conformance = { path = "crates/alux-http-conformance" }
-alux-http-direct = { path = "crates/alux-http-direct" }
-alux-http-hyper = { path = "crates/alux-http-hyper" }
-alux-http-openapi = { path = "crates/alux-http-openapi" }
-alux-http-parts = { path = "crates/alux-http-parts" }
-alux-http-poem = { path = "crates/alux-http-poem" }
-alux-http-rocket = { path = "crates/alux-http-rocket" }
-alux-http-salvo = { path = "crates/alux-http-salvo" }
-alux-http-text = { path = "crates/alux-http-text" }
-alux-http-typescript = { path = "crates/alux-http-typescript" }
-alux-http-warp = { path = "crates/alux-http-warp" }
+alux-http = { version = "0.3", path = "alux-http" }
+alux-http-actix = { version = "0.1", path = "crates/alux-http-actix" }
+alux-http-axum = { version = "0.1", path = "crates/alux-http-axum" }
+alux-http-conformance = { version = "0.1", path = "crates/alux-http-conformance" }
+alux-http-direct = { version = "0.1", path = "crates/alux-http-direct" }
+alux-http-hyper = { version = "0.1", path = "crates/alux-http-hyper" }
+alux-http-openapi = { version = "0.1", path = "crates/alux-http-openapi" }
+alux-http-parts = { version = "0.1", path = "crates/alux-http-parts" }
+alux-http-poem = { version = "0.3", path = "crates/alux-http-poem" }
+alux-http-rocket = { version = "0.1", path = "crates/alux-http-rocket" }
+alux-http-salvo = { version = "0.1", path = "crates/alux-http-salvo" }
+alux-http-text = { version = "0.3", path = "crates/alux-http-text" }
+alux-http-typescript = { version = "0.1", path = "crates/alux-http-typescript" }
+alux-http-warp = { version = "0.1", path = "crates/alux-http-warp" }
 alux-jsonrpc = { version = "0.3", path = "alux-jsonrpc" }
-alux-jsonrpc-direct = { path = "crates/alux-jsonrpc-direct" }
-alux-jsonrpc-jsonrpsee = { path = "crates/alux-jsonrpc-jsonrpsee" }
-alux-jsonrpc-typescript = { path = "crates/alux-jsonrpc-typescript" }
+alux-jsonrpc-direct = { version = "0.2", path = "crates/alux-jsonrpc-direct" }
+alux-jsonrpc-jsonrpsee = { version = "0.3", path = "crates/alux-jsonrpc-jsonrpsee" }
+alux-jsonrpc-typescript = { version = "0.2", path = "crates/alux-jsonrpc-typescript" }
 alux-sdk = { version = "0.3", path = "alux-sdk" }
 alux-sdk-macros = { version = "0.1", path = "macros/alux-sdk-macros" }
 alux-shape = { version = "0.1", path = "alux-shape" }
 alux-shape-json = { version = "0.1", path = "crates/alux-shape-json" }
-alux-shape-jsonschema = { path = "crates/alux-shape-jsonschema" }
+alux-shape-jsonschema = { version = "0.1", path = "crates/alux-shape-jsonschema" }
 alux-shape-macros = { version = "0.1", path = "macros/alux-shape-macros" }
-alux-shape-morph = { path = "crates/alux-shape-morph" }
-alux-shape-rust = { path = "crates/alux-shape-rust" }
-alux-shape-term = { path = "crates/alux-shape-term" }
+alux-shape-morph = { version = "0.1", path = "crates/alux-shape-morph" }
+alux-shape-rust = { version = "0.1", path = "crates/alux-shape-rust" }
+alux-shape-term = { version = "0.1", path = "crates/alux-shape-term" }
 alux-shape-text = { version = "0.1", path = "crates/alux-shape-text" }
 alux-shape-typescript = { version = "0.1", path = "crates/alux-shape-typescript" }
-alux-tokio = { path = "crates/alux-tokio" }
+alux-tokio = { version = "0.3", path = "crates/alux-tokio" }
 alux-traversable = { version = "0.1", path = "alux-traversable" }
 
 actix-web = "4"
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }
 bytes = "1"
-criterion = "0.5"
+criterion = "0.8"
 http-body-util = "0.1"
 hyper = "1"
 log = "0.4"
@@ -63,7 +63,7 @@ derive-new = "0.7"
 extend = "1"
 futures = "0.3"
 jsonrpsee = { version = "0.26", features = ["server", "macros"] }
-mockall = "0.14"
+mockall = "0.15"
 multer = "3"
 paste = "1"
 poem = { version = "3", features = ["multipart"] }
@@ -78,7 +78,7 @@ serde_json = "1"
 serde_urlencoded = "0.7"
 syn = { version = "3", features = ["full", "visit", "visit-mut"] }
 thiserror = "2"
-trait-set = "0.3"
+trait-set = "0.5"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "time"] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = ["io"] }
