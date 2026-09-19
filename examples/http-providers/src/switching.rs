@@ -37,7 +37,8 @@ impl Switching {
     ///
     /// # Panics
     ///
-    /// Panics where the server stops before it answers, or does not answer inside [`STARTS`].
+    /// Panics where the server stops before it answers, or does not answer before starting it
+    /// times out.
     pub fn started() -> Self {
         let mut serving = Self::starting();
         serving.wait_for_server().expect("the example serves");
@@ -45,7 +46,8 @@ impl Switching {
         serving
     }
 
-    /// Drives `rounds` switches across [`CLIENTS`] clients, and answers how long they took.
+    /// Drives `rounds` switches, split evenly between the clients sending at once, and answers how
+    /// long they took.
     ///
     /// Every client takes its own share of the rounds, so what is measured is the switches the
     /// server answered rather than the clients waiting for each other.
