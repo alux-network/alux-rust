@@ -1,0 +1,26 @@
+[package]
+name = "alux-http-typescript"
+version = "0.1.0"
+description = "TypeScript client interpretation of ALUX typed HTTP programs"
+documentation = "https://docs.rs/alux-http-typescript"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-http.workspace = true
+alux-shape.workspace = true
+alux-shape-typescript.workspace = true
+
+[dev-dependencies]
+alux-http-conformance.workspace = true
+alux-http-text.workspace = true
+serde.workspace = true

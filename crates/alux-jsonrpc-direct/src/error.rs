@@ -1,4 +1,5 @@
 use alux_jsonrpc::RpcErrorAlg;
+use core::error::Error;
 use core::fmt::{self, Display};
 use derive_new::new as New;
 use serde::Serialize;
@@ -55,7 +56,7 @@ impl Display for RpcError {
     }
 }
 
-impl core::error::Error for RpcError {}
+impl Error for RpcError {}
 
 /// A domain can answer with this error directly, stating its own code and message.
 impl RpcErrorAlg for RpcError {

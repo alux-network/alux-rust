@@ -1,0 +1,69 @@
+name: 🧹 Cleanup Actions cache
+
+# Prune GitHub Actions caches weekly. Build caches accumulate quickly and the repo has a hard 10 GB
+# quota (oldest are evicted once exceeded), so drop what nothing is using: a cache no run has read
+# for MAX_AGE_DAYS goes, and everything a branch or an open PR still hits stays warm.
+#
+# Age is measured from the last read, not from creation: a cache that is still being hit every day
+# is the one worth keeping, however old it is, and one nothing has touched is dead weight whenever
+# it was made. GitHub evicts unread caches at 7 days on its own; this is the backstop that also
+# reclaims the quota when that eviction lags.
+
+on:
+  schedule:
+    # Weekly, Monday 23:00 UTC.
+    - cron: '0 23 * * 1'
+  # Allow a manual run from the Actions tab.
+  workflow_dispatch:
+
+# Deleting caches requires `actions: write`; nothing else is touched.
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cache-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: 🧹 Prune caches
+    runs-on: ubuntu-latest
+    steps:
+    - name: Delete caches nothing has read lately
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        MAX_AGE_DAYS: 10
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        # All caches across pages as: id<TAB>last_accessed_at<TAB>ref<TAB>key
+        caches=$(gh api --paginate "/repos/$REPO/actions/caches?per_page=100" \
+          -q '.actions_caches[] | [.id, .last_accessed_at, .ref, .key] | @tsv')
+
+        if [ -z "$caches" ]; then
+          echo "No caches to prune."
+          exit 0
+        fi
+
+        cutoff=$(date -u -d "$MAX_AGE_DAYS days ago" +%s)
+        echo "Keeping every cache read since $(date -u -d "@$cutoff" '+%Y-%m-%d %H:%M UTC')."
+
+        kept=0
+        deleted=0
+        while IFS=$'\t' read -r id accessed ref key; do
+          [ -n "$id" ] || continue
+          if [ "$(date -u -d "$accessed" +%s)" -ge "$cutoff" ]; then
+            kept=$((kept + 1))
+            continue
+          fi
+          echo "Deleting cache $id ($ref, $key, last read $accessed)"
+          # A cache may vanish (concurrent eviction) between listing and delete; don't fail the run.
+          gh api -X DELETE "/repos/$REPO/actions/caches/$id" --silent \
+            && deleted=$((deleted + 1)) \
+            || echo "  warn: could not delete $id (already gone?)"
+        done <<< "$caches"
+
+        echo "Done. Kept $kept, deleted $deleted."

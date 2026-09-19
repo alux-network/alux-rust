@@ -1,0 +1,20 @@
+[package]
+name = "alux-bench-criterion"
+version = "0.1.0"
+description = "Criterion interpreter for alux-bench benchmark programs"
+documentation = "https://docs.rs/alux-bench-criterion"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-bench.workspace = true
+criterion.workspace = true
+derive-new.workspace = true

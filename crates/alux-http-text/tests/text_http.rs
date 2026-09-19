@@ -3,17 +3,24 @@
 //! The domain and its programs are declared here the way a downstream author would, then folded by the
 //! text interpreter, which executes no handler and only records what each endpoint denotes.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::{ApplyAlg, ext};
 use alux_http::{
-    CompileRouteProgram, FileOutAlg, HttpApiAlg, HttpProgramBuilder, HttpProgramExt, HttpSelectorAlg, JsonOutAlg,
-    RouteAlg, RouteAlgExt, SelectorAlg, http,
+    CompileRouteProgram, FileOutAlg, HttpApiAlg, HttpMethod, HttpProgramBuilder, HttpProgramExt, HttpSelectorAlg,
+    JsonOutAlg, NamedValuesAlg, RouteAlg, RouteAlgExt, RoutePath, SelectorAlg, http,
 };
 use alux_http_text::TextHandlerImpl;
 use core::convert::Infallible;
 use core::future::Future;
 use std::sync::Arc;
+
+/// What a caller searches by, stated as the query string carries it.
+struct Term {
+    // The text interpretation reads nothing, so this member is stated and never taken.
+    #[allow(dead_code)]
+    term: String,
+}
+
+impl NamedValuesAlg for Term {}
 
 /// Describes the domain status capability interpreted by this test.
 trait StatusAlg {
@@ -60,7 +67,7 @@ where
         self.status().await
     }
 
-    async fn status_for_query(&self, query: String) -> This::Status {
+    async fn status_for_query(&self, query: Term) -> This::Status {
         let _ = query;
         self.status().await
     }
@@ -100,7 +107,7 @@ where
             // One identified reading, its id taken from the path.
             .get("/status/:id", self.op(Alg::status_for_path).path::<u32>().json())
             // A search, its term taken from the query string.
-            .get("/status_search", self.op(Alg::status_for_query).query::<String>().json())
+            .get("/status_search", self.op(Alg::status_for_query).query::<Term>().json())
             // An adjustment, its temperature taken from the request body.
             .post("/set_temp", self.op(Alg::status_adjusted).body::<f32>().json())
     }
@@ -118,6 +125,29 @@ where
     {
         // The file and the name to offer it under.
         self.routes().get("/download", self.op(Alg::download_current).file())
+    }
+}
+
+#[ext(name = MethodApiExt, defunc(via = http))]
+impl<This> This
+where
+    This: HttpApiAlg + JsonOutAlg,
+{
+    /// Declares one route per request method, so every method the specification names is witnessed.
+    fn method_api<Alg>(&self)
+    where
+        Alg: StatusAlg,
+    {
+        self.routes()
+            .get("/status", self.op(Alg::status_current).json())
+            .post("/status", self.op(Alg::status_current).json())
+            .put("/status", self.op(Alg::status_current).json())
+            .patch("/status", self.op(Alg::status_current).json())
+            .delete("/status", self.op(Alg::status_current).json())
+            .head("/status", self.op(Alg::status_current).json())
+            .options("/status", self.op(Alg::status_current).json())
+            .trace("/status", self.op(Alg::status_current).json())
+            .connect("/status", self.op(Alg::status_current).json())
     }
 }
 
@@ -185,17 +215,26 @@ fn describes_example_http_surface() {
     assert!(api_lines[0].starts_with("### GET /status"));
     assert!(api_lines[0].contains("- `output`: `f32`"));
     assert!(api_lines[0].contains("TextJsonOutput"));
-    assert!(api_lines[1].starts_with("### GET /status/:id"));
+    assert!(api_lines[1].starts_with("### GET /status/{id}"));
     assert!(api_lines[1].contains("PathRole"));
     assert!(api_lines[1].contains("- `args`: `(u32,)`"));
     assert!(api_lines[2].starts_with("### GET /status_search"));
     assert!(api_lines[2].contains("QueryRole"));
-    assert!(api_lines[2].contains("- `args`: `(alloc::string::String,)`"));
+    assert!(api_lines[2].contains("Term"));
     assert!(api_lines[3].starts_with("### POST /set_temp"));
     assert!(api_lines[3].contains("BodyRole"));
     assert!(api_lines[3].contains("- `args`: `(f32,)`"));
     assert!(api_lines[4].starts_with("### GET /download"));
     assert!(api_lines[4].contains("TextFileOutput"));
+}
+
+#[test]
+fn describes_one_route_for_every_request_method() {
+    let api = TextHandlerImpl;
+    let routes = api.compile_http(api.method_api::<TestStatus>());
+    let expected = HttpMethod::ALL.iter().map(|method| format!("{} /status", method.label())).collect::<Vec<_>>();
+
+    assert_eq!(routes.labels(), expected);
 }
 
 #[test]
@@ -223,9 +262,12 @@ fn composes_routes_categorically() {
     assert_eq!(api.coproduct(api.initial(), routes.clone()), routes);
     assert_eq!(api.precompose(api.identity(), routes.clone()), routes);
 
-    let composed = api.compose(api.http_prefix("/api"), api.http_prefix("/v1"));
+    let composed = api.compose(api.http_prefix(&RoutePath::parse("/api")), api.http_prefix(&RoutePath::parse("/v1")));
     let together = api.precompose(composed, routes.clone());
-    let nested = api.precompose(api.http_prefix("/api"), api.precompose(api.http_prefix("/v1"), routes));
+    let nested = api.precompose(
+        api.http_prefix(&RoutePath::parse("/api")),
+        api.precompose(api.http_prefix(&RoutePath::parse("/v1")), routes),
+    );
 
     assert_eq!(together, nested);
 }

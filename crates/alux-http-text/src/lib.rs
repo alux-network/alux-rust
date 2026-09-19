@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 //! Interprets typed HTTP programs as readable route and type descriptions.
 //!
 //! The text interpretation executes no handler. It records the selectors, extractor roles, argument

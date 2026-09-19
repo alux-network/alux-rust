@@ -23,7 +23,21 @@ generator without an explicit scope decision. Downstream crates own their domain
 | `alux-jsonrpc` | Neutral typed JSON-RPC syntax, algebras, and folds |
 | `alux-http-text` | Text and metadata interpretation of an HTTP program |
 | `alux-http-poem` | Poem interpretation of an HTTP program |
+| `alux-http-axum` | axum interpretation of an HTTP program |
+| `alux-http-actix` | actix-web interpretation of an HTTP program |
+| `alux-http-salvo` | Salvo interpretation of an HTTP program |
+| `alux-http-warp` | warp interpretation of an HTTP program |
+| `alux-http-rocket` | Rocket interpretation of an HTTP program |
+| `alux-http-direct` | Interpretation of an HTTP program that answers it with no framework |
+| `alux-http-openapi` | OpenAPI interpretation of an HTTP program |
+| `alux-http-typescript` | TypeScript client interpretation of an HTTP program |
+| `alux-http-hyper` | Serves the direct interpretation of an HTTP program over hyper |
+| `alux-http-parts` | Reads a body arriving as parts, for interpretations whose framework does not |
+| `alux-http-conformance` | One declared HTTP surface and the scenario every interpretation satisfies |
 | `alux-jsonrpc-jsonrpsee` | jsonrpsee interpretation of a JSON-RPC program |
+| `alux-bench` | Neutral statement of what a benchmark measures, with no harness |
+| `alux-bench-direct` | Measures a stated bench by running it, saying each case as it finishes |
+| `alux-bench-criterion` | Measures a stated bench as criterion groups and functions |
 
 Dependency arrows point toward `alux-ext`. The specification crates declare exactly one dependency,
 `alux-ext`, and re-export the macro backends they own from `alux_ext::macros`.
@@ -31,7 +45,15 @@ Dependency arrows point toward `alux-ext`. The specification crates declare exac
 ```text
 alux-http-text ------\
                       -> alux-http ------\
-alux-http-poem ------/                    -> alux-ext -> alux-ext-macros
+alux-http-poem ------|                    -> alux-ext -> alux-ext-macros
+alux-http-axum ------|
+alux-http-actix -----|
+alux-http-salvo -----|
+alux-http-warp ------|
+alux-http-rocket ----|
+alux-http-direct ----|
+alux-http-openapi ---|
+alux-http-typescript -/
 alux-jsonrpc-jsonrpsee -> alux-jsonrpc --/
 ```
 

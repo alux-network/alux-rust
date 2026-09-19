@@ -11,8 +11,8 @@ use alux_http::{FileOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, http};
 use alux_http_poem::PoemHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use common::{
-    App, DownloadAlg, DownloadCurrentOperation, StatusAdjustedOperation, StatusAlg, StatusCurrentOperation,
-    StatusForIdOperation,
+    App, DownloadAlg, DownloadCurrentOperation, StatusAdjustedOperation, StatusAlg, StatusClearedOperation,
+    StatusCurrentOperation, StatusForIdOperation, StatusMovedOperation, StatusReplacedOperation,
 };
 use expect::expect_example_api;
 
@@ -33,6 +33,12 @@ where
             .get("/status/:id", self.op(Alg::status_for_id).path::<u32>().json())
             // An adjustment, its temperature taken from the request body.
             .post("/set_temp", self.op(Alg::status_adjusted).body::<f32>().json())
+            // A wholesale replacement, its reading taken from the request body.
+            .put("/status", self.op(Alg::status_replaced).body::<u32>().json())
+            // A partial move, its delta taken from the request body.
+            .patch("/status", self.op(Alg::status_moved).body::<i32>().json())
+            // The removal of one identified reading, its id taken from the path.
+            .delete("/status/:id", self.op(Alg::status_cleared).path::<u32>().json())
             // The file and the name to offer it under.
             .get("/download", self.op(Alg::download_current).file())
     }
@@ -55,5 +61,16 @@ fn agrees_with_the_text_interpretation_on_the_same_program() {
     let compiled = poem.compile_http(poem.example_api::<App>());
 
     assert_eq!(compiled.labels(), described.labels());
-    assert_eq!(compiled.labels(), ["GET /status", "GET /status/:id", "POST /set_temp", "GET /download"]);
+    assert_eq!(
+        compiled.labels(),
+        [
+            "GET /status",
+            "GET /status/{id}",
+            "POST /set_temp",
+            "PUT /status",
+            "PATCH /status",
+            "DELETE /status/{id}",
+            "GET /download",
+        ]
+    );
 }

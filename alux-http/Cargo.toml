@@ -16,4 +16,5 @@ workspace = true
 
 [dependencies]
 alux-ext.workspace = true
+futures.workspace = true
 trait-set.workspace = true

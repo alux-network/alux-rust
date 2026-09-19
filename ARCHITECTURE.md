@@ -30,11 +30,27 @@ extracting inputs, applying the operation, converting output, and registering th
 | JSON-RPC lowering | `alux-ext-macros::jsonrpc_program` | States what a method declaration means and compiles it through `JsonRpcProgramAlg` |
 | HTTP interpreter algebra | `alux-http::algebra` and `output` | Selectors, routes, input roles, context handles, endpoints, and output conversion |
 | HTTP first-order syntax | `alux-http::program` | Empty, merge, nest, endpoint, input, and output nodes plus the generic fold |
+| HTTP server lifecycle | `alux-http::server` | Bound setup values, ordered open/close commands, address-releasing close and draining end, and lifecycle events |
 | Neutral HTTP witness | `alux-http-text` | Interprets one HTTP program as readable type/route documentation |
 | Poem HTTP witness | `alux-http-poem` | Interprets the same program as executable Poem endpoints |
+| axum HTTP witness | `alux-http-axum` | Interprets the same program as an executable axum router |
+| actix-web HTTP witness | `alux-http-actix` | Interprets the same program as executable actix-web routes |
+| Salvo HTTP witness | `alux-http-salvo` | Interprets the same program as an executable Salvo router |
+| warp HTTP witness | `alux-http-warp` | Interprets the same program as an executable warp filter |
+| Rocket HTTP witness | `alux-http-rocket` | Interprets the same program as executable Rocket routes |
+| Direct HTTP witness | `alux-http-direct` | Answers the same program itself, with no framework |
+| OpenAPI HTTP witness | `alux-http-openapi` | Reads the same program as the document that describes it |
+| Client HTTP witness | `alux-http-typescript` | Reads the same program as the TypeScript client that calls it |
+| Transport | `alux-http-hyper` | Serves the direct interpretation over hyper, with no framework |
+| Shared reading | `alux-http-parts` | Reads a body arriving as parts, where a framework does not |
+| Shared obligation | `alux-http-conformance` | One declared surface and the scenario every interpretation satisfies |
 | JSON-RPC interpreter algebra | `alux-jsonrpc::algebra` | Empty/merge semantics and positional/named method registration |
 | JSON-RPC first-order syntax | `alux-jsonrpc::program` | Empty, merge, named program, method, and parameter-mode nodes plus the generic fold |
 | jsonrpsee witness | `alux-jsonrpc-jsonrpsee` | Interprets one JSON-RPC program as a jsonrpsee method collection |
+| Bench algebra | `alux-bench::measure` | Stating groups of named cases, and measuring what was stated, as two capabilities |
+| Bench first-order syntax | `alux-bench::program` | Group, case, and routine nodes plus the sampling a case is measured over |
+| Direct bench witness | `alux-bench-direct` | Measures a stated bench by running it, one group at a time |
+| Criterion bench witness | `alux-bench-criterion` | Measures the same bench as criterion groups and functions |
 
 The dependency direction is:
 
@@ -47,7 +63,20 @@ downstream specification
 application
     |----------------> alux-http-text --------> alux-http
     |----------------> alux-http-poem --------> alux-http + poem
-    `----------------> alux-jsonrpc-jsonrpsee -> alux-jsonrpc + jsonrpsee
+    |----------------> alux-http-axum --------> alux-http + axum
+    |----------------> alux-http-actix -------> alux-http + actix-web
+    |----------------> alux-http-salvo -------> alux-http + salvo
+    |----------------> alux-http-warp --------> alux-http + warp
+    |----------------> alux-http-rocket ------> alux-http + rocket
+    |----------------> alux-http-direct ------> alux-http
+    |----------------> alux-http-parts -------> alux-http
+    |----------------> alux-http-hyper -------> alux-http + alux-http-direct + hyper
+    |----------------> alux-http-openapi -----> alux-http + alux-shape
+    |----------------> alux-http-typescript --> alux-http + alux-shape
+    |----------------> alux-http-conformance -> alux-http + alux-http-direct
+    |----------------> alux-jsonrpc-jsonrpsee -> alux-jsonrpc + jsonrpsee
+    |----------------> alux-bench-direct -----> alux-bench
+    `----------------> alux-bench-criterion --> alux-bench + criterion
 
 alux-ext -----------> alux-ext-macros
 ```
@@ -153,18 +182,72 @@ procedural macro.
 
 - path values
 - query values
-- request bodies
+- request bodies read as a document
+- request bodies read as a form
+- request bodies taken as they arrived
+- request bodies arriving as parts
 - headers
+- cookies
 - authentication values
 - endpoint context values
+
+A query string, a header collection, and a cookie collection are names and values, so an argument
+read from one of them states `NamedValuesAlg`: it is a product, and a document keys one parameter per
+member rather than one parameter carrying the product. Nothing in a type says whether it is a
+product, so the type says it, which makes a value stating no names a compile error rather than one a
+caller finds on the first request. A header parameter is keyed the way the wire spells a header name,
+which is `write_header_name` rather than the member's own spelling.
+
+Headers and cookies are names and values, so an argument read from either is an ordinary product and
+an author states a type of their own rather than a framework's. `read_header_name` states the one
+rule that makes it portable: a header name is words, spelled with `-` and lowercased on the wire and
+with `_` in an argument. A framework's own extractor is what the endpoint-context role states, which
+is the escape hatch rather than the default.
+
+Several roles may still reach one extractor. An authentication value is a header, so it is read as
+one, and that is a correct interpretation rather than a missing distinction: the roles differ in what
+they mean, which is what a description or an OpenAPI document reads, not in how one framework happens
+to extract them.
 
 Neutral markers such as `Path<T>`, `Query<T>`, and `Body<T>` preserve those roles until the fold.
 They accumulate in the same order as the handler's argument product. The program does not parse or
 deserialize anything itself.
 
-Output roles are similarly delayed. `JsonOut` and `FileOut` select a family of conversions through
+Output roles are similarly delayed. `JsonOut`, `FileOut`, `TextOut`, `HtmlOut`, `BytesOut`,
+`EmptyOut`, `RedirectOut`, and `StreamOut` each select a family of conversions through
 `OutputKindAlg`; the handler result remains inferred from `ApplyAlg`. An API declaration therefore
-does not restate its return type merely to choose JSON or file response semantics.
+does not restate its return type merely to choose what it answers with.
+
+A body arriving as parts is the reading counterpart of one answered over time, and it is the same
+algebra: a sequence of parts is `ChunksAlg` whose chunk is a `PartAlg`, and a part's content is a
+sequence once more. What an author names states `FromPartsAlg`, so a domain says what it makes of
+parts without naming whichever reader produced them. Poem, axum, and Salvo read parts natively;
+`alux-http-parts` states the reading once for the interpretations whose framework does not, rather
+than copying a parser into each.
+
+A body answered over time is stated by `ChunksAlg` rather than by a stream type: a domain says what
+a chunk is and how the next one is taken, and each interpretation adapts that to whatever moves its
+bytes. That is what keeps `.stream()` from committing a domain to one framework's stream, and it is
+why the direct interpretation can carry a produced body at all, having no framework to hand one to.
+
+A kind is not required to convert every result. `OutputKindAlg` names the converter, and that the
+converter reads the handler's result is required where the endpoint is compiled, so an endpoint
+stating no body converts a handler returning nothing and rejects one returning data. Declaring a
+kind a handler cannot answer is a compile error rather than a value silently discarded.
+
+`HeaderOut<Kind, Name>` answers with a header beside the body `Kind` states, reading the handler's
+result as the header's value and the body. A header is a name and nothing more to a program, so
+`HeaderNameAlg` is the whole of what one states, and a header the specification does not name is a
+marker a domain writes for itself: every interpretation already witnesses `HeaderOutAlg` once and
+answers with whichever name reaches it.
+
+Two kinds read the kind beneath them rather than the handler. `StatusOut<Kind, CODE>` answers with a
+declared status around the body `Kind` states, because the status of a created resource is a
+property of the endpoint rather than a decision inside a handler. `ResultOut<Kind>` reads a handler
+that returns `Result`: the success answers with `Kind`, and the failure answers with what
+`HttpErrorAlg` says it means, as a portable `HttpStatus` and a message. A domain states its
+failures, and `HttpErrorAlg` states how they are answered, which keeps status vocabulary out of the
+domain and domain vocabulary out of the interpreters.
 
 ### Selectors and routes
 
@@ -182,13 +265,32 @@ RouteAlg
     lift endpoint
 ```
 
-`HttpSelectorAlg` adds GET, POST, exact-path, and prefix selectors. Fluent names are conventional
-aliases over the neutral structure:
+`HttpSelectorAlg` adds a request-method selector, an exact-path selector, and a prefix selector. A
+method is a value of `HttpMethod` rather than a function per method, so an interpreter witnesses
+every method by interpreting one value, and naming a further method adds no obligation to any
+interpreter. `HttpMethod::ALL` lists the standard methods a surface can answer on. Each has a
+marker type carrying its `HttpMethodAlg::METHOD`, which is what an endpoint declaration is typed by.
 
-- `.get`/`.post` combine a method and path selector around a typed endpoint.
+Fluent names are conventional aliases over the neutral structure:
+
+- `.get`, `.post`, `.put`, `.patch`, `.delete`, `.head`, `.options`, `.trace`, and `.connect`
+  combine a method and path selector around a typed endpoint; `.method` states the same for a method
+  held as a type parameter.
 - `.merge` forms a route coproduct.
 - `.nest` precomposes a route subtree with a prefix.
 - `.at` lifts an already interpreted endpoint at an exact path.
+
+A path is read into `RoutePath` segments when it is declared, not passed along as a string. Routers
+disagree about how a parameter is written, so a path held as a string is a path written for one
+framework: `:id` is Poem's spelling, `{id}` is what axum and actix read, and each states the same
+segment. `RoutePath::parse` accepts either, along with `*rest` and `{*rest}` for a segment that binds
+the remainder, and matches anything else literally.
+
+Each interpreter then spells those segments for its own router through `PathSyntaxAlg`, while
+`describe_path` states a composed path in the one spelling every interpretation shares. That
+separation is what keeps two interpretations of a program comparable: `TextRoute::labels` and
+`PoemRoute::labels` describe the same surface in the same words, and Poem's router is handed
+`PoemSelector::poem_path` instead.
 
 `Empty`, `Merge`, `Nest`, `Named`, and `Endpoint` retain the complete route tree as a Rust type and
 value. `CompileRouteProgram` folds that tree through a chosen interpreter. Named subprograms compile
@@ -205,8 +307,58 @@ not only runtime routing.
 applies operations against shared context handles, converts outputs, and materializes a Poem route.
 Poem-specific bodies, headers, errors, and endpoint erasure remain inside this interpreter.
 
-A future OpenAPI, Axum, documentation, client-generation, or conformance interpreter should fold the
-same first-order program. It must not maintain a parallel route list.
+`AxumHandlerImpl`, published as `alux-http-axum`, folds the same program into an axum `Router`. It
+is the evidence that the program describes a surface rather than one framework's callbacks: axum
+reads paths in a different spelling, filters methods rather than naming them, and routes a `tower`
+service rather than an endpoint, and none of that reached the program. Shared state stays on the
+semantic context handle rather than becoming axum state, because a framework composing domain code
+is the inversion this design exists to avoid.
+
+`ActixHandlerImpl`, `SalvoHandlerImpl`, `WarpHandlerImpl`, and `RocketHandlerImpl` fold the same
+program into the four remaining frameworks, and each one differs from the others somewhere the
+program never learns about. actix-web configures its services again per worker and its `Route` is
+neither cloneable nor reusable, so that interpretation states an endpoint as what makes one. Salvo
+writes into a response it is given rather than returning one. warp holds no route table at all: a
+coproduct is `or` and a selector is the filters a request must pass. Rocket states a method on every
+route and builds a response borrowing the request. None of that reached the declaration.
+
+`DirectHandlerImpl`, published as `alux-http-direct`, hands routing to nobody. It matches a request
+against the segments a program states, binds what they capture, reads each argument, and renders a
+`DirectResponse`, including the 404, 405, and 400 that routing and reading produce. It is the only
+interpretation that can be held to what routing means, and because it answers with values rather
+than framework types it is the reference the others are compared against. It also shows that a
+declared path needs no spelling at all when whoever routes it reads segments directly.
+
+`OpenApiHandlerImpl`, published as `alux-http-openapi`, applies nothing. It reads each endpoint for
+what a caller states and what they are answered with, asking for `alux-shape` shapes where an
+executing interpretation asks for extractors. It is the strictest reader the program has, and four
+things exist in the specification because it could not be written without them: `OperationAlg::NAME`,
+since a type name says where an operation lives rather than what it was called; `OperationAlg::DOC`,
+since what an operation is for is stated in the doc comment the author already wrote and nowhere
+else; the `OperationAlg` bound on `finish_handler`, since an interpretation that names operations to
+a reader has nowhere else to read them from; and `HttpErrorAlg::HTTP_STATUSES`, since an interpretation
+that folds a program never holds a failure to ask what it means.
+
+A doc comment already reads as a summary and then a description, so that is how both describing
+interpretations state it: OpenAPI writes the first line as `summary` and the rest as `description`,
+and the TypeScript client writes the whole of it as the comment above each call. A successful
+response is described by what its operation was documented as; what a failure answers with the
+program never says in words, so no document invents any.
+
+`TsHttpClient`, published as `alux-http-typescript`, folds the same program from the caller's side:
+what a caller states, where each argument goes, and what comes back. A path needs no second spelling
+there either, because a described path is already the template a call fills in. It is the evidence
+that a program is direction-neutral rather than a description of a server.
+
+`alux-http-conformance` states one declared surface and the exchanges every interpretation of it
+must satisfy. Two interpretations agreeing is evidence only when both were held to the same thing,
+and that is what this holds them to: the executing ones answer the exchanges, and the describing ones
+are held to the same composed surface. The exchanges name methods, paths, media types and statuses,
+and nothing of the domain or of any framework; an interpretation answering with a framework's own
+response states an adapter for `AnswerAlg`, which is the only place a framework is named.
+
+A future interpreter should fold the same first-order program. It must not maintain a parallel route
+list.
 
 ## JSON-RPC program algebra
 
@@ -283,6 +435,15 @@ A specification crate contains only neutral meaning:
   `alux-ext` as their single dependency.
 - `alux-http-text` adds a description interpreter and needs no framework.
 - `alux-http-poem` adds Poem and Serde.
+- `alux-http-axum` adds axum, Tower, and Serde.
+- `alux-http-actix` adds actix-web and Serde.
+- `alux-http-salvo` adds Salvo and Serde.
+- `alux-http-warp` adds warp, Bytes, and Serde.
+- `alux-http-rocket` adds Rocket and Serde.
+- `alux-http-direct` adds Serde and two encodings, and no framework.
+- `alux-http-hyper` adds hyper and the body utilities, and no runtime.
+- `alux-http-openapi` adds `alux-shape` and its JSON Schema interpretation, and no framework.
+- `alux-http-typescript` adds `alux-shape` and its TypeScript interpretation, and no framework.
 - `alux-jsonrpc-jsonrpsee` adds jsonrpsee, Serde, and boundary helper types.
 
 The dependency list of a specification crate is the architectural test: `alux-http` and `alux-jsonrpc`
@@ -311,6 +472,10 @@ Current tests provide finite witnesses:
 - `alux-ext-macros` checks generated public syntax and rejected forms.
 - `alux-http-text` compiles direct and lowered programs and checks the route laws.
 - `alux-http-poem` executes handlers and compares its ordered surface with the text interpretation.
+- `alux-http-axum` executes the same declaration on a second framework and compares the same surface.
+- `alux-http-direct` answers the same declaration itself, and is where routing's own failures are checked.
+- `alux-http-openapi` reads the same declaration as a document, and is where the surface's description is checked.
+- `alux-http-conformance` states the surface and scenario all of them are held to, which is what makes their agreement evidence.
 - `alux-jsonrpc-jsonrpsee` runs one shared expectation against specification-first and native
   jsonrpsee APIs.
 
@@ -325,8 +490,19 @@ The package graph determines publication order:
 alux-ext-macros
     -> alux-ext
         -> alux-http
+            -> alux-http-parts
             -> alux-http-text
             -> alux-http-poem
+            -> alux-http-axum
+            -> alux-http-actix
+            -> alux-http-salvo
+            -> alux-http-warp
+            -> alux-http-rocket
+            -> alux-http-direct
+            -> alux-http-hyper
+            -> alux-http-openapi
+            -> alux-http-typescript
+            -> alux-http-conformance
         -> alux-jsonrpc
             -> alux-jsonrpc-jsonrpsee
 ```

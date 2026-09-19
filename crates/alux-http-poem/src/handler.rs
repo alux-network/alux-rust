@@ -1,10 +1,12 @@
-use crate::input::{PoemBodyInput, PoemHeaderInput, PoemInputsAlg, PoemPathInput, PoemQueryInput, PoemRequestInput};
-use crate::output::{PoemFileOutput, PoemJsonOutput};
+use crate::input::{
+    PoemBodyInput, PoemCookieInput, PoemFormInput, PoemHeaderInput, PoemInputsAlg, PoemMultipartInput, PoemPathInput,
+    PoemQueryInput, PoemRequestInput,
+};
 use crate::route::{PoemEndpoint, PoemRoute, PoemRouteImpl, PoemSelector};
-use alux_ext::{ApplyAlg, HandlerContextAlg};
+use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use alux_http::{
-    FileOutAlg, HandlerAlg, HandlerEndpointAlg, HttpInputAlg, HttpSelectorAlg, JsonOutAlg, OutputAlg, OutputKindAlg,
-    RouteAlg, SelectorAlg,
+    HandlerAlg, HandlerEndpointAlg, HttpInputAlg, HttpMethod, HttpSelectorAlg, OutputAlg, OutputKindAlg, RouteAlg,
+    RoutePath, SelectorAlg,
 };
 use poem::endpoint::make;
 use poem::{IntoResponse, Request, Response};
@@ -42,32 +44,30 @@ impl<Context> HttpInputAlg for PoemHandlerImpl<Context> {
     type Path<I> = PoemPathInput<I>;
     type Query<I> = PoemQueryInput<I>;
     type Body<I> = PoemBodyInput<I>;
+    type Form<I> = PoemFormInput<I>;
+    type Multipart<I> = PoemMultipartInput<I>;
+    // A body taken as it arrived is whatever Poem reads a whole request into, such as `Vec<u8>`.
+    type RawBody<I> = PoemRequestInput<I>;
     type Header<I> = PoemHeaderInput<I>;
-    type Auth<I> = PoemRequestInput<I>;
+    type Cookie<I> = PoemCookieInput<I>;
+    type Auth<I> = PoemHeaderInput<I>;
     type Context<I> = PoemRequestInput<I>;
 }
 
-impl<Context> JsonOutAlg for PoemHandlerImpl<Context> {
-    type Json<From> = PoemJsonOutput;
-}
-
-impl<Context> FileOutAlg for PoemHandlerImpl<Context> {
-    type File<From> = PoemFileOutput;
-}
-
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output>
-    for PoemHandlerImpl<Context>
+impl<Context, Inputs, Args, Transform, Answering, Answered, Output>
+    HandlerEndpointAlg<Arc<Context>, Inputs, Args, Transform, Output> for PoemHandlerImpl<Context>
 where
     Context: Send + Sync + 'static,
     Inputs: PoemInputsAlg<Args>,
     Args: Send + 'static,
     Output: Send + 'static,
-    Transform: OutputKindAlg<Self, Output>,
-    <<Transform as OutputKindAlg<Self, Output>>::Transform as OutputAlg<Output>>::Output: IntoResponse,
+    Transform: OutputKindAlg<Self, Output, Transform = Answering>,
+    Answering: OutputAlg<Output, Output = Answered>,
+    Answered: IntoResponse,
 {
-    fn finish_handler<H>(&self, handler: H) -> <Self as HandlerAlg>::Endpoint
+    fn finish_handler<Handler>(&self, handler: Handler) -> <Self as HandlerAlg>::Endpoint
     where
-        H: ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
+        Handler: OperationAlg + ApplyAlg<Arc<Context>, Args, Output = Output> + Send + Sync + 'static,
     {
         let context = Arc::clone(&self.context);
         let handler = Arc::new(handler);
@@ -78,9 +78,7 @@ where
                 let (request, mut body) = request.split();
                 let inputs = Inputs::extract(&request, &mut body).await?;
                 let output = handler.apply(context, inputs).await;
-                Ok::<Response, poem::Error>(
-                    <Transform as OutputKindAlg<Self, Output>>::Transform::output(output).into_response(),
-                )
+                Ok::<Response, poem::Error>(Answering::output(output).into_response())
             }
         }))
     }
@@ -123,19 +121,15 @@ impl<Context> RouteAlg for PoemHandlerImpl<Context> {
 impl<Context> HttpSelectorAlg for PoemHandlerImpl<Context> {
     type Selector = PoemSelector;
 
-    fn http_get(&self) -> Self::Selector {
-        HttpSelectorAlg::http_get(&PoemRouteImpl)
+    fn http_method(&self, method: HttpMethod) -> Self::Selector {
+        HttpSelectorAlg::http_method(&PoemRouteImpl, method)
     }
 
-    fn http_post(&self) -> Self::Selector {
-        HttpSelectorAlg::http_post(&PoemRouteImpl)
-    }
-
-    fn http_path(&self, path: &str) -> Self::Selector {
+    fn http_path(&self, path: &RoutePath) -> Self::Selector {
         HttpSelectorAlg::http_path(&PoemRouteImpl, path)
     }
 
-    fn http_prefix(&self, prefix: &str) -> Self::Selector {
+    fn http_prefix(&self, prefix: &RoutePath) -> Self::Selector {
         HttpSelectorAlg::http_prefix(&PoemRouteImpl, prefix)
     }
 }

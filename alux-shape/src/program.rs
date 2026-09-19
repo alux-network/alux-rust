@@ -18,7 +18,7 @@ pub trait ShapeProgramAlg<Alg> {
 }
 
 /// Compiles a shape declaration with an interpretation.
-#[ext(name = ShapeProgramExt, supertraits = Sized)]
+#[ext(name = ShapeProgramExt)]
 pub impl<This> This {
     /// Folds a declaration with this interpretation.
     fn compile_shape<Program>(&self, program: Program) -> Program::Ty
@@ -30,7 +30,7 @@ pub impl<This> This {
 }
 
 /// The operations a declaration's body states.
-#[ext(name = ShapeDeclareExt, supertraits = Sorts + Sized)]
+#[ext(name = ShapeDeclareExt)]
 pub impl<This> This
 where
     This: ShapeAlg + FieldAlg,

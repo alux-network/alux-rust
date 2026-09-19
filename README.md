@@ -3,24 +3,11 @@
 [![Build and Test][ga-badge]][ga-url]
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> [!WARNING]
-> **Operational developers, welcome.** There is very little code here. Nothing to step through, no god
-> object, no framework to blame, nothing to prove the work was hard.
->
-> Side effects may include angst, dizziness, and phantom breakpoints when a whole subsystem fits on one
-> screen. All temporary. Do not operate heavy inheritance hierarchies until they pass.
->
-> Treatment: read the [ALUX programming guidelines](https://alux-network.github.io/alux-programming/)
-> and [`DENOTATIONAL_DESIGN.md`](DENOTATIONAL_DESIGN.md). The meaning is in the trait signatures and
-> the `where` clauses. The code you were looking for is the code that did not have to exist.
->
-> Most developers recover fully and go on to delete things happily.
-
-Reusable Design by Meaning infrastructure for ALUX specifications.
+Reusable Design by Meaning infrastructure for typed programs and their interpreters.
 
 ALUX expects many independently published specification crates. This workspace provides the common
-operation and interface-program vocabulary without centralizing their domain algebras. Each crate is
-one or the other: it states what something means, or it makes something of that statement.
+operation and interface-program vocabulary without centralizing their domain algebras. Each crate has
+one role: it either defines a meaning, or interprets that meaning for a particular purpose.
 
 ## Specifications
 
@@ -30,28 +17,63 @@ procedural macro has to be, and those live under [`macros/`](macros).
 
 | Crate | | Responsibility |
 | --- | --- | --- |
-| [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs, no web framework |
+| [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs and server lifecycle, no web framework |
 | [`alux-jsonrpc`](alux-jsonrpc) | [![crates.io][v-rpc]][c-rpc] [![docs.rs][d-rpc]][r-rpc] | JSON-RPC programs, no RPC framework |
 | [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](macros/alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, no encoder<br>The derive reading one out of a layout |
 | [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](macros/alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
-| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros)<br>[`alux-traversable`](alux-traversable) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros]<br>[![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | Transformations kept as expressions<br>The macros it exports<br>`traverse` over `Option` and iterators |
+| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros] | Transformations kept as expressions<br>The macros it exports |
+| [`alux-traversable`](alux-traversable) | [![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | `traverse` over `Option` and iterators |
+| [`alux-bench`](alux-bench) | [![crates.io][v-bench]][c-bench] [![docs.rs][d-bench]][r-bench] | What a benchmark measures, no harness |
 
 ## Interpretations
 
-What a library makes of a specification. Each is published separately and lives under
-[`crates/`](crates), so the distinction shows in the layout and not only in the dependency graph. A
-specification never names one of these, which is what lets the same statement have several.
+These crates are interpreters, or implementations, of the specifications above. They consume a
+specification and interpret its meaning for a concrete target, such as a web framework, a document,
+or a client. Each is published separately under [`crates/`](crates), so specifications can be used
+without any particular interpreter and the same specification can have several implementations.
 
-### Of a transport program
+### Of an HTTP program
+
+Framework-backed execution:
 
 | Crate | | Interprets a program as |
 | --- | --- | --- |
-| [`alux-http-poem`](crates/alux-http-poem) | [![crates.io][v-poem]][c-poem] [![docs.rs][d-poem]][r-poem] | executable Poem routes |
+| [`alux-http-axum`](crates/alux-http-axum) | [![crates.io][v-axum]][c-axum] [![docs.rs][d-axum]][r-axum] | executable [axum](https://docs.rs/axum) routes |
+| [`alux-http-actix`](crates/alux-http-actix) | [![crates.io][v-actix]][c-actix] [![docs.rs][d-actix]][r-actix] | executable [Actix Web](https://docs.rs/actix-web) routes |
+| [`alux-http-rocket`](crates/alux-http-rocket) | [![crates.io][v-rocket]][c-rocket] [![docs.rs][d-rocket]][r-rocket] | executable [Rocket](https://docs.rs/rocket) routes |
+| [`alux-http-warp`](crates/alux-http-warp) | [![crates.io][v-warp]][c-warp] [![docs.rs][d-warp]][r-warp] | executable [warp](https://docs.rs/warp) filters |
+| [`alux-http-poem`](crates/alux-http-poem) | [![crates.io][v-poem]][c-poem] [![docs.rs][d-poem]][r-poem] | executable [Poem](https://docs.rs/poem) routes |
+| [`alux-http-salvo`](crates/alux-http-salvo) | [![crates.io][v-salvo]][c-salvo] [![docs.rs][d-salvo]][r-salvo] | executable [Salvo](https://docs.rs/salvo) routes |
+
+Framework-free execution:
+
+| Crate | | Interprets a program as |
+| --- | --- | --- |
+| [`alux-http-hyper`](crates/alux-http-hyper) | [![crates.io][v-hyper]][c-hyper] [![docs.rs][d-hyper]][r-hyper] | a [hyper](https://docs.rs/hyper) service around the direct interpretation |
+| [`alux-http-direct`](crates/alux-http-direct) | [![crates.io][v-http-direct]][c-http-direct] [![docs.rs][d-http-direct]][r-http-direct] | direct request and response handling |
+
+Documentation and clients:
+
+| Crate | | Interprets a program as |
+| --- | --- | --- |
+| [`alux-http-typescript`](crates/alux-http-typescript) | [![crates.io][v-http-ts]][c-http-ts] [![docs.rs][d-http-ts]][r-http-ts] | a TypeScript client module |
+| [`alux-http-openapi`](crates/alux-http-openapi) | [![crates.io][v-openapi]][c-openapi] [![docs.rs][d-openapi]][r-openapi] | an OpenAPI document |
 | [`alux-http-text`](crates/alux-http-text) | [![crates.io][v-text]][c-text] [![docs.rs][d-text]][r-text] | documentation or metadata |
-| [`alux-jsonrpc-jsonrpsee`](crates/alux-jsonrpc-jsonrpsee) | [![crates.io][v-rpsee]][c-rpsee] [![docs.rs][d-rpsee]][r-rpsee] | jsonrpsee `Methods` |
-| [`alux-jsonrpc-direct`](crates/alux-jsonrpc-direct) | [![crates.io][v-direct]][c-direct] [![docs.rs][d-direct]][r-direct] | a message handler, no framework |
+
+Shared HTTP support:
+
+| Crate | | Provides |
+| --- | --- | --- |
+| [`alux-http-parts`](crates/alux-http-parts) | [![crates.io][v-parts]][c-parts] [![docs.rs][d-parts]][r-parts] | shared multipart reading |
+| [`alux-http-conformance`](crates/alux-http-conformance) | [![crates.io][v-conformance]][c-conformance] [![docs.rs][d-conformance]][r-conformance] | shared HTTP scenarios |
+
+### Of a JSON-RPC program
+
+| Crate | | Interprets a program as |
+| --- | --- | --- |
 | [`alux-jsonrpc-typescript`](crates/alux-jsonrpc-typescript) | [![crates.io][v-rpc-ts]][c-rpc-ts] [![docs.rs][d-rpc-ts]][r-rpc-ts] | a TypeScript client module |
-| [`alux-tokio`](crates/alux-tokio) | [![crates.io][v-tokio]][c-tokio] [![docs.rs][d-tokio]][r-tokio] | bounded Tokio channels |
+| [`alux-jsonrpc-jsonrpsee`](crates/alux-jsonrpc-jsonrpsee) | [![crates.io][v-rpsee]][c-rpsee] [![docs.rs][d-rpsee]][r-rpsee] | [jsonrpsee](https://docs.rs/jsonrpsee) `Methods` |
+| [`alux-jsonrpc-direct`](crates/alux-jsonrpc-direct) | [![crates.io][v-rpc-direct]][c-rpc-direct] [![docs.rs][d-rpc-direct]][r-rpc-direct] | a message handler, no framework |
 
 ### Of a data shape
 
@@ -60,9 +82,23 @@ specification never names one of these, which is what lets the same statement ha
 | [`alux-shape-rust`](crates/alux-shape-rust) | [![crates.io][v-shape-rust]][c-shape-rust] [![docs.rs][d-shape-rust]][r-shape-rust] | a Rust layout |
 | [`alux-shape-typescript`](crates/alux-shape-typescript) | [![crates.io][v-shape-ts]][c-shape-ts] [![docs.rs][d-shape-ts]][r-shape-ts] | TypeScript declarations |
 | [`alux-shape-json`](crates/alux-shape-json) | [![crates.io][v-shape-json]][c-shape-json] [![docs.rs][d-shape-json]][r-shape-json] | a decision about a JSON value |
+| [`alux-shape-jsonschema`](crates/alux-shape-jsonschema) | [![crates.io][v-shape-jsonschema]][c-shape-jsonschema] [![docs.rs][d-shape-jsonschema]][r-shape-jsonschema] | a JSON Schema document |
 | [`alux-shape-text`](crates/alux-shape-text) | [![crates.io][v-shape-text]][c-shape-text] [![docs.rs][d-shape-text]][r-shape-text] | a readable description |
 | [`alux-shape-term`](crates/alux-shape-term) | [![crates.io][v-shape-term]][c-shape-term] [![docs.rs][d-shape-term]][r-shape-term] | the term itself |
 | [`alux-shape-morph`](crates/alux-shape-morph) | [![crates.io][v-shape-morph]][c-shape-morph] [![docs.rs][d-shape-morph]][r-shape-morph] | another shape |
+
+### Of a benchmark
+
+| Crate | | Measures a stated bench with |
+| --- | --- | --- |
+| [`alux-bench-criterion`](crates/alux-bench-criterion) | [![crates.io][v-bench-criterion]][c-bench-criterion] [![docs.rs][d-bench-criterion]][r-bench-criterion] | [criterion](https://docs.rs/criterion) groups and functions |
+| [`alux-bench-direct`](crates/alux-bench-direct) | [![crates.io][v-bench-direct]][c-bench-direct] [![docs.rs][d-bench-direct]][r-bench-direct] | its own runner, saying each case as it finishes |
+
+### Other interpretations
+
+| Crate | | Interprets a value as |
+| --- | --- | --- |
+| [`alux-tokio`](crates/alux-tokio) | [![crates.io][v-tokio]][c-tokio] [![docs.rs][d-tokio]][r-tokio] | bounded [Tokio](https://docs.rs/tokio) channels |
 
 ## Semantic shape
 
@@ -106,11 +142,14 @@ to update between dependent packages:
 
 1. `alux-ext-macros`, `alux-sdk-macros`, and `alux-shape-macros` in any order
 2. `alux-ext`
-3. `alux-http`, `alux-jsonrpc`, `alux-shape`, and `alux-traversable` in any order
+3. `alux-bench`, `alux-http`, `alux-jsonrpc`, `alux-shape`, and `alux-traversable` in any order
 4. `alux-sdk`, `alux-shape-json`, `alux-shape-text`, and `alux-shape-typescript` in any order
-5. `alux-http-text`, `alux-http-poem`, `alux-jsonrpc-jsonrpsee`, `alux-jsonrpc-direct`,
-   `alux-jsonrpc-typescript`, `alux-shape-rust`, `alux-shape-term`, `alux-shape-morph`, and
-   `alux-tokio` in any order
+5. `alux-shape-jsonschema`, `alux-http-parts`, `alux-http-text`, `alux-http-direct`,
+   `alux-http-conformance`, `alux-http-poem`, `alux-http-actix`, `alux-http-axum`,
+   `alux-http-hyper`, `alux-http-openapi`, `alux-http-rocket`, `alux-http-salvo`,
+   `alux-http-typescript`, `alux-http-warp`, `alux-jsonrpc-jsonrpsee`, `alux-jsonrpc-direct`,
+   `alux-jsonrpc-typescript`, `alux-shape-rust`, `alux-shape-term`, `alux-shape-morph`,
+   `alux-bench-direct`, `alux-bench-criterion`, and `alux-tokio` in dependency order where needed
 
 Cargo cannot fully package later steps against crates.io until the preceding package version is
 available there.
@@ -207,6 +246,70 @@ available there.
 [c-poem]: https://crates.io/crates/alux-http-poem
 [d-poem]: https://docs.rs/alux-http-poem/badge.svg
 [r-poem]: https://docs.rs/alux-http-poem
+[v-actix]: https://img.shields.io/crates/v/alux-http-actix
+[c-actix]: https://crates.io/crates/alux-http-actix
+[d-actix]: https://docs.rs/alux-http-actix/badge.svg
+[r-actix]: https://docs.rs/alux-http-actix
+[v-axum]: https://img.shields.io/crates/v/alux-http-axum
+[c-axum]: https://crates.io/crates/alux-http-axum
+[d-axum]: https://docs.rs/alux-http-axum/badge.svg
+[r-axum]: https://docs.rs/alux-http-axum
+[v-conformance]: https://img.shields.io/crates/v/alux-http-conformance
+[c-conformance]: https://crates.io/crates/alux-http-conformance
+[d-conformance]: https://docs.rs/alux-http-conformance/badge.svg
+[r-conformance]: https://docs.rs/alux-http-conformance
+[v-http-direct]: https://img.shields.io/crates/v/alux-http-direct
+[c-http-direct]: https://crates.io/crates/alux-http-direct
+[d-http-direct]: https://docs.rs/alux-http-direct/badge.svg
+[r-http-direct]: https://docs.rs/alux-http-direct
+[v-hyper]: https://img.shields.io/crates/v/alux-http-hyper
+[c-hyper]: https://crates.io/crates/alux-http-hyper
+[d-hyper]: https://docs.rs/alux-http-hyper/badge.svg
+[r-hyper]: https://docs.rs/alux-http-hyper
+[v-openapi]: https://img.shields.io/crates/v/alux-http-openapi
+[c-openapi]: https://crates.io/crates/alux-http-openapi
+[d-openapi]: https://docs.rs/alux-http-openapi/badge.svg
+[r-openapi]: https://docs.rs/alux-http-openapi
+[v-bench]: https://img.shields.io/crates/v/alux-bench
+[c-bench]: https://crates.io/crates/alux-bench
+[d-bench]: https://docs.rs/alux-bench/badge.svg
+[r-bench]: https://docs.rs/alux-bench
+[v-bench-direct]: https://img.shields.io/crates/v/alux-bench-direct
+[c-bench-direct]: https://crates.io/crates/alux-bench-direct
+[d-bench-direct]: https://docs.rs/alux-bench-direct/badge.svg
+[r-bench-direct]: https://docs.rs/alux-bench-direct
+[v-bench-criterion]: https://img.shields.io/crates/v/alux-bench-criterion
+[c-bench-criterion]: https://crates.io/crates/alux-bench-criterion
+[d-bench-criterion]: https://docs.rs/alux-bench-criterion/badge.svg
+[r-bench-criterion]: https://docs.rs/alux-bench-criterion
+[v-parts]: https://img.shields.io/crates/v/alux-http-parts
+[c-parts]: https://crates.io/crates/alux-http-parts
+[d-parts]: https://docs.rs/alux-http-parts/badge.svg
+[r-parts]: https://docs.rs/alux-http-parts
+[v-rocket]: https://img.shields.io/crates/v/alux-http-rocket
+[c-rocket]: https://crates.io/crates/alux-http-rocket
+[d-rocket]: https://docs.rs/alux-http-rocket/badge.svg
+[r-rocket]: https://docs.rs/alux-http-rocket
+[v-salvo]: https://img.shields.io/crates/v/alux-http-salvo
+[c-salvo]: https://crates.io/crates/alux-http-salvo
+[d-salvo]: https://docs.rs/alux-http-salvo/badge.svg
+[r-salvo]: https://docs.rs/alux-http-salvo
+[v-http-ts]: https://img.shields.io/crates/v/alux-http-typescript
+[c-http-ts]: https://crates.io/crates/alux-http-typescript
+[d-http-ts]: https://docs.rs/alux-http-typescript/badge.svg
+[r-http-ts]: https://docs.rs/alux-http-typescript
+[v-warp]: https://img.shields.io/crates/v/alux-http-warp
+[c-warp]: https://crates.io/crates/alux-http-warp
+[d-warp]: https://docs.rs/alux-http-warp/badge.svg
+[r-warp]: https://docs.rs/alux-http-warp
+[v-rpc-direct]: https://img.shields.io/crates/v/alux-jsonrpc-direct
+[c-rpc-direct]: https://crates.io/crates/alux-jsonrpc-direct
+[d-rpc-direct]: https://docs.rs/alux-jsonrpc-direct/badge.svg
+[r-rpc-direct]: https://docs.rs/alux-jsonrpc-direct
+[v-shape-jsonschema]: https://img.shields.io/crates/v/alux-shape-jsonschema
+[c-shape-jsonschema]: https://crates.io/crates/alux-shape-jsonschema
+[d-shape-jsonschema]: https://docs.rs/alux-shape-jsonschema/badge.svg
+[r-shape-jsonschema]: https://docs.rs/alux-shape-jsonschema
 [v-direct]: https://img.shields.io/crates/v/alux-jsonrpc-direct
 [c-direct]: https://crates.io/crates/alux-jsonrpc-direct
 [d-direct]: https://docs.rs/alux-jsonrpc-direct/badge.svg

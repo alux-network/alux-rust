@@ -1,0 +1,55 @@
+[package]
+name = "http-providers"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[[bench]]
+name = "switching"
+harness = false
+
+[[bench]]
+name = "handover"
+harness = false
+
+[[bench]]
+name = "closing"
+harness = false
+
+[dependencies]
+actix-web.workspace = true
+alux-bench.workspace = true
+alux-ext.workspace = true
+alux-sdk.workspace = true
+alux-http.workspace = true
+alux-http-actix.workspace = true
+alux-http-axum.workspace = true
+alux-http-conformance.workspace = true
+alux-http-direct.workspace = true
+alux-http-hyper.workspace = true
+alux-http-openapi.workspace = true
+alux-http-poem.workspace = true
+alux-http-rocket.workspace = true
+alux-http-salvo.workspace = true
+alux-http-text.workspace = true
+alux-http-typescript.workspace = true
+alux-http-warp.workspace = true
+alux-shape.workspace = true
+axum.workspace = true
+derive-new.workspace = true
+futures.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+log.workspace = true
+poem.workspace = true
+rocket.workspace = true
+salvo.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+warp.workspace = true
+
+[dev-dependencies]
+alux-bench-criterion.workspace = true
+alux-bench-direct.workspace = true
+criterion.workspace = true

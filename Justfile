@@ -27,21 +27,36 @@ package:
     cargo package --list -p alux-http > /dev/null
     cargo package --list -p alux-jsonrpc > /dev/null
     cargo package --list -p alux-traversable > /dev/null
+    cargo package --list -p alux-bench > /dev/null
     cargo package --list -p alux-sdk > /dev/null
     cargo package --list -p alux-shape-macros > /dev/null
     cargo package --list -p alux-shape > /dev/null
     cargo package --list -p alux-shape-json > /dev/null
+    cargo package --list -p alux-shape-jsonschema > /dev/null
     cargo package --list -p alux-shape-text > /dev/null
     cargo package --list -p alux-shape-typescript > /dev/null
     cargo package --list -p alux-shape-rust > /dev/null
     cargo package --list -p alux-shape-term > /dev/null
     cargo package --list -p alux-shape-morph > /dev/null
+    cargo package --list -p alux-http-parts > /dev/null
     cargo package --list -p alux-http-text > /dev/null
     cargo package --list -p alux-http-poem > /dev/null
+    cargo package --list -p alux-http-axum > /dev/null
+    cargo package --list -p alux-http-actix > /dev/null
+    cargo package --list -p alux-http-salvo > /dev/null
+    cargo package --list -p alux-http-warp > /dev/null
+    cargo package --list -p alux-http-rocket > /dev/null
+    cargo package --list -p alux-http-direct > /dev/null
+    cargo package --list -p alux-http-hyper > /dev/null
+    cargo package --list -p alux-http-openapi > /dev/null
+    cargo package --list -p alux-http-typescript > /dev/null
+    cargo package --list -p alux-http-conformance > /dev/null
     cargo package --list -p alux-jsonrpc-direct > /dev/null
     cargo package --list -p alux-jsonrpc-jsonrpsee > /dev/null
     cargo package --list -p alux-tokio > /dev/null
     cargo package --list -p alux-jsonrpc-typescript > /dev/null
+    cargo package --list -p alux-bench-direct > /dev/null
+    cargo package --list -p alux-bench-criterion > /dev/null
 
 # Run the whole gate, in the order CI runs it.
 ci: fmt build clippy doc test package

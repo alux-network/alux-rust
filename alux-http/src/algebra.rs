@@ -1,4 +1,5 @@
-use alux_ext::{ApplyAlg, ext};
+use crate::{HttpMethod, RoutePath};
+use alux_ext::{ApplyAlg, OperationAlg, ext};
 use trait_set::trait_set;
 
 /// Describes the capability to build typed handler endpoints.
@@ -13,10 +14,13 @@ pub trait HandlerEndpointAlg<Context, Inputs, Args, Transform, Output> {
     ///
     /// `Inputs`, `Args`, `Transform`, and `Output` remain type-level evidence;
     /// only the handler value needs to be supplied at runtime.
+    ///
+    /// The handler states its own signature, because an interpretation that names an operation to a
+    /// reader rather than applying it has nowhere else to read the name and the argument names from.
     fn finish_handler<Handler>(&self, handler: Handler) -> Self::Endpoint
     where
         Self: HandlerAlg,
-        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
+        Handler: OperationAlg + ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static;
 }
 
 /// Interprets a named, defunctionalized HTTP program with `Compiler`.
@@ -70,8 +74,19 @@ pub trait HttpInputAlg {
     type Query<Input>;
     /// The interpreter's request-body extractor for `Input`.
     type Body<Input>;
+    /// The interpreter's form-encoded request-body extractor for `Input`.
+    type Form<Input>;
+    /// The interpreter's unread request-body extractor for `Input`.
+    type RawBody<Input>;
     /// The interpreter's header extractor for `Input`.
+    ///
+    /// Headers are names and values, so an argument read from them is an ordinary product. A
+    /// framework's own extractor is what [`HttpInputAlg::Context`] states.
     type Header<Input>;
+    /// The interpreter's cookie extractor for `Input`.
+    type Cookie<Input>;
+    /// The interpreter's extractor for `Input` read from a body arriving as parts.
+    type Multipart<Input>;
     /// The interpreter's authentication extractor for `Input`.
     type Auth<Input>;
     /// The interpreter's endpoint-context extractor for `Input`.
@@ -83,17 +98,14 @@ pub trait HttpSelectorAlg {
     /// The interpreter's HTTP selector representation.
     type Selector;
 
-    /// Interprets the GET method selector.
-    fn http_get(&self) -> Self::Selector;
-
-    /// Interprets the POST method selector.
-    fn http_post(&self) -> Self::Selector;
+    /// Interprets a request-method selector.
+    fn http_method(&self, method: HttpMethod) -> Self::Selector;
 
     /// Interprets an exact path selector.
-    fn http_path(&self, path: &str) -> Self::Selector;
+    fn http_path(&self, path: &RoutePath) -> Self::Selector;
 
     /// Interprets a path-prefix selector.
-    fn http_prefix(&self, prefix: &str) -> Self::Selector;
+    fn http_prefix(&self, prefix: &RoutePath) -> Self::Selector;
 }
 
 trait_set! {
@@ -157,20 +169,20 @@ where
     /// Adds an endpoint at an exact path.
     #[must_use]
     pub fn at(self, path: &str, endpoint: Alg::Endpoint) -> Self {
-        let route = self.alg.precompose(self.alg.http_path(path), self.alg.lift(endpoint));
+        let route = self.alg.precompose(self.alg.http_path(&RoutePath::parse(path)), self.alg.lift(endpoint));
         self.append(route)
     }
 
     /// Nests another route composition under a path prefix.
     #[must_use]
     pub fn nest(self, prefix: &str, nested: Self) -> Self {
-        let route = self.alg.precompose(self.alg.http_prefix(prefix), nested.route);
+        let route = self.alg.precompose(self.alg.http_prefix(&RoutePath::parse(prefix)), nested.route);
         self.append(route)
     }
 }
 
 /// Provides fluent route composition on any `RouteAlg`.
-#[ext(name = RouteAlgExt, supertraits = RouteAlg + Sized)]
+#[ext(name = RouteAlgExt)]
 pub impl<This> This
 where
     This: RouteAlg,

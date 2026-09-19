@@ -3,8 +3,6 @@
 //! The domain and its declared surface are what a downstream author writes. Everything after them
 //! observes the specification itself: request documents in, response documents out.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_jsonrpc::{JsonRpcApiAlg, JsonRpcProgramExt, RpcErrorAlg, jsonrpc};
 use alux_jsonrpc_direct::{DirectImpl, MethodTable};

@@ -6,8 +6,6 @@
 //! checking it stays ordinary work. The assertion is the compile; the test body only names the
 //! program the declaration denotes.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_jsonrpc::{JsonRpcApiAlg, jsonrpc};
 use core::future::Future;

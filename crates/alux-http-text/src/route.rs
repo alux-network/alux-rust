@@ -1,13 +1,13 @@
 //! Records the selectors a route composes, and renders the surface they describe.
 
 use crate::{TextEndpoint, TextHandlerImpl};
-use alux_http::{HttpSelectorAlg, RouteAlg, SelectorAlg, append_path};
+use alux_http::{HttpMethod, HttpSelectorAlg, RouteAlg, RoutePath, SelectorAlg, describe_path};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TextSelectorPart {
-    Method(&'static str),
-    Path(String),
-    Prefix(String),
+    Method(HttpMethod),
+    Path(RoutePath),
+    Prefix(RoutePath),
 }
 
 /// Carries interpreted selector data.
@@ -70,18 +70,10 @@ impl TextRoute {
 impl TextSelector {
     /// Returns the composed absolute path this selector matches.
     pub fn path(&self) -> String {
-        let mut path = String::new();
-        for part in &self.parts {
-            if let TextSelectorPart::Path(value) | TextSelectorPart::Prefix(value) = part {
-                append_path(&mut path, value);
-            }
-        }
-
-        if path.is_empty() {
-            path.push('/');
-        }
-
-        path
+        describe_path(self.parts.iter().filter_map(|part| match part {
+            TextSelectorPart::Path(path) | TextSelectorPart::Prefix(path) => Some(path),
+            TextSelectorPart::Method(_) => None,
+        }))
     }
 
     /// Returns the selected method and path, using `*` when no method is selected.
@@ -91,7 +83,7 @@ impl TextSelector {
             .iter()
             .rev()
             .find_map(|part| match part {
-                TextSelectorPart::Method(value) => Some(*value),
+                TextSelectorPart::Method(method) => Some(method.label()),
                 TextSelectorPart::Path(_) | TextSelectorPart::Prefix(_) => None,
             })
             .unwrap_or("*");
@@ -142,19 +134,15 @@ impl RouteAlg for TextHandlerImpl {
 impl HttpSelectorAlg for TextHandlerImpl {
     type Selector = TextSelector;
 
-    fn http_get(&self) -> TextSelector {
-        TextSelector { parts: vec![TextSelectorPart::Method("GET")] }
+    fn http_method(&self, method: HttpMethod) -> TextSelector {
+        TextSelector { parts: vec![TextSelectorPart::Method(method)] }
     }
 
-    fn http_post(&self) -> TextSelector {
-        TextSelector { parts: vec![TextSelectorPart::Method("POST")] }
+    fn http_path(&self, path: &RoutePath) -> TextSelector {
+        TextSelector { parts: vec![TextSelectorPart::Path(path.clone())] }
     }
 
-    fn http_path(&self, path: &str) -> TextSelector {
-        TextSelector { parts: vec![TextSelectorPart::Path(path.into())] }
-    }
-
-    fn http_prefix(&self, prefix: &str) -> TextSelector {
-        TextSelector { parts: vec![TextSelectorPart::Prefix(prefix.into())] }
+    fn http_prefix(&self, prefix: &RoutePath) -> TextSelector {
+        TextSelector { parts: vec![TextSelectorPart::Prefix(prefix.clone())] }
     }
 }

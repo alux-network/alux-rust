@@ -16,3 +16,4 @@ poem::Server::new(poem::listener::TcpListener::bind("0.0.0.0:3000")).run(route).
 
 Poem bodies, headers, errors, and endpoint erasure stay inside this crate. Compiling the same program
 with [`alux-http-text`](https://docs.rs/alux-http-text) observes the identical ordered surface.
+

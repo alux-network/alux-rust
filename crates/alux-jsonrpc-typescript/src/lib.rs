@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 //! Interprets an [`alux_jsonrpc`] program as a TypeScript client module.
 //!
 //! The program states a name, an argument product and an answer; the shapes of that product and that

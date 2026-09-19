@@ -1,5 +1,7 @@
 use crate::{
-    FileOut, HandlerEndpointAlg, HttpApiAlg, HttpInputAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, RouteAlg, WithAlg,
+    BytesOut, Connect, Delete, EmptyOut, FileOut, Get, HandlerEndpointAlg, Head, HeaderOut, HtmlOut, HttpApiAlg,
+    HttpInputAlg, HttpMethodAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, NamedValuesAlg, Options, Patch, Post, Put,
+    RedirectOut, ResultOut, RouteAlg, RoutePath, StatusOut, StreamOut, TextOut, Trace, WithAlg,
 };
 use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use core::marker::PhantomData;
@@ -30,7 +32,7 @@ pub struct Merge<Left, Right> {
 /// Represents a route program nested below an HTTP path prefix.
 #[derive(Debug)]
 pub struct Nest<Program> {
-    prefix: String,
+    prefix: RoutePath,
     program: Program,
 }
 
@@ -38,18 +40,10 @@ pub struct Nest<Program> {
 #[derive(Debug)]
 pub struct Named<Program>(Program);
 
-/// Identifies a GET endpoint declaration.
-#[derive(Debug)]
-pub struct Get;
-
-/// Identifies a POST endpoint declaration.
-#[derive(Debug)]
-pub struct Post;
-
 /// Represents an endpoint without choosing an HTTP interpreter.
 #[derive(Debug)]
 pub struct Endpoint<Method, Handler, Inputs, Args, Transform> {
-    path: String,
+    path: RoutePath,
     handler: Handler,
     marker: PhantomData<fn(Method, Inputs, Args, Transform)>,
 }
@@ -81,8 +75,20 @@ pub struct Query<Input>(PhantomData<Input>);
 /// Marks an HTTP request-body input.
 pub struct Body<Input>(PhantomData<Input>);
 
+/// Marks a form-encoded HTTP request-body input.
+pub struct Form<Input>(PhantomData<Input>);
+
+/// Marks an HTTP request body taken as it arrived.
+pub struct RawBody<Input>(PhantomData<Input>);
+
 /// Marks an HTTP header input.
 pub struct Header<Input>(PhantomData<Input>);
+
+/// Marks an input read from the cookies a caller sent.
+pub struct Cookie<Input>(PhantomData<Input>);
+
+/// Marks an input read from a request body arriving as parts.
+pub struct Multipart<Input>(PhantomData<Input>);
 
 /// Marks an HTTP authentication input.
 pub struct Auth<Input>(PhantomData<Input>);
@@ -125,11 +131,39 @@ where
     type Inputs = Compiler::Body<Input>;
 }
 
+impl<Compiler, Input> InterpretInputsAlg<Compiler> for Form<Input>
+where
+    Compiler: HttpInputAlg,
+{
+    type Inputs = Compiler::Form<Input>;
+}
+
+impl<Compiler, Input> InterpretInputsAlg<Compiler> for RawBody<Input>
+where
+    Compiler: HttpInputAlg,
+{
+    type Inputs = Compiler::RawBody<Input>;
+}
+
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Header<Input>
 where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Header<Input>;
+}
+
+impl<Compiler, Input> InterpretInputsAlg<Compiler> for Cookie<Input>
+where
+    Compiler: HttpInputAlg,
+{
+    type Inputs = Compiler::Cookie<Input>;
+}
+
+impl<Compiler, Input> InterpretInputsAlg<Compiler> for Multipart<Input>
+where
+    Compiler: HttpInputAlg,
+{
+    type Inputs = Compiler::Multipart<Input>;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Auth<Input>
@@ -165,6 +199,14 @@ interpret_inputs!(I1, I2, I3, I4, I5);
 interpret_inputs!(I1, I2, I3, I4, I5, I6);
 interpret_inputs!(I1, I2, I3, I4, I5, I6, I7);
 interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15);
+interpret_inputs!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16);
 
 impl HttpProgramBuilder {
     /// Starts an empty, uninterpreted route program.
@@ -200,14 +242,58 @@ pub type WithInput<Handler, Inputs, Args, Transform, Extractor, Arg> =
 pub type WithEndpoint<Program, Method, Handler, Inputs, Args, Transform> =
     RouteProgram<Merge<Program, Endpoint<Method, Handler, Inputs, Args, Transform>>>;
 
+macro_rules! output_methods {
+    ($($method:ident => $kind:ident, $alg:ident, $selected:ident, $meaning:literal),+ $(,)?) => {
+        $(
+            #[doc = concat!("Marks the inferred handler result for ", $meaning, " interpretation.")]
+            pub fn $method(self) -> Operation<Handler, Inputs, Args, $kind> {
+                self.out()
+            }
+        )+
+    };
+}
+
+/// States the nine method declarations on both a program and a standalone operation.
+///
+/// An author writes the program form; a declaration read by the `http` macro becomes the operation
+/// form. Emitting both from one list is what keeps the two spellings of a method in step.
+macro_rules! route_methods {
+    ($($method:ident => $marker:ident, $label:literal),+ $(,)?) => {
+        impl<Program> RouteProgram<Program> {
+            $(
+                #[doc = concat!("Records a `", $label, "` selector and typed operation at an exact path.")]
+                pub fn $method<Handler, Inputs, Args, Transform>(
+                    self,
+                    path: &str,
+                    operation: Operation<Handler, Inputs, Args, Transform>,
+                ) -> WithEndpoint<Program, $marker, Handler, Inputs, Args, Transform> {
+                    self.method(path, operation)
+                }
+            )+
+        }
+
+        impl<Handler, Inputs, Args, Transform> Operation<Handler, Inputs, Args, Transform> {
+            $(
+                #[doc = concat!("Declares this operation at an exact path, answered under `", $label, "`.")]
+                ///
+                /// This is the same thing the declaration of that name on `RouteProgram` states,
+                /// for one endpoint standing on its own rather than one inside a composition.
+                pub fn $method(self, path: &str) -> Endpoint<$marker, Handler, Inputs, Args, Transform> {
+                    self.declare::<$marker>(path)
+                }
+            )+
+        }
+    };
+}
+
 impl<Handler, Inputs, Args, Transform> Operation<Handler, Inputs, Args, Transform> {
     /// Declares this operation at one path under one method selector, with no program around it.
     ///
     /// A program that states many endpoints composes their routes rather than their types, so it
-    /// needs each endpoint on its own. `RouteProgram::get` and `RouteProgram::post` state the same
-    /// thing inside a composition, and are what an author writes.
+    /// needs each endpoint on its own. The named declarations below select one method each; this
+    /// states the same thing for a method held as a type parameter.
     pub fn declare<Method>(self, path: &str) -> Endpoint<Method, Handler, Inputs, Args, Transform> {
-        Endpoint { path: path.into(), handler: self.handler, marker: PhantomData }
+        Endpoint { path: RoutePath::parse(path), handler: self.handler, marker: PhantomData }
     }
 }
 
@@ -233,7 +319,10 @@ where
     }
 
     /// Records a query extractor whose value becomes the next handler argument.
-    pub fn query<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Query<Input>, Input> {
+    pub fn query<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Query<Input>, Input>
+    where
+        Input: NamedValuesAlg,
+    {
         self.with_as::<Query<Input>, Input>()
     }
 
@@ -242,13 +331,42 @@ where
         self.with_as::<Body<Input>, Input>()
     }
 
-    /// Records a header extractor whose value becomes the next handler argument.
-    pub fn header<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Header<Input>, Input> {
+    /// Records a form-encoded request-body extractor whose value becomes the next handler argument.
+    pub fn form<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Form<Input>, Input> {
+        self.with_as::<Form<Input>, Input>()
+    }
+
+    /// Records the request body as it arrived, becoming the next handler argument.
+    pub fn raw_body<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, RawBody<Input>, Input> {
+        self.with_as::<RawBody<Input>, Input>()
+    }
+
+    /// Records an incoming header extractor whose value becomes the next handler argument.
+    pub fn in_header<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Header<Input>, Input>
+    where
+        Input: NamedValuesAlg,
+    {
         self.with_as::<Header<Input>, Input>()
     }
 
+    /// Records a cookie extractor whose value becomes the next handler argument.
+    pub fn cookie<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Cookie<Input>, Input>
+    where
+        Input: NamedValuesAlg,
+    {
+        self.with_as::<Cookie<Input>, Input>()
+    }
+
+    /// Records a body arriving as parts, read into the next handler argument.
+    pub fn multipart<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Multipart<Input>, Input> {
+        self.with_as::<Multipart<Input>, Input>()
+    }
+
     /// Records an authentication extractor whose value becomes the next handler argument.
-    pub fn auth<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Auth<Input>, Input> {
+    pub fn auth<Input>(self) -> WithInput<Handler, Inputs, Args, Transform, Auth<Input>, Input>
+    where
+        Input: NamedValuesAlg,
+    {
         self.with_as::<Auth<Input>, Input>()
     }
 
@@ -265,13 +383,26 @@ where
         Operation { handler: self.handler, marker: PhantomData }
     }
 
-    /// Marks the inferred handler result for JSON interpretation.
-    pub fn json(self) -> Operation<Handler, Inputs, Args, JsonOut> {
+    with_output_kinds!(output_methods);
+
+    /// Answers with `CODE` and the body already stated.
+    pub fn status<const CODE: u16>(self) -> Operation<Handler, Inputs, Args, StatusOut<Transform, CODE>> {
         self.out()
     }
 
-    /// Marks the inferred handler result for streamed-file interpretation.
-    pub fn file(self) -> Operation<Handler, Inputs, Args, FileOut> {
+    /// Answers with an outgoing response header the handler states, beside the body already stated.
+    ///
+    /// The handler answers with the header's value and the body, so a value an endpoint cannot know
+    /// is one the handler still states.
+    pub fn out_header<Name>(self) -> Operation<Handler, Inputs, Args, HeaderOut<Transform, Name>> {
+        self.out()
+    }
+
+    /// Answers with what the handler's failure means when it fails.
+    ///
+    /// The kind already stated answers the successful result, so `.json().result()` states JSON on
+    /// success and the meaning of the failure otherwise.
+    pub fn result(self) -> Operation<Handler, Inputs, Args, ResultOut<Transform>> {
         self.out()
     }
 }
@@ -283,7 +414,7 @@ impl<Program> RouteProgram<Program> {
     /// needs each nesting on its own. `RouteProgram::nest` states the same thing inside a
     /// composition, and is what an author writes.
     pub fn under(self, prefix: &str) -> Nest<Program> {
-        Nest { prefix: prefix.into(), program: self.0 }
+        Nest { prefix: RoutePath::parse(prefix), program: self.0 }
     }
 
     /// Records the categorical coproduct of two typed route programs.
@@ -299,25 +430,23 @@ impl<Program> RouteProgram<Program> {
     /// The prefix is selector precomposition rather than a framework-specific
     /// router operation.
     pub fn nest<Other>(self, prefix: &str, other: RouteProgram<Other>) -> RouteProgram<Merge<Program, Nest<Other>>> {
-        self.merge(RouteProgram(Nest { prefix: prefix.into(), program: other.0 }))
+        self.merge(RouteProgram(Nest { prefix: RoutePath::parse(prefix), program: other.0 }))
     }
 
-    /// Records a GET selector and typed operation at an exact path.
-    pub fn get<Handler, Inputs, Args, Transform>(
+    /// Records a method selector and typed operation at an exact path.
+    ///
+    /// The named declarations below select one method each and are what an author writes; this
+    /// states the same thing for a method held as a type parameter.
+    pub fn method<Method, Handler, Inputs, Args, Transform>(
         self,
         path: &str,
         operation: Operation<Handler, Inputs, Args, Transform>,
-    ) -> WithEndpoint<Program, Get, Handler, Inputs, Args, Transform> {
-        self.merge(RouteProgram(Endpoint { path: path.into(), handler: operation.handler, marker: PhantomData }))
-    }
-
-    /// Records a POST selector and typed operation at an exact path.
-    pub fn post<Handler, Inputs, Args, Transform>(
-        self,
-        path: &str,
-        operation: Operation<Handler, Inputs, Args, Transform>,
-    ) -> WithEndpoint<Program, Post, Handler, Inputs, Args, Transform> {
-        self.merge(RouteProgram(Endpoint { path: path.into(), handler: operation.handler, marker: PhantomData }))
+    ) -> WithEndpoint<Program, Method, Handler, Inputs, Args, Transform> {
+        self.merge(RouteProgram(Endpoint {
+            path: RoutePath::parse(path),
+            handler: operation.handler,
+            marker: PhantomData,
+        }))
     }
 
     /// Removes the fluent wrapper and returns the first-order syntax tree.
@@ -325,6 +454,8 @@ impl<Program> RouteProgram<Program> {
         self.0
     }
 }
+
+with_http_methods!(route_methods);
 
 impl<Compiler> CompileRouteProgram<Compiler> for Empty
 where
@@ -373,44 +504,20 @@ where
     }
 }
 
-trait HttpMethodAlg<Compiler> {
-    fn selector(compiler: &Compiler) -> <Compiler as RouteAlg>::Selector
-    where
-        Compiler: HttpApiAlg;
-}
-
-impl<Compiler> HttpMethodAlg<Compiler> for Get {
-    fn selector(compiler: &Compiler) -> <Compiler as RouteAlg>::Selector
-    where
-        Compiler: HttpApiAlg,
-    {
-        compiler.http_get()
-    }
-}
-
-impl<Compiler> HttpMethodAlg<Compiler> for Post {
-    fn selector(compiler: &Compiler) -> <Compiler as RouteAlg>::Selector
-    where
-        Compiler: HttpApiAlg,
-    {
-        compiler.http_post()
-    }
-}
-
 impl<Compiler, Method, Handler, Inputs, Args, Transform, Handle> CompileRouteProgram<Compiler>
     for Endpoint<Method, Handler, Inputs, Args, Transform>
 where
     Compiler: HttpApiAlg
         + HandlerContextAlg<Handler::Context, Handle = Handle>
         + HandlerEndpointAlg<Handle, Inputs::Inputs, Args, Transform, Handler::Output>,
-    Method: HttpMethodAlg<Compiler>,
+    Method: HttpMethodAlg,
     Handler: OperationAlg + ApplyAlg<Handle, Args> + Send + Sync + 'static,
     Inputs: InterpretInputsAlg<Compiler>,
 {
     type Route = Compiler::Route;
 
     fn compile_route(self, compiler: &Compiler) -> Self::Route {
-        let selector = compiler.compose(Method::selector(compiler), compiler.http_path(&self.path));
+        let selector = compiler.compose(compiler.http_method(Method::METHOD), compiler.http_path(&self.path));
         let endpoint = compiler.finish_handler(self.handler);
 
         compiler.precompose(selector, compiler.lift(endpoint))

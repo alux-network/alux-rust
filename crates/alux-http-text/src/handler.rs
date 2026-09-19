@@ -1,6 +1,6 @@
 //! Records what one endpoint means: the handler it names and the types it relates.
 
-use alux_ext::{ApplyAlg, HandlerContextAlg};
+use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use alux_http::{HandlerAlg, HandlerEndpointAlg, OutputAlg, OutputKindAlg};
 use core::any::type_name;
 use std::sync::Arc;
@@ -24,22 +24,23 @@ impl HandlerAlg for TextHandlerImpl {
     type Endpoint = TextEndpoint;
 }
 
-impl<Context, Inputs, Args, Transform, Output> HandlerEndpointAlg<Context, Inputs, Args, Transform, Output>
-    for TextHandlerImpl
+impl<Context, Inputs, Args, Transform, Answering, Answered, Output>
+    HandlerEndpointAlg<Context, Inputs, Args, Transform, Output> for TextHandlerImpl
 where
-    Transform: OutputKindAlg<TextHandlerImpl, Output>,
+    Transform: OutputKindAlg<TextHandlerImpl, Output, Transform = Answering>,
+    Answering: OutputAlg<Output, Output = Answered>,
 {
     fn finish_handler<Handler>(&self, _handler: Handler) -> TextEndpoint
     where
-        Handler: ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static,
+        Handler: OperationAlg + ApplyAlg<Context, Args, Output = Output> + Send + Sync + 'static,
     {
         TextEndpoint {
             handler: type_name::<Handler>(),
             inputs: type_name::<Inputs>(),
             args: type_name::<Args>(),
             result: type_name::<Output>(),
-            transform: type_name::<<Transform as OutputKindAlg<Self, Output>>::Transform>(),
-            output: type_name::<<<Transform as OutputKindAlg<Self, Output>>::Transform as OutputAlg<Output>>::Output>(),
+            transform: type_name::<Answering>(),
+            output: type_name::<Answered>(),
         }
     }
 }

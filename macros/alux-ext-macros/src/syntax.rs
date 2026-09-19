@@ -11,8 +11,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::{self, VisitMut};
 use syn::{
-    Attribute, Expr, GenericArgument, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, PathArguments,
-    Token, Type, TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
+    Attribute, Expr, ExprLit, GenericArgument, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Lit,
+    Meta, PathArguments, Token, Type, TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
 };
 
 /// Parses the visibility syntax accepted by `extend::ext` before an inherent impl.
@@ -105,6 +105,27 @@ pub(crate) fn unbind(generics: &mut Generics) {
 /// author wrote rather than nothing at all.
 pub(crate) fn documentation(attrs: &[Attribute]) -> Vec<Attribute> {
     attrs.iter().filter(|attr| attr.path().is_ident("doc")).cloned().collect()
+}
+
+/// Returns the text of an item's documentation, as the author wrote it.
+///
+/// Every line arrives with the space rustdoc writes after `///`, which is spelling rather than
+/// content, so it is dropped. Order and blank lines are kept, which is what makes the first line a
+/// summary and the rest a description.
+pub(crate) fn doc_text(attrs: &[Attribute]) -> String {
+    let lines = attrs
+        .iter()
+        .filter_map(|attr| match &attr.meta {
+            Meta::NameValue(pair) if pair.path.is_ident("doc") => match &pair.value {
+                Expr::Lit(ExprLit { lit: Lit::Str(text), .. }) => Some(text.value()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .map(|line| line.strip_prefix(' ').unwrap_or(&line).to_owned())
+        .collect::<Vec<_>>();
+
+    lines.join("\n").trim().to_owned()
 }
 
 /// Returns the names of every method the extension declares.

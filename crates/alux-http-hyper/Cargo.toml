@@ -1,0 +1,32 @@
+[package]
+name = "alux-http-hyper"
+version = "0.1.0"
+description = "Serves an ALUX HTTP surface over hyper, with no web framework"
+documentation = "https://docs.rs/alux-http-hyper"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-http.workspace = true
+alux-http-direct.workspace = true
+bytes.workspace = true
+derive-new.workspace = true
+futures.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util = { workspace = true, features = ["http1", "http2"] }
+tokio.workspace = true
+tokio-stream = { workspace = true, features = ["net"] }
+
+[dev-dependencies]
+alux-http-conformance.workspace = true
+alux-http-direct.workspace = true
+tokio.workspace = true

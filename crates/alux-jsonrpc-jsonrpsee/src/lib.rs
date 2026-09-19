@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 //! Interprets typed JSON-RPC programs as `jsonrpsee` method collections.
 //!
 //! The interpretation owns parameter decoding, method registration, context sharing, serialization,

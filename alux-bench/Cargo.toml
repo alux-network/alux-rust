@@ -1,0 +1,18 @@
+[package]
+name = "alux-bench"
+version = "0.1.0"
+description = "Interpreter-independent benchmark programs: named cases measured in rounds"
+documentation = "https://docs.rs/alux-bench"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
