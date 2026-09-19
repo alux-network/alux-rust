@@ -30,6 +30,7 @@ extracting inputs, applying the operation, converting output, and registering th
 | JSON-RPC lowering | `alux-ext-macros::jsonrpc_program` | States what a method declaration means and compiles it through `JsonRpcProgramAlg` |
 | HTTP interpreter algebra | `alux-http::algebra` and `output` | Selectors, routes, input roles, context handles, endpoints, and output conversion |
 | HTTP first-order syntax | `alux-http::program` | Empty, merge, nest, endpoint, input, and output nodes plus the generic fold |
+| HTTP server lifecycle | `alux-http::server` | Bound setup values, ordered open/close commands, address-releasing close and draining end, and lifecycle events |
 | Neutral HTTP witness | `alux-http-text` | Interprets one HTTP program as readable type/route documentation |
 | Poem HTTP witness | `alux-http-poem` | Interprets the same program as executable Poem endpoints |
 | axum HTTP witness | `alux-http-axum` | Interprets the same program as an executable axum router |
@@ -46,6 +47,10 @@ extracting inputs, applying the operation, converting output, and registering th
 | JSON-RPC interpreter algebra | `alux-jsonrpc::algebra` | Empty/merge semantics and positional/named method registration |
 | JSON-RPC first-order syntax | `alux-jsonrpc::program` | Empty, merge, named program, method, and parameter-mode nodes plus the generic fold |
 | jsonrpsee witness | `alux-jsonrpc-jsonrpsee` | Interprets one JSON-RPC program as a jsonrpsee method collection |
+| Bench algebra | `alux-bench::measure` | Stating groups of named cases, and measuring what was stated, as two capabilities |
+| Bench first-order syntax | `alux-bench::program` | Group, case, and routine nodes plus the sampling a case is measured over |
+| Direct bench witness | `alux-bench-direct` | Measures a stated bench by running it, one group at a time |
+| Criterion bench witness | `alux-bench-criterion` | Measures the same bench as criterion groups and functions |
 
 The dependency direction is:
 
@@ -69,7 +74,9 @@ application
     |----------------> alux-http-openapi -----> alux-http + alux-shape
     |----------------> alux-http-typescript --> alux-http + alux-shape
     |----------------> alux-http-conformance -> alux-http + alux-http-direct
-    `----------------> alux-jsonrpc-jsonrpsee -> alux-jsonrpc + jsonrpsee
+    |----------------> alux-jsonrpc-jsonrpsee -> alux-jsonrpc + jsonrpsee
+    |----------------> alux-bench-direct -----> alux-bench
+    `----------------> alux-bench-criterion --> alux-bench + criterion
 
 alux-ext -----------> alux-ext-macros
 ```

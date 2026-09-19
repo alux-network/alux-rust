@@ -35,6 +35,9 @@ generator without an explicit scope decision. Downstream crates own their domain
 | `alux-http-parts` | Reads a body arriving as parts, for interpretations whose framework does not |
 | `alux-http-conformance` | One declared HTTP surface and the scenario every interpretation satisfies |
 | `alux-jsonrpc-jsonrpsee` | jsonrpsee interpretation of a JSON-RPC program |
+| `alux-bench` | Neutral statement of what a benchmark measures, with no harness |
+| `alux-bench-direct` | Measures a stated bench by running it, saying each case as it finishes |
+| `alux-bench-criterion` | Measures a stated bench as criterion groups and functions |
 
 Dependency arrows point toward `alux-ext`. The specification crates declare exactly one dependency,
 `alux-ext`, and re-export the macro backends they own from `alux_ext::macros`.

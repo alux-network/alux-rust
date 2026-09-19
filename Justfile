@@ -27,6 +27,7 @@ package:
     cargo package --list -p alux-http > /dev/null
     cargo package --list -p alux-jsonrpc > /dev/null
     cargo package --list -p alux-traversable > /dev/null
+    cargo package --list -p alux-bench > /dev/null
     cargo package --list -p alux-sdk > /dev/null
     cargo package --list -p alux-shape-macros > /dev/null
     cargo package --list -p alux-shape > /dev/null
@@ -54,6 +55,8 @@ package:
     cargo package --list -p alux-jsonrpc-jsonrpsee > /dev/null
     cargo package --list -p alux-tokio > /dev/null
     cargo package --list -p alux-jsonrpc-typescript > /dev/null
+    cargo package --list -p alux-bench-direct > /dev/null
+    cargo package --list -p alux-bench-criterion > /dev/null
 
 # Run the whole gate, in the order CI runs it.
 ci: fmt build clippy doc test package

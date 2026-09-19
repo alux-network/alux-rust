@@ -3,20 +3,7 @@
 [![Build and Test][ga-badge]][ga-url]
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> [!WARNING]
-> **Operational developers, welcome.** There is very little code here. Nothing to step through, no god
-> object, no framework to blame, nothing to prove the work was hard.
->
-> Side effects may include angst, dizziness, and phantom breakpoints when a whole subsystem fits on one
-> screen. All temporary. Do not operate heavy inheritance hierarchies until they pass.
->
-> Treatment: read the [ALUX programming guidelines](https://alux-network.github.io/alux-programming/)
-> and [`DENOTATIONAL_DESIGN.md`](DENOTATIONAL_DESIGN.md). The meaning is in the trait signatures and
-> the `where` clauses. The code you were looking for is the code that did not have to exist.
->
-> Most developers recover fully and go on to delete things happily.
-
-Reusable Design by Meaning infrastructure for ALUX specifications.
+Reusable Design by Meaning infrastructure for typed programs and their interpreters.
 
 ALUX expects many independently published specification crates. This workspace provides the common
 operation and interface-program vocabulary without centralizing their domain algebras. Each crate has
@@ -30,12 +17,13 @@ procedural macro has to be, and those live under [`macros/`](macros).
 
 | Crate | | Responsibility |
 | --- | --- | --- |
-| [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs, no web framework |
+| [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs and server lifecycle, no web framework |
 | [`alux-jsonrpc`](alux-jsonrpc) | [![crates.io][v-rpc]][c-rpc] [![docs.rs][d-rpc]][r-rpc] | JSON-RPC programs, no RPC framework |
 | [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](macros/alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, no encoder<br>The derive reading one out of a layout |
 | [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](macros/alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
 | [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros] | Transformations kept as expressions<br>The macros it exports |
 | [`alux-traversable`](alux-traversable) | [![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | `traverse` over `Option` and iterators |
+| [`alux-bench`](alux-bench) | [![crates.io][v-bench]][c-bench] [![docs.rs][d-bench]][r-bench] | What a benchmark measures, no harness |
 
 ## Interpretations
 
@@ -99,6 +87,13 @@ Shared HTTP support:
 | [`alux-shape-term`](crates/alux-shape-term) | [![crates.io][v-shape-term]][c-shape-term] [![docs.rs][d-shape-term]][r-shape-term] | the term itself |
 | [`alux-shape-morph`](crates/alux-shape-morph) | [![crates.io][v-shape-morph]][c-shape-morph] [![docs.rs][d-shape-morph]][r-shape-morph] | another shape |
 
+### Of a benchmark
+
+| Crate | | Measures a stated bench with |
+| --- | --- | --- |
+| [`alux-bench-criterion`](crates/alux-bench-criterion) | [![crates.io][v-bench-criterion]][c-bench-criterion] [![docs.rs][d-bench-criterion]][r-bench-criterion] | [criterion](https://docs.rs/criterion) groups and functions |
+| [`alux-bench-direct`](crates/alux-bench-direct) | [![crates.io][v-bench-direct]][c-bench-direct] [![docs.rs][d-bench-direct]][r-bench-direct] | its own runner, saying each case as it finishes |
+
 ### Other interpretations
 
 | Crate | | Interprets a value as |
@@ -147,14 +142,14 @@ to update between dependent packages:
 
 1. `alux-ext-macros`, `alux-sdk-macros`, and `alux-shape-macros` in any order
 2. `alux-ext`
-3. `alux-http`, `alux-jsonrpc`, `alux-shape`, and `alux-traversable` in any order
+3. `alux-bench`, `alux-http`, `alux-jsonrpc`, `alux-shape`, and `alux-traversable` in any order
 4. `alux-sdk`, `alux-shape-json`, `alux-shape-text`, and `alux-shape-typescript` in any order
 5. `alux-shape-jsonschema`, `alux-http-parts`, `alux-http-text`, `alux-http-direct`,
    `alux-http-conformance`, `alux-http-poem`, `alux-http-actix`, `alux-http-axum`,
    `alux-http-hyper`, `alux-http-openapi`, `alux-http-rocket`, `alux-http-salvo`,
    `alux-http-typescript`, `alux-http-warp`, `alux-jsonrpc-jsonrpsee`, `alux-jsonrpc-direct`,
-   `alux-jsonrpc-typescript`, `alux-shape-rust`, `alux-shape-term`, `alux-shape-morph`, and
-   `alux-tokio` in dependency order where needed
+   `alux-jsonrpc-typescript`, `alux-shape-rust`, `alux-shape-term`, `alux-shape-morph`,
+   `alux-bench-direct`, `alux-bench-criterion`, and `alux-tokio` in dependency order where needed
 
 Cargo cannot fully package later steps against crates.io until the preceding package version is
 available there.
@@ -275,6 +270,18 @@ available there.
 [c-openapi]: https://crates.io/crates/alux-http-openapi
 [d-openapi]: https://docs.rs/alux-http-openapi/badge.svg
 [r-openapi]: https://docs.rs/alux-http-openapi
+[v-bench]: https://img.shields.io/crates/v/alux-bench
+[c-bench]: https://crates.io/crates/alux-bench
+[d-bench]: https://docs.rs/alux-bench/badge.svg
+[r-bench]: https://docs.rs/alux-bench
+[v-bench-direct]: https://img.shields.io/crates/v/alux-bench-direct
+[c-bench-direct]: https://crates.io/crates/alux-bench-direct
+[d-bench-direct]: https://docs.rs/alux-bench-direct/badge.svg
+[r-bench-direct]: https://docs.rs/alux-bench-direct
+[v-bench-criterion]: https://img.shields.io/crates/v/alux-bench-criterion
+[c-bench-criterion]: https://crates.io/crates/alux-bench-criterion
+[d-bench-criterion]: https://docs.rs/alux-bench-criterion/badge.svg
+[r-bench-criterion]: https://docs.rs/alux-bench-criterion
 [v-parts]: https://img.shields.io/crates/v/alux-http-parts
 [c-parts]: https://crates.io/crates/alux-http-parts
 [d-parts]: https://docs.rs/alux-http-parts/badge.svg
