@@ -1,4 +1,5 @@
 use crate::error::RpcError;
+use core::error::Error;
 use core::fmt::{self, Debug, Display};
 use core::future::Future;
 use core::pin::Pin;
@@ -23,7 +24,7 @@ impl Display for DuplicateMethod {
     }
 }
 
-impl core::error::Error for DuplicateMethod {}
+impl Error for DuplicateMethod {}
 
 /// A JSON-RPC surface: every method a program declared, keyed by the name it answers to.
 #[derive(Clone, Default)]

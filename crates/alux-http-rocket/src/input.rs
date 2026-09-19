@@ -4,6 +4,7 @@ use crate::RocketRequest;
 use alux_http::{FromPartsAlg, read_cookies, read_header_name};
 use alux_http::{HttpErrorAlg, HttpStatus};
 use alux_http_parts::ReadParts;
+use core::error::Error;
 use core::fmt::{self, Display};
 use core::future::Future;
 use core::marker::PhantomData;
@@ -54,7 +55,7 @@ impl Display for RocketError {
     }
 }
 
-impl core::error::Error for RocketError {}
+impl Error for RocketError {}
 
 /// Reads the handler argument a path's captured segments state.
 pub trait FromCapturedAlg: Sized {
