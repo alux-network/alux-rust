@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["alux-*", "crates/alux-*", "macros/alux-*"]
+members = ["alux-*", "crates/alux-*", "macros/alux-*", "examples/*"]
+default-members = ["alux-*", "crates/alux-*", "macros/alux-*"]
 
 [workspace.package]
 authors = ["Tomislav Grospic <grospic@gmail.com>"]
@@ -11,6 +12,9 @@ license = "MIT"
 rust-version = "1.97"
 
 [workspace.dependencies]
+alux-bench = { version = "0.1", path = "alux-bench" }
+alux-bench-criterion = { path = "crates/alux-bench-criterion" }
+alux-bench-direct = { path = "crates/alux-bench-direct" }
 alux-ext = { version = "0.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.1", path = "macros/alux-ext-macros" }
 alux-http = { version = "0.2", path = "alux-http" }
@@ -49,8 +53,11 @@ actix-web = "4"
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }
 bytes = "1"
+criterion = "0.5"
 http-body-util = "0.1"
 hyper = "1"
+log = "0.4"
+hyper-util = { version = "0.1", features = ["server", "tokio"] }
 derive_more = { version = "2", features = ["deref", "deref_mut", "from"] }
 derive-new = "0.7"
 extend = "1"
@@ -72,7 +79,7 @@ serde_urlencoded = "0.7"
 syn = { version = "3", features = ["full", "visit", "visit-mut"] }
 thiserror = "2"
 trait-set = "0.3"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "time"] }
 tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = ["io"] }
 tower = { version = "0.5", features = ["util"] }
