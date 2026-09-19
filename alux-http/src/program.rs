@@ -243,7 +243,7 @@ pub type WithEndpoint<Program, Method, Handler, Inputs, Args, Transform> =
     RouteProgram<Merge<Program, Endpoint<Method, Handler, Inputs, Args, Transform>>>;
 
 macro_rules! output_methods {
-    ($($method:ident => $kind:ident, $meaning:literal),+ $(,)?) => {
+    ($($method:ident => $kind:ident, $alg:ident, $selected:ident, $meaning:literal),+ $(,)?) => {
         $(
             #[doc = concat!("Marks the inferred handler result for ", $meaning, " interpretation.")]
             pub fn $method(self) -> Operation<Handler, Inputs, Args, $kind> {
@@ -383,16 +383,7 @@ where
         Operation { handler: self.handler, marker: PhantomData }
     }
 
-    output_methods! {
-        json     => JsonOut, "JSON",
-        file     => FileOut, "streamed-file",
-        text     => TextOut, "plain-text",
-        html     => HtmlOut, "HTML",
-        bytes    => BytesOut, "raw-byte",
-        empty    => EmptyOut, "empty",
-        redirect => RedirectOut, "redirect",
-        stream   => StreamOut, "streamed",
-    }
+    with_output_kinds!(output_methods);
 
     /// Answers with `CODE` and the body already stated.
     pub fn status<const CODE: u16>(self) -> Operation<Handler, Inputs, Args, StatusOut<Transform, CODE>> {
@@ -464,17 +455,7 @@ impl<Program> RouteProgram<Program> {
     }
 }
 
-route_methods! {
-    get     => Get, "GET",
-    post    => Post, "POST",
-    put     => Put, "PUT",
-    patch   => Patch, "PATCH",
-    delete  => Delete, "DELETE",
-    head    => Head, "HEAD",
-    options => Options, "OPTIONS",
-    trace   => Trace, "TRACE",
-    connect => Connect, "CONNECT",
-}
+with_http_methods!(route_methods);
 
 impl<Compiler> CompileRouteProgram<Compiler> for Empty
 where

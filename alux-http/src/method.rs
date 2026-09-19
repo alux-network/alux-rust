@@ -11,7 +11,7 @@ pub trait HttpMethodAlg {
 }
 
 macro_rules! http_methods {
-    ($($marker:ident => $label:literal),+ $(,)?) => {
+    ($($declaration:ident => $marker:ident, $label:literal),+ $(,)?) => {
         /// Names one HTTP request method.
         ///
         /// These are the standard request methods, which every major framework routes natively. A
@@ -49,14 +49,4 @@ macro_rules! http_methods {
     };
 }
 
-http_methods! {
-    Get     => "GET",
-    Post    => "POST",
-    Put     => "PUT",
-    Patch   => "PATCH",
-    Delete  => "DELETE",
-    Head    => "HEAD",
-    Options => "OPTIONS",
-    Trace   => "TRACE",
-    Connect => "CONNECT",
-}
+with_http_methods!(http_methods);

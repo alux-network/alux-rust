@@ -2,6 +2,10 @@
 
 extern crate self as alux_http;
 
+// Read by the lists in `method` and `output`, and by the declarations `program` states of them.
+#[macro_use]
+mod vocabulary;
+
 mod algebra;
 mod answer;
 mod chunks;

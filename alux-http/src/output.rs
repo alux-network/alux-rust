@@ -26,7 +26,7 @@ pub trait OutputKindAlg<Interpreter: ?Sized, From> {
 }
 
 macro_rules! output_kinds {
-    ($($kind:ident => $alg:ident, $selected:ident, $meaning:literal),+ $(,)?) => {
+    ($($declaration:ident => $kind:ident, $alg:ident, $selected:ident, $meaning:literal),+ $(,)?) => {
         $(
             #[doc = concat!("Selects the converter used for ", $meaning, " API outputs.")]
             pub trait $alg {
@@ -48,16 +48,7 @@ macro_rules! output_kinds {
     };
 }
 
-output_kinds! {
-    JsonOut     => JsonOutAlg, Json, "JSON",
-    FileOut     => FileOutAlg, File, "streamed file",
-    TextOut     => TextOutAlg, Text, "plain text",
-    HtmlOut     => HtmlOutAlg, Html, "HTML",
-    BytesOut    => BytesOutAlg, Bytes, "raw byte",
-    EmptyOut    => EmptyOutAlg, Empty, "empty",
-    RedirectOut => RedirectOutAlg, Redirect, "redirect",
-    StreamOut   => StreamOutAlg, Stream, "streamed",
-}
+with_output_kinds!(output_kinds);
 
 /// Selects the converter used to answer with a declared status.
 pub trait StatusOutAlg {
