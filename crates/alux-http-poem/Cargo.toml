@@ -21,6 +21,7 @@ futures.workspace = true
 poem.workspace = true
 serde.workspace = true
 serde_urlencoded.workspace = true
+tokio.workspace = true
 
 [dev-dependencies]
 alux-http-conformance.workspace = true
