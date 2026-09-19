@@ -5,8 +5,6 @@
 //! everything crossing the wire, and every status an endpoint can answer with. Nothing here is
 //! restated: it is the same declaration the executing interpretations compile.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_http::{
     EmptyOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, NamedValuesAlg, ResultOutAlg, StatusOutAlg, http,

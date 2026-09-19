@@ -36,18 +36,55 @@ trait ValueExt<This> { fn describe(&self) -> String; }
 impl<This> ValueExt<This> for This where This: ValueAlg { /* the body you wrote */ }
 ```
 
-`alux_ext::ext` accepts the same arguments as `extend::ext` and forwards the ones it does not use, so
-`name`, `supertraits`, and friends behave exactly as documented there. The `extend` crate is
-re-exported as `alux_ext::extend`, which is the path the generated code names — that is why crates
-using `#[ext]` do not list `extend` as a dependency themselves.
+`alux_ext::ext` takes the same arguments as `extend::ext`: `name`, `supertraits`, and a visibility.
+It generates the trait and the impl itself, except for a block stating no `name`, which it passes to
+`extend::ext`. The `extend` crate is re-exported as `alux_ext::extend`, which is the path that
+generated code names — that is why crates using `#[ext]` do not list `extend` as a dependency
+themselves.
+
+## What the attribute generates
+
+`#[ext]` writes the trait and the impl itself, from one block, so each half says what it is for:
+
+- **The trait** declares the future a method answers, which is what a caller can bound. `Send` is
+  declared only where the block wrote it, since only a body satisfies it. Arguments are declared by
+  name, without `mut`, and a pattern is declared as `_`, since how a body binds an argument is the
+  body's business.
+- **The impl** states the same method as the `async fn` it is, with the bindings the body asks for.
+
+Either spelling in the block reaches both halves:
+
+```rust ignore
+// Written as `async fn`, and declared as the future it answers.
+async fn gathered(mut self) -> Result<Vec<Self::Chunk>, Self::Error> { … }
+fn gathered(self) -> impl core::future::Future<Output = Result<Vec<This::Chunk>, This::Error>>;
+
+// Written as a future, which is how a method says its future is `Send`, and carried as the body
+// the `async` block is made of.
+fn gathered(mut self) -> impl Future<Output = …> + Send { async move { … } }
+fn gathered(self) -> impl Future<Output = …> + Send;              // declared
+async fn gathered(mut self) -> Result<Vec<This::Chunk>, This::Error> { … }   // carried
+```
+
+A future the block did not build here, such as one forwarding another call, is carried as written.
+
+Both halves name the carrier where the block wrote `Self`. The trait is generic over the carrier, so
+`Self::Chunk` would need a bound on `Self`, while `This::Chunk` is resolved by the bounds the block
+already states. A nested item states its own `Self` and is left alone.
+
+`supertraits` is what the trait extends, and nothing is added to it.
+
+With `defunc`, one operation type per method is generated beside the two halves. A block handed to a
+backend with `defunc(via = path)` is left to the backend, which states its own trait, and a block
+stating no `name` is passed to `extend::ext`, which reads a name off the carrier.
 
 ## What `alux-ext` adds on top
 
 Adding `defunc` to the attribute keeps everything above and generates one extra type per method:
 
 ```text
-#[ext(name = ValueExt)]           ->  extension trait only          (plain extend behavior)
-#[ext(name = ValueExt, defunc)]   ->  extension trait + operation   (alux-ext addition)
+#[ext(name = ValueExt)]           ->  extension trait + blanket impl
+#[ext(name = ValueExt, defunc)]   ->  extension trait + blanket impl + operation
 ```
 
 An *operation* is a value that means "apply this method." It records the context the method needs,
@@ -104,18 +141,23 @@ The expansion below is real output with only the `#[allow(...)]` noise removed. 
 ordinary extension trait described earlier; the second half is the operation.
 
 ```rust ignore
-// --- First half: the ordinary extension. This is the `extend` behavior, unchanged. ---
+// --- First half: the ordinary extension, as a trait declaring the method and an impl carrying its
+// body. ---
 
-// The signature, lifted into a trait so it can apply to types this crate does not own.
+// The signature, lifted into a trait so it can apply to types this crate does not own. `async fn` is
+// how a body is written, not something a declaration can state, so the declaration states the future
+// that body answers with. A caller can name and bound that future, and there is nothing here for
+// `async_fn_in_trait` to warn about.
 trait ValueExt<This>
 where
     This: ValueAlg,
 {
-    async fn value_plus(&self, increment: u32) -> u32;
+    fn value_plus(&self, increment: u32) -> impl core::future::Future<Output = u32>;
 }
 
-// The body you wrote, implemented for every type satisfying the bound. This is what makes
-// `value.value_plus(2).await` compile as an ordinary method call.
+// The body you wrote, kept as the `async fn` it was written as, implemented for every type
+// satisfying the bound. This is what makes `value.value_plus(2).await` compile as an ordinary method
+// call. Declaring the future and stating the body are the two halves of one written method.
 impl<This> ValueExt<This> for This
 where
     This: ValueAlg,

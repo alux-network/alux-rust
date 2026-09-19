@@ -5,8 +5,6 @@
 //! nothing, which is what lets every role be mixed here without a transport deciding which of them
 //! may appear more than once.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_http::{HttpApiAlg, HttpProgramExt, JsonOutAlg, NamedValuesAlg, http};
 use alux_http_text::TextHandlerImpl;

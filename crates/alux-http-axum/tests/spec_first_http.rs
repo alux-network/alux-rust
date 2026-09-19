@@ -4,8 +4,6 @@
 //! route, a method, a path spelling, an input role, or an output kind: the declaration is the one a
 //! Poem service would be compiled from, and axum answers it.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_http::{
     BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, RedirectOutAlg, ResultOutAlg,

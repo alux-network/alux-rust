@@ -10,6 +10,7 @@
 //! own expansion targets. The executed examples live in those crates' documentation.
 
 mod ext;
+mod extension;
 mod http_program;
 mod jsonrpc_program;
 mod lower;

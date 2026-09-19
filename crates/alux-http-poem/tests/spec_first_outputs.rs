@@ -5,8 +5,6 @@
 //! without answering anything, which is what shows the kinds are stated by the program rather than
 //! chosen by the framework.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_http::{
     BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, RedirectOutAlg, ResultOutAlg,

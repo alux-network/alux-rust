@@ -9,8 +9,6 @@
 //! domain, which is why both examples in this crate share the file unchanged: the specification-first
 //! program and the hand-written Poem service expose the same `App` two different ways.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use core::convert::Infallible;
 use core::future::Future;

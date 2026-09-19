@@ -4,8 +4,6 @@
 //! calls it. Nothing about the surface is written twice, which is what makes a client and a service
 //! unable to disagree about it.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_http::{
     EmptyOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, NamedValuesAlg, ResultOutAlg, StatusOutAlg, TextOutAlg, http,

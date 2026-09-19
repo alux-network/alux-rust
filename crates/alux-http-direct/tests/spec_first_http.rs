@@ -4,8 +4,6 @@
 //! that can be held to what routing means: which endpoint a request reaches, what a path binds, and
 //! what is answered when nothing is declared there.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_http::{
     BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpMethod, HttpProgramExt, HttpStatus, JsonOutAlg,

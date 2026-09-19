@@ -9,8 +9,6 @@
 //! domain, which is why both examples in this crate share the file unchanged: the specification-first
 //! program and the native jsonrpsee service expose the same `App` two different ways.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_jsonrpc::RpcErrorAlg;
 use core::fmt::{self, Display};

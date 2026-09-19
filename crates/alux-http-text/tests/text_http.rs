@@ -3,8 +3,6 @@
 //! The domain and its programs are declared here the way a downstream author would, then folded by the
 //! text interpreter, which executes no handler and only records what each endpoint denotes.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::{ApplyAlg, ext};
 use alux_http::{
     CompileRouteProgram, FileOutAlg, HttpApiAlg, HttpMethod, HttpProgramBuilder, HttpProgramExt, HttpSelectorAlg,

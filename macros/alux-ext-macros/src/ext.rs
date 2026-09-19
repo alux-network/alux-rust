@@ -5,16 +5,17 @@
 //! application through `ApplyAlg`; `defunc(via = backend)` delegates to an
 //! attribute-macro backend while retaining the same extension surface.
 
+use crate::extension::extension;
 use crate::http_program::http_program_defunc_internal;
 use crate::syntax::{ExtensionImpl, doc_text, documentation, operation_ident};
 use proc_macro2::TokenStream;
-use quote::{format_ident, quote};
-use syn::parse::{Parse, ParseStream};
+use quote::{ToTokens, format_ident, quote};
+use syn::parse::{Parse, ParseStream, Parser};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::VisitMut;
 use syn::{
-    ExprMethodCall, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path, ReceiverKind, ReturnType, Token,
-    Type, Visibility, parse_quote,
+    Expr, ExprMethodCall, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path, ReceiverKind, ReturnType,
+    Token, Type, TypeParamBound, Visibility, parse_quote,
 };
 
 enum Defunc {
@@ -193,10 +194,55 @@ fn defunctionalize(
     })
 }
 
+/// Reads the trait name a block stated.
+fn stated_name(arguments: &[Meta]) -> Option<Ident> {
+    arguments.iter().find_map(|argument| match argument {
+        Meta::NameValue(argument) if argument.path.is_ident("name") => match &argument.value {
+            Expr::Path(named) => named.path.get_ident().cloned(),
+            _ => None,
+        },
+        _ => None,
+    })
+}
+
+/// Reads the supertraits a block stated.
+fn stated_supertraits(arguments: &[Meta]) -> Option<syn::Result<Punctuated<TypeParamBound, Token![+]>>> {
+    arguments.iter().find_map(|argument| match argument {
+        Meta::NameValue(argument) if argument.path.is_ident("supertraits") => {
+            Some(Punctuated::parse_terminated.parse2(argument.value.to_token_stream()))
+        }
+        _ => None,
+    })
+}
+
+/// States every `async fn` as the future it answers, for the `extend::ext` path.
+///
+/// `Send` is not stated, since only a body satisfies it.
+fn state_the_futures(item: &mut ItemImpl) {
+    for method in item.items.iter_mut().filter_map(|item| match item {
+        ImplItem::Fn(method) => Some(method),
+        _ => None,
+    }) {
+        if method.sig.asyncness.take().is_none() {
+            continue;
+        }
+
+        let answered = match &method.sig.output {
+            ReturnType::Default => parse_quote!(()),
+            ReturnType::Type(_, answered) => answered.clone(),
+        };
+        let body = &method.block;
+        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = #answered>);
+        method.block = parse_quote!({ async move #body });
+    }
+}
+
 /// Expands the facade macro after converting compiler token streams into testable tokens.
 pub(crate) fn ext_internal(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     let arguments = syn::parse2::<ExtArgs>(attr)?;
     if let Defunc::Via(via) = &arguments.defunc {
+        // A backend states its own trait, so what it extends is its business rather than read off
+        // the carrier here.
         let forwarded = &arguments.forwarded;
         return Ok(quote! {
             #[#via(#(#forwarded),*)]
@@ -224,12 +270,27 @@ pub(crate) fn ext_internal(attr: TokenStream, item: TokenStream) -> syn::Result<
     } else {
         Vec::new()
     };
-    let forwarded = arguments.forwarded;
-    let forwarded = input.forwarded(quote!(#(#forwarded),*));
-    let item = input.item;
+    let supertraits = stated_supertraits(&arguments.forwarded).transpose()?;
+
+    // A block stating no name is named by `extend`, which reads a name off any carrier. Everything
+    // else is stated here, where the trait and the impl can differ.
+    let Some(name) = stated_name(&arguments.forwarded) else {
+        let arguments = &arguments.forwarded;
+        let forwarded = input.forwarded(quote!(#(#arguments),*));
+        // After the operations, which read whether a method was written as `async fn`.
+        let mut item = input.item;
+        state_the_futures(&mut item);
+
+        return Ok(quote! {
+            #[::alux_ext::extend::ext(#forwarded)]
+            #item
+            #(#operations)*
+        });
+    };
+    let extension = extension(&visibility, &name, supertraits, &input.item)?;
+
     Ok(quote! {
-        #[::alux_ext::extend::ext(#forwarded)]
-        #item
+        #extension
         #(#operations)*
     })
 }
@@ -238,6 +299,135 @@ pub(crate) fn ext_internal(attr: TokenStream, item: TokenStream) -> syn::Result<
 mod tests {
     use super::ext_internal;
     use quote::quote;
+
+    #[test]
+    fn declares_over_the_carrier_rather_than_over_self() {
+        let output = ext_internal(
+            quote!(name = ValueExt),
+            quote! {
+                impl<This> This
+                where
+                    This: ValueAlg,
+                {
+                    fn value(&self) -> Self::Value { self.value() }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // Both halves name the carrier, which the block's own bounds resolve. No supertrait states
+        // what bounds `Self`.
+        assert_eq!(output.matches("< This > :: Value").count(), 2, "{output}");
+        assert!(!output.contains("trait ValueExt < This > :"), "{output}");
+    }
+
+    #[test]
+    fn keeps_the_supertraits_a_block_states() {
+        let output = ext_internal(
+            quote!(name = ValueExt, supertraits = Sorts),
+            quote! {
+                impl<This> This
+                where
+                    This: ValueAlg,
+                {
+                    fn value(&self) -> u32 { 1 }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("trait ValueExt < This > : Sorts where"), "{output}");
+    }
+
+    #[test]
+    fn states_no_supertraits_for_an_unbounded_carrier() {
+        let output = ext_internal(
+            quote!(name = ValueExt),
+            quote! {
+                impl<This> This {
+                    fn value(&self) -> u32 { 1 }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(!output.contains("trait ValueExt < This > :"), "{output}");
+    }
+
+    #[test]
+    fn declares_without_the_bindings_a_body_asks_for() {
+        let output = ext_internal(
+            quote!(name = ValueExt),
+            quote! {
+                impl<This> This {
+                    fn value(mut self, mut increment: u32) -> u32 { increment += 1; increment }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("fn value (self , increment : u32) -> u32 ;"), "{output}");
+        assert!(output.contains("fn value (mut self , mut increment : u32) -> u32 {"), "{output}");
+    }
+
+    #[test]
+    fn states_the_future_an_async_method_answers() {
+        let output = ext_internal(
+            quote!(name = ValueExt),
+            quote! {
+                impl<This> This {
+                    async fn value(&self) -> u32 { 1 }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // The declaration states the future, the body stays what the author wrote.
+        assert!(
+            output.contains("fn value (& self) -> impl :: core :: future :: Future < Output = u32 > ;"),
+            "{output}"
+        );
+        assert!(output.contains("async fn value (& self) -> u32"), "{output}");
+    }
+
+    #[test]
+    fn carries_a_written_out_future_as_an_async_body() {
+        let output = ext_internal(
+            quote!(name = ValueExt),
+            quote! {
+                impl<This> This {
+                    fn value(&self) -> impl Future<Output = u32> + Send { async move { 1 } }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // The declaration states the future and what bounds it; the body is the `async fn` it is.
+        assert!(output.contains("fn value (& self) -> impl Future < Output = u32 > + Send ;"), "{output}");
+        assert!(output.contains("async fn value (& self) -> u32 { 1 }"), "{output}");
+    }
+
+    #[test]
+    fn leaves_a_future_it_did_not_build_alone() {
+        let output = ext_internal(
+            quote!(name = ValueExt),
+            quote! {
+                impl<This> This {
+                    fn value(&self) -> impl Future<Output = u32> + Send { answered(self) }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(!output.contains("async fn"), "{output}");
+    }
 
     #[test]
     fn preserves_an_ordinary_extension() {
@@ -252,9 +442,9 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("extend :: ext"));
-        assert!(output.contains("name = ValueExt"));
-        assert!(!output.contains("ValueOperation"));
+        assert!(output.contains("trait ValueExt < This >"), "{output}");
+        assert!(output.contains("impl < This > ValueExt < This > for This"), "{output}");
+        assert!(!output.contains("ValueOperation"), "{output}");
     }
 
     #[test]

@@ -8,11 +8,11 @@
 
 use alux_ext::ext;
 use alux_ext::macros::shape;
-use alux_shape::{FieldAlg, ShapeAlg, ShapeDeclareExt, ShapeExt, ShapeProgramExt, Sorts};
+use alux_shape::{FieldAlg, ShapeAlg, ShapeDeclareExt, ShapeExt, ShapeProgramExt};
 use alux_shape_text::TextShape;
 
 /// A domain names its leaves once, and its declarations read as declarations.
-#[ext(name = LeafExt, supertraits = Sorts + Sized)]
+#[ext(name = LeafExt)]
 pub impl<This> This
 where
     This: ShapeAlg,

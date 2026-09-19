@@ -6,12 +6,12 @@
 
 use alux_ext::ext;
 use alux_ext::macros::shape;
-use alux_shape::{FieldAlg, ShapeAlg, ShapeDeclareExt, ShapeExt, ShapeProgramExt, Sorts, Spelling};
+use alux_shape::{FieldAlg, ShapeAlg, ShapeDeclareExt, ShapeExt, ShapeProgramExt, Spelling};
 use alux_shape_rust::RustShape;
 use alux_shape_text::TextShape;
 
 /// A domain names its leaves once.
-#[ext(name = LeafExt, supertraits = Sorts + Sized)]
+#[ext(name = LeafExt)]
 pub impl<This> This
 where
     This: ShapeAlg,

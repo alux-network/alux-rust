@@ -5,11 +5,11 @@
 //! all of them — and cannot disagree with another interpretation about what internal tagging means,
 //! because neither of them decides it.
 
-use crate::{FieldAlg, ShapeAlg, Sorts, Words};
+use crate::{FieldAlg, ShapeAlg, Words};
 use alux_ext::ext;
 
 /// The shape operations that follow from the primitives alone.
-#[ext(name = ShapeExt, supertraits = Sorts)]
+#[ext(name = ShapeExt)]
 pub impl<This> This
 where
     This: ShapeAlg,
@@ -51,7 +51,7 @@ where
 }
 
 /// The encodings of a choice that state a discriminant, which is what needs a member to state it in.
-#[ext(name = ShapeTaggedExt, supertraits = Sorts)]
+#[ext(name = ShapeTaggedExt)]
 pub impl<This> This
 where
     This: ShapeAlg + FieldAlg,

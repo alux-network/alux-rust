@@ -72,7 +72,7 @@ mod tests {
         }
     }
 
-    #[ext(name = DescribeExt, supertraits = ValueAlg + Sized)]
+    #[ext(name = DescribeExt)]
     impl<This> This
     where
         This: ValueAlg,

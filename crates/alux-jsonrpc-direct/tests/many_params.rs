@@ -4,8 +4,6 @@
 //! both readings stay in step with the argument product all the way up: the same sixteen values
 //! reach the same sixteen arguments whether the caller wrote an array or an object.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_jsonrpc::{JsonRpcApiAlg, JsonRpcProgramExt, jsonrpc};
 use alux_jsonrpc_direct::{DirectImpl, MethodTable};

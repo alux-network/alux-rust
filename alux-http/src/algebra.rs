@@ -182,7 +182,7 @@ where
 }
 
 /// Provides fluent route composition on any `RouteAlg`.
-#[ext(name = RouteAlgExt, supertraits = RouteAlg + Sized)]
+#[ext(name = RouteAlgExt)]
 pub impl<This> This
 where
     This: RouteAlg,

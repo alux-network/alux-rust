@@ -1,7 +1,5 @@
 //! Reifies extension methods as first-order operations with explicit application meaning.
 
-#![allow(async_fn_in_trait)]
-
 extern crate self as alux_ext;
 
 /// Re-exports the procedural-macro implementation shared by ALUX program crates.

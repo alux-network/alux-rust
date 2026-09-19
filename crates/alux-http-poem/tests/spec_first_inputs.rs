@@ -4,8 +4,6 @@
 //! handler argument arrives as JSON, as a form, or as the bytes that were sent, and only the
 //! declaration says which.
 
-#![allow(async_fn_in_trait)]
-
 use alux_ext::ext;
 use alux_http::{HttpApiAlg, HttpProgramExt, JsonOutAlg, TextOutAlg, http};
 use alux_http_poem::PoemHandlerImpl;
