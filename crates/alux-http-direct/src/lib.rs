@@ -13,12 +13,12 @@
 
 mod handler;
 mod input;
-mod message;
 mod output;
 mod route;
 
+// A request and an answer are stated by `alux-http-parts`, which names no interpretation.
+pub use alux_http_parts::{Chunks, DirectBody, DirectError, DirectRequest, DirectResponse};
 pub use handler::*;
 pub use input::*;
-pub use message::*;
 pub use output::*;
 pub use route::*;

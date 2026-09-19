@@ -1,6 +1,7 @@
 //! States a request and an answer without naming a transport.
 
 use alux_http::{HttpErrorAlg, HttpStatus};
+use core::error::Error;
 use core::fmt::{self, Debug, Display};
 use core::pin::Pin;
 use futures::{Stream, StreamExt};
@@ -265,7 +266,7 @@ impl Display for DirectError {
     }
 }
 
-impl core::error::Error for DirectError {}
+impl Error for DirectError {}
 
 impl From<DirectError> for DirectResponse {
     fn from(error: DirectError) -> Self {
