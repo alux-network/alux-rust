@@ -18,9 +18,13 @@ workspace = true
 alux-http.workspace = true
 alux-http-direct.workspace = true
 bytes.workspace = true
+derive-new.workspace = true
 futures.workspace = true
 http-body-util.workspace = true
 hyper.workspace = true
+hyper-util = { workspace = true, features = ["http1", "http2"] }
+tokio.workspace = true
+tokio-stream = { workspace = true, features = ["net"] }
 
 [dev-dependencies]
 alux-http-conformance.workspace = true

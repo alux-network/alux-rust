@@ -1,4 +1,4 @@
-//! Serves one compiled surface over hyper.
+//! The compiled surface, as a route hyper can serve.
 
 use crate::message::{HyperAnswer, answered, asked};
 use alux_http_direct::DirectRoute;
@@ -7,6 +7,7 @@ use core::convert::Infallible;
 use core::fmt::Display;
 use core::future::Future;
 use core::pin::Pin;
+use derive_new::new as New;
 use hyper::Request;
 use hyper::body::Body;
 use hyper::service::Service;
@@ -15,17 +16,12 @@ use hyper::service::Service;
 ///
 /// The surface does the routing and the reading; this states only how a hyper request becomes one a
 /// surface answers, and how that answer becomes a hyper response.
-#[derive(Clone)]
-pub struct HyperService {
+#[derive(Clone, New)]
+pub struct HyperRoute {
     surface: DirectRoute,
 }
 
-impl HyperService {
-    /// Serves the surface a program compiled.
-    pub fn new(surface: DirectRoute) -> Self {
-        Self { surface }
-    }
-
+impl HyperRoute {
     /// Answers one request, whatever carried it here.
     ///
     /// A request that cannot be read is answered rather than dropped, because a caller that sent
@@ -42,7 +38,7 @@ impl HyperService {
     }
 }
 
-impl<Sent> Service<Request<Sent>> for HyperService
+impl<Sent> Service<Request<Sent>> for HyperRoute
 where
     Sent: Body<Data = Bytes> + Send + 'static,
     Sent::Error: Display,

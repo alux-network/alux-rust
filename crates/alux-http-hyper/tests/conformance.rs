@@ -6,19 +6,20 @@
 
 use alux_http::{HttpMethod, HttpProgramExt, HttpStatus};
 use alux_http_conformance::{
-    LABELS, MultipartApiExt, Shop, ShopApiExt, StreamApiExt, WideApiExt, expect, expect_multipart, expect_streaming,
+    AnswerAlg, LABELS, MultipartApiExt, Shop, ShopApiExt, StreamApiExt, WideApiExt, expect, expect_multipart,
+    expect_streaming,
 };
 use alux_http_direct::{DirectHandlerImpl, DirectRequest, DirectResponse};
-use alux_http_hyper::HyperService;
+use alux_http_hyper::HyperRoute;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Collected, Full};
 use hyper::header::{HeaderName, HeaderValue};
 use hyper::{Method, Request};
 
 /// Answers a stated request by sending it through hyper, as a caller's connection would.
-struct Answering(HyperService);
+struct Answering(HyperRoute);
 
-impl alux_http_conformance::AnswerAlg for Answering {
+impl AnswerAlg for Answering {
     async fn answer(&self, request: DirectRequest) -> DirectResponse {
         let method = request
             .method()
@@ -52,7 +53,7 @@ fn serving<Api>(api: Api) -> Answering
 where
     Api: FnOnce() -> alux_http_direct::DirectRoute,
 {
-    Answering(HyperService::new(api()))
+    Answering(HyperRoute::new(api()))
 }
 
 #[tokio::test]
@@ -92,7 +93,7 @@ fn compiles_the_widest_endpoint_the_specification_states() {
 #[tokio::test]
 async fn answers_a_method_it_states_nothing_for() {
     let api = DirectHandlerImpl::new(Shop);
-    let served = HyperService::new(api.compile_http(api.shop_api::<Shop>()));
+    let route = HyperRoute::new(api.compile_http(api.shop_api::<Shop>()));
     let sent = Request::builder()
         .method(Method::from_bytes(b"PROPFIND").expect("an extension method is a method"))
         .uri("/items")
@@ -100,6 +101,6 @@ async fn answers_a_method_it_states_nothing_for() {
         .expect("a stated request is a request");
 
     // A method the specification names none of reaches no endpoint, and is still answered.
-    assert_eq!(served.answer(sent).await.status(), HttpStatus::METHOD_NOT_ALLOWED.code());
+    assert_eq!(route.answer(sent).await.status(), HttpStatus::METHOD_NOT_ALLOWED.code());
     let _ = HttpMethod::ALL;
 }

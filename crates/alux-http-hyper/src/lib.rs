@@ -7,11 +7,16 @@
 //! reads a hyper request into a `DirectRequest`, hands it to the surface, and writes the answer back
 //! as a hyper response.
 //!
-//! It states a [`hyper::service::Service`] and stops there. Which runtime listens, and how
-//! connections are driven, stays the caller's, so this crate names no runtime either.
+//! It also states the accepting itself, in [`HyperConnections`]. A framework that hands out a
+//! service rather than a loop needs nothing more than that to serve, so the interpreters for those
+//! frameworks accept through this one rather than each writing the same loop.
 
+mod connections;
 mod message;
-mod service;
+mod route;
+mod server;
 
+pub use connections::*;
 pub use message::*;
-pub use service::*;
+pub use route::*;
+pub use server::*;

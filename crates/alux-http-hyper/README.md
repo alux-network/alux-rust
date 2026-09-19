@@ -10,12 +10,12 @@ it to the surface, and writes the answer back as a hyper response.
 ```rust ignore
 use alux_http::HttpProgramExt;
 use alux_http_direct::DirectHandlerImpl;
-use alux_http_hyper::HyperService;
+use alux_http_hyper::HyperRoute;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
 
 let api = DirectHandlerImpl::new(App::new());
-let served = HyperService::new(api.compile_http(api.status_api::<App>()));
+let served = HyperRoute::new(api.compile_http(api.status_api::<App>()));
 
 let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 loop {
