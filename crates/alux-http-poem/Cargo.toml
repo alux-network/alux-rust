@@ -24,6 +24,10 @@ serde_urlencoded.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+trait-set.workspace = true
+alux-http-openapi.workspace = true
+alux-shape.workspace = true
+alux-shape-jsonschema.workspace = true
 alux-http-conformance.workspace = true
 alux-http-direct.workspace = true
 alux-http-text.workspace = true
