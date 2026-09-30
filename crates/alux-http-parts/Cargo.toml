@@ -1,6 +1,6 @@
 [package]
 name = "alux-http-parts"
-version = "0.1.0"
+version = "0.2.0"
 description = "Reads a body arriving as parts, for ALUX HTTP interpretations whose framework does not"
 documentation = "https://docs.rs/alux-http-parts"
 authors.workspace = true
