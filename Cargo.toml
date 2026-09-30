@@ -31,7 +31,7 @@ alux-http-salvo = { version = "0.1.0", path = "crates/alux-http-salvo" }
 alux-http-text = { version = "0.3.0", path = "crates/alux-http-text" }
 alux-http-typescript = { version = "0.1.0", path = "crates/alux-http-typescript" }
 alux-http-warp = { version = "0.1.0", path = "crates/alux-http-warp" }
-alux-jsonrpc = { version = "0.3.0", path = "alux-jsonrpc" }
+alux-jsonrpc = { version = "0.4.0", path = "alux-jsonrpc" }
 alux-jsonrpc-direct = { version = "0.2.1", path = "crates/alux-jsonrpc-direct" }
 alux-jsonrpc-jsonrpsee = { version = "0.3.1", path = "crates/alux-jsonrpc-jsonrpsee" }
 alux-jsonrpc-typescript = { version = "0.2.1", path = "crates/alux-jsonrpc-typescript" }
