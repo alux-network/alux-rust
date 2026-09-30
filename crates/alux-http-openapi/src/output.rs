@@ -177,6 +177,10 @@ impl<From> OpenApiOutputAlg<From> for OpenApiRedirectOutput {
 }
 
 /// Describes a header an answer carries, beside the body it states.
+///
+/// The header is written around whatever the kind inside answers with, so every answer that kind
+/// states carries it: `.out_header::<ETag>().result().json()` states `etag` on success and failure
+/// alike, and `.result().out_header::<ETag>().json()` only on success.
 pub struct OpenApiHeaderOutput<Inner, Name>(PhantomData<fn(Inner, Name)>);
 
 impl<Inner, Name, From> OutputAlg<From> for OpenApiHeaderOutput<Inner, Name> {
@@ -195,13 +199,10 @@ where
     fn answers(schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
         Inner::answers(schema)
             .into_iter()
-            .map(|answer| {
-                let mut carried = answer;
-                if carried.status.is_success() {
-                    carried.headers.push(Name::HEADER_NAME.to_owned());
-                }
+            .map(|mut answer| {
+                answer.headers.push(Name::HEADER_NAME.to_owned());
 
-                carried
+                answer
             })
             .collect()
     }
@@ -213,8 +214,8 @@ impl<Context> HeaderOutAlg for OpenApiHandlerImpl<Context> {
 
 /// Describes the headers a named product states beside the answer a kind already states.
 ///
-/// Each member is one header a successful answer carries, named by the words its member name
-/// states, so the document keys it exactly as the answer writes it.
+/// Each member is one header every answer of the kind inside carries, named by the words its member
+/// name states, so the document keys it exactly as the answer writes it.
 pub struct OpenApiHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
 
 impl<Inner, Headers, From> OutputAlg<From> for OpenApiHeadersOutput<Inner, Headers> {
@@ -239,9 +240,7 @@ where
         Inner::answers(schema)
             .into_iter()
             .map(|mut answer| {
-                if answer.status.is_success() {
-                    answer.headers.extend(names.iter().cloned());
-                }
+                answer.headers.extend(names.iter().cloned());
 
                 answer
             })

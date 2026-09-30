@@ -67,7 +67,9 @@ struct Routes<'a>(&'a mut Vec<RouteRequirement>);
 
 impl VisitMut for Routes<'_> {
     fn visit_expr_method_call_mut(&mut self, call: &mut ExprMethodCall) {
-        if method_marker(&call.method.to_string()).is_some()
+        // A method held as a type parameter, `.method::<Get, ..>(path, op)`, states an endpoint the
+        // same way the named declarations do.
+        if (method_marker(&call.method.to_string()).is_some() || call.method == "method")
             && let Some(declaration) = call.args.iter_mut().nth(1)
         {
             let written = declaration.span();
@@ -264,6 +266,26 @@ mod tests {
         assert!(!output.contains("HandlerContextAlg"));
         assert!(!output.contains("HandlerEndpointAlg"));
         assert!(!output.contains("ApplyAlg"));
+    }
+
+    #[test]
+    fn reads_an_endpoint_declared_under_a_method_type_parameter() {
+        let output = http_program_defunc_internal(
+            quote!(name = StatusApiExt),
+            quote! {
+                impl<This> This where This: HttpRouteAlg {
+                    fn status_api<Alg>(&self) {
+                        self.routes().method::<::alux_http::Get, _, _, _, _>("/status", self.op(Alg::status_current).json())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains(
+            "This : :: alux_http :: HttpOperationAlg < StatusCurrentOperation < Alg > , () , :: alux_http :: JsonOut"
+        ));
     }
 
     #[test]
