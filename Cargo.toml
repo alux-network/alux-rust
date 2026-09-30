@@ -47,7 +47,7 @@ alux-shape-term = { version = "0.1.0", path = "crates/alux-shape-term" }
 alux-shape-text = { version = "0.1.0", path = "crates/alux-shape-text" }
 alux-shape-typescript = { version = "0.1.0", path = "crates/alux-shape-typescript" }
 alux-tokio = { version = "0.3.0", path = "crates/alux-tokio" }
-alux-traversable = { version = "0.1.1", path = "alux-traversable" }
+alux-traversable = { version = "0.2.0", path = "alux-traversable" }
 
 actix-web = "4"
 anyhow = "1"
