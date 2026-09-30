@@ -7,4 +7,4 @@ depending on this implementation crate directly. Generated code targets the publ
 
 HTTP lowering reifies operation references and states one `HttpOperationAlg` bound per endpoint from
 its input roles and output kind, plus an `HttpProgramAlg` bound per nested program. Built-in
-`.json()` and downstream `.out::<Kind>()` lower to the same public capability contract. See the workspace [migration notes](../../MIGRATION.md).
+`.json()` and downstream `.out::<Kind>()` lower to the same public capability contract.

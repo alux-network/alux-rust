@@ -256,7 +256,7 @@ mod tests {
     }
 
     #[test]
-    fn does_not_infer_missing_endpoint_or_nested_program_bounds() {
+    fn states_the_endpoint_and_nested_program_bounds() {
         let output = http_program_defunc_internal(
             quote!(name = RootApiExt),
             quote! {
@@ -271,8 +271,12 @@ mod tests {
         )
         .unwrap()
         .to_string();
-        assert!(!output.contains("HttpOperationAlg"));
-        assert!(!output.contains("OtherApiProgram"));
+        // The `.json()` endpoint states its capability, and `other_api`, named by its `_api` suffix,
+        // states the program it nests.
+        assert!(output.contains(
+            "This : :: alux_http :: HttpOperationAlg < StatusCurrentOperation < Alg > , () , :: alux_http :: JsonOut"
+        ));
+        assert!(output.contains("OtherApiProgram < Alg > : :: alux_http :: HttpProgramAlg < This"));
         assert!(output.contains(". json ()"));
         assert!(output.contains(". program ("));
     }

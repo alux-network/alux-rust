@@ -24,7 +24,7 @@ pub(crate) struct MethodDefaults {
     fallible: bool,
 }
 
-/// Separates the program-level arguments this backend owns from those `extend::ext` reads.
+/// Separates the program-level arguments this backend owns from those the extension reads.
 fn split_arguments(attr: TokenStream) -> syn::Result<(MethodDefaults, TokenStream)> {
     if attr.is_empty() {
         return Ok((MethodDefaults::default(), attr));

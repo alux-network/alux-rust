@@ -5,17 +5,19 @@
 //! authored capability bounds; backends for other transports may still derive interpretation
 //! evidence. A backend supplies only what its own transport means.
 
+use crate::extension::{extension, stated};
 use crate::syntax::{
     ExtensionImpl, ReplaceSelf, Subprograms, documentation, method_names, predicates, program_ident,
     program_type_params, unbind,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::visit_mut::VisitMut;
 use syn::{
-    Block, Expr, ExprMethodCall, GenericParam, Ident, ImplItem, ImplItemFn, Stmt, Token, Visibility, WherePredicate,
-    parse_quote,
+    Block, Expr, ExprMethodCall, GenericParam, Ident, ImplItem, ImplItemFn, Meta, Stmt, Token, Visibility,
+    WherePredicate, parse_quote,
 };
 
 /// Carries the parts of a lowered program that no backend chooses.
@@ -112,10 +114,10 @@ where
     let input = syn::parse2::<ExtensionImpl>(item)?;
     let visibility = input.item_visibility();
     let impl_predicates = input.impl_predicates();
-    let mut extension = input.unbounded_item();
-    let methods = method_names(&extension);
+    let mut block = input.unbounded_item();
+    let methods = method_names(&block);
     let mut generated = Vec::new();
-    for item in &mut extension.items {
+    for item in &mut block.items {
         if let ImplItem::Fn(method) = item {
             let (constructor, program) =
                 lower_program::<Backend>(method, &methods, &visibility, &impl_predicates, defaults)?;
@@ -123,10 +125,10 @@ where
             generated.push(program);
         }
     }
-    let forwarded = input.forwarded(attr);
+    let arguments = Punctuated::<Meta, Token![,]>::parse_terminated.parse2(attr)?.into_iter().collect::<Vec<_>>();
+    let extension = extension(&visibility, stated(&arguments, &input.item)?, &block)?;
 
     Ok(quote! {
-        #[::alux_ext::extend::ext(#forwarded)]
         #extension
         #(#generated)*
     })

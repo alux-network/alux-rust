@@ -4,26 +4,61 @@
 //! The impl states each method as `async fn`.
 
 use proc_macro2::TokenStream;
-use quote::quote;
+use quote::{ToTokens, format_ident, quote};
+use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Async, Plus};
+use syn::visit::Visit;
 use syn::{
-    Expr, FnArg, GenericArgument, Ident, ImplItem, ImplItemFn, ItemImpl, Pat, PathArguments, ReceiverKind, ReturnType,
-    Signature, Stmt, TraitItemConst, TraitItemFn, Type, TypeImplTrait, TypeParamBound, Visibility, parse_quote,
+    Expr, FnArg, GenericArgument, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, PathArguments, ReceiverKind,
+    ReturnType, Signature, Stmt, TraitItemConst, TraitItemFn, Type, TypeImplTrait, TypeParamBound, Visibility,
+    WherePredicate, parse_quote,
 };
 
-/// States the trait and the impl an extension block means.
-pub(crate) fn extension(
-    visibility: &Visibility,
-    name: &Ident,
+/// Carries what an extension's arguments state about its trait.
+pub(crate) struct Stated {
+    name: Ident,
     supertraits: Option<Punctuated<TypeParamBound, Plus>>,
-    item: &ItemImpl,
-) -> syn::Result<TokenStream> {
+}
+
+/// Reads the `name` and `supertraits` an extension states, naming an unnamed trait after the block.
+///
+/// A block over a generic carrier is named after the carrier's first trait bound that is not a
+/// marker, so `impl<This> This where This: ChunksAlg + Send` declares `ChunksAlgExt`. Any other
+/// block is named after its carrier by the rule `extend::ext` states.
+pub(crate) fn stated(arguments: &[Meta], authored: &ItemImpl) -> syn::Result<Stated> {
+    let mut name = None;
+    let mut supertraits = None;
+    for argument in arguments {
+        match argument {
+            Meta::NameValue(argument) if argument.path.is_ident("name") => {
+                name = Some(syn::parse2::<Ident>(argument.value.to_token_stream())?);
+            }
+            Meta::NameValue(argument) if argument.path.is_ident("supertraits") => {
+                supertraits = Some(Punctuated::parse_terminated.parse2(argument.value.to_token_stream())?);
+            }
+            other => return Err(syn::Error::new_spanned(other, "an extension states `name` and `supertraits`")),
+        }
+    }
+    let name = match name {
+        Some(name) => name,
+        None => match bound_name(authored) {
+            Some(bound) => format_ident!("{bound}Ext"),
+            None => format_ident!("{}Ext", carrier_name(&authored.self_ty)?),
+        },
+    };
+
+    Ok(Stated { name, supertraits })
+}
+
+/// States the trait and the impl an extension block means.
+pub(crate) fn extension(visibility: &Visibility, stated: Stated, item: &ItemImpl) -> syn::Result<TokenStream> {
     let ItemImpl { attrs, unsafety, generics, self_ty, items, trait_, .. } = item;
     if let Some((path, _)) = trait_ {
         return Err(syn::Error::new(path.span(), "a trait impl states no extension"));
     }
+    let Stated { name, supertraits } = stated;
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let extends = supertraits.map(|supertraits| quote!(: #supertraits));
@@ -51,6 +86,133 @@ pub(crate) fn extension(
         impl #impl_generics #name #ty_generics for #self_ty #where_clause {
             #(#carried)*
         }
+    })
+}
+
+/// Reads the trait bound a generic carrier is named after: its first bound that is not a basic Rust
+/// trait, or its first bound when every one is.
+///
+/// Bounds written on the parameter are read before the `where` clause, each in written order.
+fn bound_name(authored: &ItemImpl) -> Option<Ident> {
+    const BASIC: [&str; 16] = [
+        "Send",
+        "Sync",
+        "Sized",
+        "Unpin",
+        "Copy",
+        "UnwindSafe",
+        "RefUnwindSafe",
+        "Clone",
+        "Default",
+        "Debug",
+        "Display",
+        "PartialEq",
+        "Eq",
+        "PartialOrd",
+        "Ord",
+        "Any",
+    ];
+
+    let Type::Path(carrier) = &*authored.self_ty else { return None };
+    let carrier = carrier.path.get_ident()?;
+    let generics = &authored.generics;
+    // A concrete carrier such as `Registry` is named after itself.
+    let param = generics.type_params().find(|param| param.ident == *carrier)?;
+    let clauses = generics
+        .where_clause
+        .iter()
+        .flat_map(|clause| &clause.predicates)
+        .filter_map(|predicate| match predicate {
+            WherePredicate::Type(predicate) => Some(predicate),
+            _ => None,
+        })
+        .filter(|predicate| matches!(&predicate.bounded_ty, Type::Path(bounded) if bounded.path.is_ident(carrier)))
+        .flat_map(|predicate| &predicate.bounds);
+    let traits = param
+        .bounds
+        .iter()
+        .chain(clauses)
+        .filter_map(|bound| match bound {
+            TypeParamBound::Trait(bound) if bound.maybe.is_none() => Some(&bound.path.segments.last()?.ident),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    traits
+        .iter()
+        .find(|named| !BASIC.iter().any(|basic| *named == basic))
+        .or(traits.first())
+        .map(|named| (*named).clone())
+}
+
+/// Names a trait after its carrier by the rule `extend::ext` states, so `impl<This> This` declares
+/// `ThisExt` and `impl<T> &Vec<T>` declares `RefVecTExt`.
+fn carrier_name(carrier: &Type) -> syn::Result<Ident> {
+    Ok(match carrier {
+        Type::Path(named) => {
+            struct Idents(Vec<Ident>);
+
+            impl Visit<'_> for Idents {
+                fn visit_ident(&mut self, ident: &Ident) {
+                    self.0.push(ident.clone());
+                }
+            }
+
+            let mut idents = Idents(Vec::new());
+            idents.visit_type_path(named);
+            if idents.0.is_empty() {
+                return Err(syn::Error::new(named.span(), "an empty type path names no extension"));
+            }
+
+            format_ident!("{}", idents.0.iter().map(Ident::to_string).collect::<String>())
+        }
+        Type::Reference(referred) if referred.mutability.is_some() => {
+            format_ident!("RefMut{}", carrier_name(&referred.elem)?)
+        }
+        Type::Reference(referred) => format_ident!("Ref{}", carrier_name(&referred.elem)?),
+        Type::Array(array) => format_ident!("ListOf{}", carrier_name(&array.elem)?),
+        Type::Group(group) => format_ident!("Group{}", carrier_name(&group.elem)?),
+        Type::Paren(paren) => format_ident!("Paren{}", carrier_name(&paren.elem)?),
+        Type::Ptr(pointer) => format_ident!("PointerTo{}", carrier_name(&pointer.elem)?),
+        Type::Slice(slice) => format_ident!("SliceOf{}", carrier_name(&slice.elem)?),
+        Type::Tuple(tuple) => format_ident!(
+            "TupleOf{}",
+            tuple
+                .elems
+                .iter()
+                .map(|elem| carrier_name(elem).map(|name| name.to_string()))
+                .collect::<syn::Result<String>>()?
+        ),
+        Type::Never(_) => format_ident!("Never"),
+        Type::FnPtr(function) => {
+            let inputs = function
+                .inputs
+                .iter()
+                .map(|input| carrier_name(&input.ty).map(|name| name.to_string()))
+                .collect::<syn::Result<String>>()?;
+            let output = match &function.output {
+                ReturnType::Default => format_ident!("Unit"),
+                ReturnType::Type(_, output) => carrier_name(output.as_ref())?,
+            };
+
+            format_ident!("BareFn{inputs}{output}")
+        }
+        Type::TraitObject(object) => {
+            let bounds = object
+                .bounds
+                .iter()
+                .map(|bound| match bound {
+                    TypeParamBound::Trait(bound) => {
+                        Ok(bound.path.segments.iter().map(|segment| segment.ident.to_string()).collect::<String>())
+                    }
+                    TypeParamBound::Lifetime(lifetime) => Ok(lifetime.ident.to_string()),
+                    other => Err(syn::Error::new(other.span(), "this bound names no extension")),
+                })
+                .collect::<syn::Result<String>>()?;
+
+            format_ident!("TraitObject{bounds}")
+        }
+        other => return Err(syn::Error::new(other.span(), "this kind of type names no extension; state a `name`")),
     })
 }
 

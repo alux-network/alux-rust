@@ -25,7 +25,6 @@ use shape_program::shape_program_defunc_internal;
 
 /// Declares extension methods and optionally gives each method a first-order operation type.
 ///
-/// Arguments unrelated to defunctionalization are forwarded to `extend::ext`.
 /// Plain `defunc` produces a hidden `*Operation<Context>` type implementing
 /// `OperationAlg` and `ApplyAlg`. When every method already builds first-order
 /// route syntax from `routes()`, plain `defunc` names those inferred programs
@@ -124,7 +123,7 @@ pub fn http(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// A `fallible` argument converts every declared method's error into a JSON-RPC protocol error, so
 /// each declaration that does not say otherwise is read as `.fallible()`. This argument belongs to
-/// the JSON-RPC backend; every other argument is forwarded to `extend::ext`.
+/// the JSON-RPC backend; every other argument is read as `ext` reads it.
 ///
 /// ```ignore
 /// use alux_ext::ext;
