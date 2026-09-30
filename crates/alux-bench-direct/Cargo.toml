@@ -1,6 +1,6 @@
 [package]
 name = "alux-bench-direct"
-version = "0.1.0"
+version = "0.2.0"
 description = "Direct interpreter for alux-bench programs: runs the samples asked for and reports them"
 documentation = "https://docs.rs/alux-bench-direct"
 authors.workspace = true
