@@ -5,7 +5,9 @@
 
 use crate::SETTLE;
 use alux_ext::ext;
-use alux_http::{CacheControl, ChunksAlg, ChunksExt, FromPartsAlg, HttpApiAlg, NamedValuesAlg, PartAlg, http};
+use alux_http::{
+    CacheControl, ChunksAlg, ChunksExt, FromPartsAlg, HttpApiAlg, NamedValuesAlg, PartAlg, SetCookie, http,
+};
 use alux_shape::Shape;
 use core::convert::Infallible;
 use core::fmt::Display;
@@ -29,7 +31,20 @@ pub struct Agent {
     pub user_agent: String,
 }
 
+/// The headers an answer states about itself, each member one header.
+#[derive(Debug, Serialize, Shape)]
+pub struct Signed {
+    /// How long a caller may keep the answer.
+    pub cache_control: String,
+    /// Which version the answer is, which this answer does not state.
+    pub etag: Option<String>,
+    /// Every cookie the answer sets, each its own header.
+    pub set_cookie: Vec<String>,
+}
+
 impl NamedValuesAlg for Session {}
+
+impl NamedValuesAlg for Signed {}
 
 impl NamedValuesAlg for Agent {}
 
@@ -64,6 +79,12 @@ pub trait ShopAlg {
     fn agent(&self, agent: String) -> impl Future<Output = String> + Send;
     /// Returns the readings and how long they may be kept.
     fn cached(&self) -> impl Future<Output = (String, Vec<u32>)> + Send;
+    /// Opens a session, returning the cookie that keeps it and what the caller is told.
+    fn sign_in(&self, session: String) -> impl Future<Output = (String, String)> + Send;
+    /// Closes a session, returning the two cookies that remove it and what the caller is told.
+    fn sign_out(&self) -> impl Future<Output = (String, (String, String))> + Send;
+    /// Returns the readings with every header they are answered with.
+    fn signed(&self) -> impl Future<Output = (Signed, Vec<u32>)> + Send;
 }
 
 /// Derives the operations the shared surface exposes.
@@ -122,6 +143,21 @@ where
         self.who(session.session).await
     }
 
+    /// Opens the session a caller asked for.
+    async fn shop_sign_in(&self, session: Session) -> (String, String) {
+        self.sign_in(session.session).await
+    }
+
+    /// Closes the caller's session.
+    async fn shop_sign_out(&self) -> (String, (String, String)) {
+        self.sign_out().await
+    }
+
+    /// Returns the readings with every header they are answered with.
+    async fn shop_signed(&self) -> (Signed, Vec<u32>) {
+        self.signed().await
+    }
+
     /// Returns what the caller says they are.
     async fn shop_agent(&self, agent: Agent) -> String {
         self.agent(agent.user_agent).await
@@ -169,6 +205,12 @@ where
             .get("/agent", self.op(Alg::shop_agent).in_header::<Agent>().text())
             // Every reading, and how long a caller may keep it.
             .get("/cached", self.op(Alg::shop_cached).json().out_header::<CacheControl>())
+            // A session opened, kept by a cookie the answer sets.
+            .post("/session", self.op(Alg::shop_sign_in).form::<Session>().text().out_header::<SetCookie>())
+            // A session closed, by two cookies the answer removes.
+            .delete("/session", self.op(Alg::shop_sign_out).text().out_header::<SetCookie>().out_header::<SetCookie>())
+            // The readings, with the headers one named product states.
+            .get("/signed", self.op(Alg::shop_signed).json().out_headers::<Signed>())
     }
 }
 
@@ -221,6 +263,24 @@ impl ShopAlg for Shop {
     async fn cached(&self) -> (String, Vec<u32>) {
         ("max-age=60".to_owned(), vec![7])
     }
+
+    async fn sign_in(&self, session: String) -> (String, String) {
+        (format!("session={session}; Path=/; HttpOnly"), format!("signed in as {session}"))
+    }
+
+    async fn sign_out(&self) -> (String, (String, String)) {
+        ("theme=; Max-Age=0".to_owned(), ("session=; Max-Age=0".to_owned(), "signed out".to_owned()))
+    }
+
+    async fn signed(&self) -> (Signed, Vec<u32>) {
+        let signed = Signed {
+            cache_control: "no-store".to_owned(),
+            etag: None,
+            set_cookie: vec!["session=abc; Path=/".to_owned(), "theme=dark; Path=/".to_owned()],
+        };
+
+        (signed, vec![7])
+    }
 }
 
 /// Every label the declared surface states, in declaration order.
@@ -237,6 +297,9 @@ pub const LABELS: &[&str] = &[
     "GET /session",
     "GET /agent",
     "GET /cached",
+    "POST /session",
+    "DELETE /session",
+    "GET /signed",
 ];
 
 /// Reads however many arguments a caller states.
