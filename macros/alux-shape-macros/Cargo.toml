@@ -1,6 +1,6 @@
 [package]
 name = "alux-shape-macros"
-version = "0.1.0"
+version = "0.1.1"
 description = "Procedural macros reading a shape out of a Rust layout"
 documentation = "https://docs.rs/alux-shape-macros"
 authors.workspace = true

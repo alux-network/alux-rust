@@ -40,7 +40,7 @@ alux-sdk-macros = { version = "0.1.3", path = "macros/alux-sdk-macros" }
 alux-shape = { version = "0.1.1", path = "alux-shape" }
 alux-shape-json = { version = "0.1.0", path = "crates/alux-shape-json" }
 alux-shape-jsonschema = { version = "0.1.0", path = "crates/alux-shape-jsonschema" }
-alux-shape-macros = { version = "0.1.0", path = "macros/alux-shape-macros" }
+alux-shape-macros = { version = "0.1.1", path = "macros/alux-shape-macros" }
 alux-shape-morph = { version = "0.1.0", path = "crates/alux-shape-morph" }
 alux-shape-rust = { version = "0.1.0", path = "crates/alux-shape-rust" }
 alux-shape-term = { version = "0.1.0", path = "crates/alux-shape-term" }
