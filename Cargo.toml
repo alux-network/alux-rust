@@ -15,7 +15,7 @@ rust-version = "1.97"
 alux-bench = { version = "0.1.0", path = "alux-bench" }
 alux-bench-criterion = { version = "0.1.0", path = "crates/alux-bench-criterion" }
 alux-bench-direct = { version = "0.1.0", path = "crates/alux-bench-direct" }
-alux-ext = { version = "0.1.3", path = "alux-ext" }
+alux-ext = { version = "0.2.0", path = "alux-ext" }
 alux-ext-macros = { version = "0.2.0", path = "macros/alux-ext-macros" }
 alux-http = { version = "0.3.0", path = "alux-http" }
 alux-http-actix = { version = "0.1.0", path = "crates/alux-http-actix" }
