@@ -209,6 +209,7 @@ semantic god traits.
 - Inherit edition, minimum Rust version, license, and common metadata from the workspace manifest.
 - Declare dependencies in root `[workspace.dependencies]`; members use `dependency.workspace = true`.
 - Use major versions for stable dependencies and minor versions for `0.x` dependencies.
+- Require a workspace crate at its full version, patch included (`alux-ext = { version = "0.1.3", path = "alux-ext" }`), so a published dependent never resolves an older release of it.
 - Enable only required dependency features. Framework dependencies belong to interpreter crates.
 - Avoid bounds on trait and struct definitions unless the definition is meaningless without them.
   Put bounds at use sites.
