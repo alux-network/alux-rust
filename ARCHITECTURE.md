@@ -85,8 +85,7 @@ A specification crate depends only on `alux-ext`. Interpreter crates depend on t
 they witness plus their framework; nothing depends on an interpreter in order to declare a program.
 
 The proc-macro crate does not depend on product crates. It emits references to their public
-surfaces, and generated extension code names `alux_ext::extend`, so a crate using `#[ext]` needs no
-separate `extend` dependency. Program crates re-export their applicable backend attributes from
+surfaces. Program crates re-export their applicable backend attributes from
 `alux_ext::macros`, so authored code imports meaningful entry points such as `alux_http::http`
 rather than the implementation crate.
 

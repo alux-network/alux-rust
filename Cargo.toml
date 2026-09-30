@@ -60,7 +60,6 @@ log = "0.4"
 hyper-util = { version = "0.1", features = ["server", "tokio"] }
 derive_more = { version = "2", features = ["deref", "deref_mut", "from"] }
 derive-new = "0.7"
-extend = "1"
 futures = "0.3"
 jsonrpsee = { version = "0.26", features = ["server", "macros"] }
 mockall = "0.15"
