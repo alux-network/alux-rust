@@ -33,7 +33,7 @@ where
     /// Nothing is converted and nothing is carried: a chunk stays what the domain said it was, and
     /// a failure stays what the domain said it meant. An interpretation states what to make of
     /// either, which is the only part of moving bytes that is its own.
-    fn moving(self) -> impl Stream<Item = Result<Self::Chunk, Self::Error>> {
+    fn moving(self) -> impl Stream<Item = Result<This::Chunk, This::Error>> {
         stream::unfold(self, |mut chunks| async move {
             let taken = chunks.next_chunk().await?;
 
@@ -45,7 +45,7 @@ where
     ///
     /// A sequence read whole is what anything states that cannot act on a piece at a time: a part's
     /// content read into a value, or an answer compared against what a caller would have received.
-    async fn gathered(mut self) -> Result<Vec<Self::Chunk>, Self::Error> {
+    async fn gathered(mut self) -> Result<Vec<This::Chunk>, This::Error> {
         let mut taken = Vec::new();
         while let Some(chunk) = self.next_chunk().await {
             taken.push(chunk?);

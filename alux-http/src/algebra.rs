@@ -206,12 +206,12 @@ where
     This: RouteAlg,
 {
     /// Starts with the initial route.
-    fn routes(&self) -> Routes<'_, Self> {
+    fn routes(&self) -> Routes<'_, This> {
         Routes { alg: self, route: self.initial() }
     }
 
     /// Wraps an already interpreted route for further fluent composition.
-    fn route(&self, route: This::Route) -> Routes<'_, Self> {
+    fn route(&self, route: This::Route) -> Routes<'_, This> {
         Routes { alg: self, route }
     }
 }

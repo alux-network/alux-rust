@@ -301,7 +301,7 @@ mod tests {
     use quote::quote;
 
     #[test]
-    fn declares_over_the_carrier_rather_than_over_self() {
+    fn keeps_self_as_the_block_wrote_it() {
         let output = ext_internal(
             quote!(name = ValueExt),
             quote! {
@@ -316,9 +316,9 @@ mod tests {
         .unwrap()
         .to_string();
 
-        // Both halves name the carrier, which the block's own bounds resolve. No supertrait states
-        // what bounds `Self`.
-        assert_eq!(output.matches("< This > :: Value").count(), 2, "{output}");
+        // Both halves state `Self` as written, as `extend::ext` does. No supertrait is added.
+        assert_eq!(output.matches("Self :: Value").count(), 2, "{output}");
+        assert!(!output.contains("< This > :: Value"), "{output}");
         assert!(!output.contains("trait ValueExt < This > :"), "{output}");
     }
 
@@ -479,7 +479,7 @@ mod tests {
             quote! {
                 pub impl<This> This
                 where
-                    This: HttpApiAlg + JsonOutAlg,
+                    This: HttpApiAlg,
                 {
                     fn direct_api<Alg>(&self)
                     where
@@ -544,7 +544,7 @@ mod tests {
             quote! {
                 impl<This> This
                 where
-                    This: HttpApiAlg + JsonOutAlg,
+                    This: HttpApiAlg,
                 {
                     fn status_routes<Alg>(&self)
                     where

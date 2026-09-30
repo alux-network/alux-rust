@@ -15,37 +15,37 @@ where
     This: ShapeAlg,
 {
     /// Bytes written as hexadecimal.
-    fn bytes_hex(&self, len: Option<usize>) -> Self::Ty {
+    fn bytes_hex(&self, len: Option<usize>) -> This::Ty {
         self.hex(self.bytes(len))
     }
 
     /// Bytes written as an array of JSON numbers, which is a sequence of octets and nothing more.
-    fn bytes_array(&self) -> Self::Ty {
+    fn bytes_array(&self) -> This::Ty {
         self.seq(self.int(false, 8))
     }
 
     /// An integer written as decimal digits, for a width a JSON number cannot hold.
-    fn int_decimal(&self, signed: bool, bits: u16) -> Self::Ty {
+    fn int_decimal(&self, signed: bool, bits: u16) -> This::Ty {
         self.decimal(self.int(signed, bits))
     }
 
     /// An integer written as a `0x` quantity, as the Ethereum JSON-RPC specification states one.
-    fn int_hex(&self, signed: bool, bits: u16) -> Self::Ty {
+    fn int_hex(&self, signed: bool, bits: u16) -> This::Ty {
         self.hex(self.int(signed, bits))
     }
 
     /// A named product: the shape most types have.
-    fn named_product(&self, words: Words<'_>, fields: Vec<Self::Field>) -> Self::Ty {
+    fn named_product(&self, words: Words<'_>, fields: Vec<This::Field>) -> This::Ty {
         self.named(words, self.product(fields))
     }
 
     /// A choice written as the alternative's value alone, with no discriminant on the wire.
-    fn sum_untagged<'w>(&self, alternatives: Vec<(Words<'w>, Self::Ty)>) -> Self::Ty {
+    fn sum_untagged<'w>(&self, alternatives: Vec<(Words<'w>, This::Ty)>) -> This::Ty {
         self.choice(alternatives.into_iter().map(|(_, shape)| shape).collect())
     }
 
     /// A choice between names alone, which is a choice between name-valued constants.
-    fn sum_of_names<'w>(&self, names: Vec<Words<'w>>) -> Self::Ty {
+    fn sum_of_names<'w>(&self, names: Vec<Words<'w>>) -> This::Ty {
         self.choice(names.into_iter().map(|words| self.name_word(words)).collect())
     }
 }
@@ -57,7 +57,7 @@ where
     This: ShapeAlg + FieldAlg,
 {
     /// A choice written as one object per alternative, keyed by its name.
-    fn sum_external<'w>(&self, alternatives: Vec<(Words<'w>, Self::Ty)>) -> Self::Ty {
+    fn sum_external<'w>(&self, alternatives: Vec<(Words<'w>, This::Ty)>) -> This::Ty {
         let alternatives =
             alternatives.into_iter().map(|(words, shape)| self.product(vec![self.field(words, shape)])).collect();
 
@@ -65,7 +65,7 @@ where
     }
 
     /// A choice written as one object carrying its name under `tag`, beside its own members.
-    fn sum_internal<'w>(&self, tag: Words<'w>, alternatives: Vec<(Words<'w>, Self::Ty)>) -> Self::Ty {
+    fn sum_internal<'w>(&self, tag: Words<'w>, alternatives: Vec<(Words<'w>, This::Ty)>) -> This::Ty {
         let alternatives = alternatives
             .into_iter()
             .map(|(words, shape)| self.product(vec![self.field(tag, self.name_word(words)), self.merge(shape)]))
@@ -79,8 +79,8 @@ where
         &self,
         tag: Words<'w>,
         content: Words<'w>,
-        alternatives: Vec<(Words<'w>, Self::Ty)>,
-    ) -> Self::Ty {
+        alternatives: Vec<(Words<'w>, This::Ty)>,
+    ) -> This::Ty {
         let alternatives = alternatives
             .into_iter()
             .map(|(words, shape)| {

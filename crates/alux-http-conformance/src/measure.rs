@@ -63,7 +63,7 @@ where
     /// cost every round a drain it is not measuring.
     async fn time_closing<Compile>(mut self, mut compile: Compile, closing: Closing, rounds: u64) -> Duration
     where
-        Compile: FnMut() -> Self::Program,
+        Compile: FnMut() -> This::Program,
     {
         LocalSet::new()
             .run_until(async move {
@@ -97,7 +97,7 @@ where
     /// needs, and nothing more. [`Handover::RequestHeld`] holds its connection off the clock.
     async fn time_handover<Compile>(mut self, mut compile: Compile, load: Handover, rounds: u64) -> Duration
     where
-        Compile: FnMut() -> Self::Program,
+        Compile: FnMut() -> This::Program,
     {
         LocalSet::new()
             .run_until(async move {

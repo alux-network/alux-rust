@@ -8,7 +8,6 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Async, Plus};
-use syn::visit_mut::{self, VisitMut};
 use syn::{
     Expr, FnArg, GenericArgument, Ident, ImplItem, ImplItemFn, ItemImpl, Pat, PathArguments, ReceiverKind, ReturnType,
     Signature, Stmt, TraitItemConst, TraitItemFn, Type, TypeImplTrait, TypeParamBound, Visibility, parse_quote,
@@ -28,12 +27,11 @@ pub(crate) fn extension(
 
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let extends = supertraits.map(|supertraits| quote!(: #supertraits));
-    let declared = items.iter().map(|item| declaration(item, self_ty)).collect::<syn::Result<Vec<_>>>()?;
+    let declared = items.iter().map(declaration).collect::<syn::Result<Vec<_>>>()?;
     let carried = items
         .iter()
         .map(|item| {
             let mut carried = item.clone();
-            AsCarrier { carrier: self_ty }.visit_impl_item_mut(&mut carried);
             if let ImplItem::Fn(method) = &mut carried {
                 as_async(method);
             }
@@ -100,12 +98,12 @@ fn future_output(answered: &TypeImplTrait) -> Option<Type> {
 }
 
 /// States one item of the block as the declaration the trait carries.
-fn declaration(item: &ImplItem, carrier: &Type) -> syn::Result<TokenStream> {
+fn declaration(item: &ImplItem) -> syn::Result<TokenStream> {
     match item {
         ImplItem::Fn(method) => {
             // `inline` states how a body is compiled, which a declaration has no body to state.
             let attrs = method.attrs.iter().filter(|attribute| !attribute.path().is_ident("inline"));
-            let sig = declared(&method.sig, carrier);
+            let sig = declared(&method.sig);
             let declared: TraitItemFn = parse_quote!(#(#attrs)* #sig;);
 
             Ok(quote!(#[allow(unused_attributes)] #declared))
@@ -120,38 +118,12 @@ fn declaration(item: &ImplItem, carrier: &Type) -> syn::Result<TokenStream> {
     }
 }
 
-/// Names the carrier where the block wrote `Self`.
-///
-/// The trait is generic over the carrier, so `This::Chunk` resolves from the bounds the block
-/// states, while `Self::Chunk` needs a bound on `Self`. A nested item keeps its own `Self`.
-struct AsCarrier<'a> {
-    carrier: &'a Type,
-}
-
-impl VisitMut for AsCarrier<'_> {
-    fn visit_item_mut(&mut self, _: &mut syn::Item) {}
-
-    fn visit_type_mut(&mut self, ty: &mut Type) {
-        if let Type::Path(named) = ty
-            && named.qself.is_none()
-            && named.path.segments.first().is_some_and(|segment| segment.ident == "Self")
-        {
-            let carrier = self.carrier;
-            let rest = named.path.segments.iter().skip(1).collect::<Vec<_>>();
-            *ty = if rest.is_empty() { carrier.clone() } else { parse_quote!(<#carrier> #(:: #rest)*) };
-        }
-
-        visit_mut::visit_type_mut(self, ty);
-    }
-}
-
 /// Declares one signature: the future an `async fn` answers, and its arguments by name.
 ///
 /// `Send` is stated only where the block wrote the future out, since only a body satisfies it.
 /// `mut` is dropped and a pattern becomes `_`, which rust-analyzer reports as E0130 otherwise.
-fn declared(sig: &Signature, carrier: &Type) -> Signature {
+fn declared(sig: &Signature) -> Signature {
     let mut declared = sig.clone();
-    AsCarrier { carrier }.visit_signature_mut(&mut declared);
     declared.inputs = declared
         .inputs
         .into_iter()

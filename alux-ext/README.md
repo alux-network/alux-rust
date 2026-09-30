@@ -56,7 +56,7 @@ Either spelling in the block reaches both halves:
 
 ```rust ignore
 // Written as `async fn`, and declared as the future it answers.
-async fn gathered(mut self) -> Result<Vec<Self::Chunk>, Self::Error> { … }
+async fn gathered(mut self) -> Result<Vec<This::Chunk>, This::Error> { … }
 fn gathered(self) -> impl core::future::Future<Output = Result<Vec<This::Chunk>, This::Error>>;
 
 // Written as a future, which is how a method says its future is `Send`, and carried as the body
@@ -68,9 +68,9 @@ async fn gathered(mut self) -> Result<Vec<This::Chunk>, This::Error> { … }   /
 
 A future the block did not build here, such as one forwarding another call, is carried as written.
 
-Both halves name the carrier where the block wrote `Self`. The trait is generic over the carrier, so
-`Self::Chunk` would need a bound on `Self`, while `This::Chunk` is resolved by the bounds the block
-already states. A nested item states its own `Self` and is left alone.
+Both halves state `Self` as the block wrote it, as `extend::ext` does. In the trait, `Self::Chunk`
+needs a bound on `Self`, so a block names the carrier instead: `This::Chunk` is resolved by the
+bounds the block already states.
 
 `supertraits` is what the trait extends, and nothing is added to it.
 
