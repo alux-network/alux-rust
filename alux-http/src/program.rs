@@ -1,7 +1,8 @@
 use crate::{
-    BytesOut, Connect, Delete, EmptyOut, FileOut, Get, HandlerAlg, HandlerEndpointAlg, Head, HeaderOut, HeadersOut,
-    HtmlOut, HttpInputAlg, HttpMethodAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, NamedValuesAlg, Options, Patch, Post,
-    Put, RedirectOut, ResultOut, RouteAlg, RoutePath, StatusOut, StreamOut, TextOut, Trace, WithAlg,
+    BytesOut, CloseAlg, Connect, Delete, EmptyOut, FileOut, Get, HandlerAlg, HandlerEndpointAlg, Head, HeaderOut,
+    HeadersOut, HtmlOut, HttpInputAlg, HttpMethodAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, NamedValuesAlg, OpenAlg,
+    Options, Patch, Post, Put, RedirectOut, ResultOut, RouteAlg, RoutePath, StatusOut, StreamOut, TextOut, Trace,
+    WithAlg,
 };
 use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use core::marker::PhantomData;
@@ -436,40 +437,64 @@ where
         self.with_as::<Context<Input>, Input>()
     }
 
-    /// Replaces the declaration's output-kind marker without converting a value.
-    ///
-    /// The selected kind is interpreted only after the handler result type is
-    /// known at the compilation boundary.
-    pub fn out<NewTransform>(self) -> Operation<Handler, Inputs, Args, NewTransform> {
+    // Changes only the declaration's phantom output kind while preserving the first-order handler.
+    fn retag<NewTransform>(self) -> Operation<Handler, Inputs, Args, NewTransform> {
         Operation { handler: self.handler, marker: PhantomData }
     }
 
-    /// Answers with `CODE` and the body already stated.
-    pub fn status<const CODE: u16>(self) -> Operation<Handler, Inputs, Args, StatusOut<Transform, CODE>> {
-        self.out()
+    /// Closes the declaration with the output kind `Kind`, inside every wrapper already stated.
+    ///
+    /// The kind is interpreted only after the handler result type is known at the compilation
+    /// boundary, so a downstream kind closes a declaration exactly as a built-in one does.
+    pub fn out<Kind>(self) -> Operation<Handler, Inputs, Args, <Transform as CloseAlg<Kind>>::Closed>
+    where
+        Transform: CloseAlg<Kind>,
+    {
+        self.retag()
     }
 
-    /// Answers with the handler's header value beside the body already stated.
-    pub fn out_header<Name>(self) -> Operation<Handler, Inputs, Args, HeaderOut<Transform, Name>> {
-        self.out()
+    /// Answers with `CODE`, around what the rest of the declaration states.
+    pub fn status<const CODE: u16>(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, StatusOut<(), CODE>>>
+    where
+        Transform: OpenAlg,
+    {
+        self.retag()
     }
 
-    /// Answers with the headers the handler's named product states, beside the body already stated.
+    /// Answers with the handler's header value, around what the rest of the declaration states.
+    ///
+    /// The handler answers with the value and then with what the rest states: `(value, rest)`.
+    pub fn out_header<Name>(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, HeaderOut<(), Name>>>
+    where
+        Transform: OpenAlg,
+    {
+        self.retag()
+    }
+
+    /// Answers with the headers the handler's named product states, around what the rest states.
     ///
     /// The output twin of [`Operation::in_header`]: each member of `Headers` is one header, named by
-    /// its member name.
-    pub fn out_headers<Headers>(self) -> Operation<Handler, Inputs, Args, HeadersOut<Transform, Headers>>
+    /// its member name, and the handler answers with `(headers, rest)`.
+    pub fn out_headers<Headers>(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, HeadersOut<(), Headers>>>
     where
+        Transform: OpenAlg,
         Headers: NamedValuesAlg,
     {
-        self.out()
+        self.retag()
     }
 
-    /// Interprets the successful result with the selected kind and the failure as an HTTP error.
-    pub fn result(self) -> Operation<Handler, Inputs, Args, ResultOut<Transform>> {
-        self.out()
+    /// Answers with what the rest of the declaration states when the handler succeeded, and with
+    /// what its failure means otherwise.
+    pub fn result(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, ResultOut<()>>>
+    where
+        Transform: OpenAlg,
+    {
+        self.retag()
     }
 }
+
+/// Carries a declaration with one more wrapper inside those it already states.
+pub type OpenWith<Transform, Wrapper> = <Transform as OpenAlg>::With<Wrapper>;
 
 macro_rules! output_methods {
     ($($method:ident => $kind:ident, $alg:ident, $selected:ident, $meaning:literal),+ $(,)?) => {
@@ -479,8 +504,11 @@ macro_rules! output_methods {
             Args: WithAlg,
         {
             $(
-                #[doc = concat!("Selects ", $meaning, " output meaning.")]
-                pub fn $method(self) -> Operation<Handler, Inputs, Args, $kind> {
+                #[doc = concat!("Closes the declaration with ", $meaning, " output meaning.")]
+                pub fn $method(self) -> Operation<Handler, Inputs, Args, <Transform as CloseAlg<$kind>>::Closed>
+                where
+                    Transform: CloseAlg<$kind>,
+                {
                     self.out()
                 }
             )+

@@ -160,15 +160,12 @@ returning `()` and rejects one returning data, so you cannot quietly throw a val
 [`ChunksAlg`](ChunksAlg), which says what a chunk is and how to take the next one, so you are not
 committed to any particular stream type.
 
-Four kinds wrap the one before them:
+Four wrappers come before the kind. A declaration reads from the outside in and the kind closes it, so `.out_header::<ETag>().result().json()` answers with an `ETag` header around a result around a JSON body, and its handler returns `(etag, Result<body, E>)`: the header is sent whether the handler succeeded or not. Written the other way round, `.result().out_header::<ETag>().json()`, the handler returns `Result<(etag, body), E>` and the header is sent only on success. A wrapper after the kind does not compile.
 
-- **`.status::<201>()`** sets the status code. Which code a created resource answers with belongs to
-  the endpoint, not the handler.
-- **`.result()`** handles a handler returning `Result`. Success answers with the kind you already
-  chose; a failure answers with the status and message its `HttpErrorAlg` impl gives.
-- **`.out_header::<CacheControl>()`** adds a response header. The handler returns `(value, body)`,
-  because only the handler knows an `ETag` or a cache lifetime.
-- **`.out_headers::<Signed>()`** adds every header a named product states, the output twin of `.in_header::<Agent>()`. The handler returns `(headers, body)`. Each member is one header named by its member name, so `cache_control` is `cache-control`; an `Option` that is `None` writes nothing, and a `Vec` writes one header per value, which is how several `set-cookie` headers are stated. Prefer it over stacking `.out_header`, whose values nest one pair per header.
+- **`.status::<201>()`** sets the status code. Which code a created resource answers with belongs to the endpoint, not the handler.
+- **`.result()`** handles a handler returning `Result`. Success answers with what follows; a failure answers with the status and message its `HttpErrorAlg` impl gives.
+- **`.out_header::<CacheControl>()`** adds a response header. The handler returns `(value, rest)`, because only the handler knows an `ETag` or a cache lifetime.
+- **`.out_headers::<Signed>()`** adds every header a named product states, the output twin of `.in_header::<Agent>()`. The handler returns `(headers, rest)`. Each member is one header named by its member name, so `cache_control` is `cache-control`; an `Option` that is `None` writes nothing, and a `Vec` writes one header per value, which is how several `set-cookie` headers are stated. Prefer it over stacking `.out_header`, which adds one pair per header.
 
 A header is just a name, so one this crate does not already ship is three lines of your own and no
 interpreter changes:
@@ -198,11 +195,11 @@ impl NamedValuesAlg for Signed {}
 ```rust ignore
 self.routes()
     // A recording, which creates something and says so.
-    .post("/record", self.op(Alg::record).body::<u32>().json().status::<201>())
+    .post("/record", self.op(Alg::record).body::<u32>().status::<201>().json())
     // One identified reading, or what its failure means.
-    .get("/find/{id}", self.op(Alg::find).path::<u32>().json().result())
+    .get("/find/{id}", self.op(Alg::find).path::<u32>().result().json())
     // The readings, with every header one product states: the handler returns `(Signed, body)`.
-    .get("/readings", self.op(Alg::readings).json().out_headers::<Signed>())
+    .get("/readings", self.op(Alg::readings).out_headers::<Signed>().json())
 ```
 
 ## Paths

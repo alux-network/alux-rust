@@ -1,5 +1,6 @@
 //! States what an endpoint answers with, before any framework can convert it.
 
+use crate::WithAlg;
 use core::marker::PhantomData;
 
 /// Transforms an inferred handler result into its portable API output.
@@ -136,3 +137,111 @@ where
 {
     type Transform = Interpreter::Result<Kind::Transform, Error>;
 }
+
+/// Holds the wrappers a declaration states before its kind, the outermost first.
+///
+/// A declaration reads from the outside in: `.out_header::<ETag>().result().json()` answers with an
+/// `ETag` around a result around a JSON body, and its handler returns `(etag, Result<body, E>)`. The
+/// kind closes the declaration, folding the wrappers held here around it.
+///
+/// Nothing wraps a declaration its kind has closed:
+///
+/// ```compile_fail,E0277
+/// use alux_http::HttpProgramBuilder;
+///
+/// let syntax = HttpProgramBuilder;
+/// let _ = syntax.op(()).json().result();
+/// ```
+#[derive(Debug, Default)]
+pub struct Pending<Wrappers>(PhantomData<Wrappers>);
+
+/// States one wrapper as the kind it makes of the kind inside it.
+pub trait WrapAlg {
+    /// The kind this wrapper makes around `Inner`.
+    type Wrap<Inner>;
+}
+
+impl<const CODE: u16> WrapAlg for StatusOut<(), CODE> {
+    type Wrap<Inner> = StatusOut<Inner, CODE>;
+}
+
+impl<Name> WrapAlg for HeaderOut<(), Name> {
+    type Wrap<Inner> = HeaderOut<Inner, Name>;
+}
+
+impl<Headers> WrapAlg for HeadersOut<(), Headers> {
+    type Wrap<Inner> = HeadersOut<Inner, Headers>;
+}
+
+impl WrapAlg for ResultOut<()> {
+    type Wrap<Inner> = ResultOut<Inner>;
+}
+
+/// Reads a declaration still open to wrappers: one stating nothing yet, or wrappers and no kind.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` already states its output kind",
+    note = "wrappers such as `.status()`, `.out_header()`, `.out_headers()`, and `.result()` come before the kind, which closes the declaration"
+)]
+pub trait OpenAlg {
+    /// The declaration with `Wrapper` inside every wrapper already stated.
+    type With<Wrapper>;
+}
+
+impl OpenAlg for () {
+    type With<Wrapper> = Pending<(Wrapper,)>;
+}
+
+impl<Wrappers> OpenAlg for Pending<Wrappers>
+where
+    Wrappers: WithAlg,
+{
+    type With<Wrapper> = Pending<Wrappers::With<Wrapper>>;
+}
+
+/// Closes a declaration with its kind, folding the wrappers it states around that kind.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` already states its output kind",
+    note = "a declaration states one kind, last, after the wrappers around it"
+)]
+pub trait CloseAlg<Kind> {
+    /// The kind the whole declaration answers with.
+    type Closed;
+}
+
+impl<Kind> CloseAlg<Kind> for () {
+    type Closed = Kind;
+}
+
+impl<Kind, Wrappers> CloseAlg<Kind> for Pending<Wrappers>
+where
+    Wrappers: FoldAlg<Kind>,
+{
+    type Closed = Wrappers::Folded;
+}
+
+/// Folds wrappers around a kind, the first of them outermost.
+pub trait FoldAlg<Kind> {
+    /// The kind the wrappers make around `Kind`.
+    type Folded;
+}
+
+macro_rules! fold_wrappers {
+    () => {
+        impl<Kind> FoldAlg<Kind> for () {
+            type Folded = Kind;
+        }
+    };
+    ($first:ident $(, $rest:ident)*) => {
+        impl<Kind, $first $(, $rest)*> FoldAlg<Kind> for ($first, $($rest,)*)
+        where
+            $first: WrapAlg,
+            ($($rest,)*): FoldAlg<Kind>,
+        {
+            type Folded = $first::Wrap<<($($rest,)*) as FoldAlg<Kind>>::Folded>;
+        }
+
+        fold_wrappers!($($rest),*);
+    };
+}
+
+fold_wrappers!(W1, W2, W3, W4, W5, W6, W7, W8);

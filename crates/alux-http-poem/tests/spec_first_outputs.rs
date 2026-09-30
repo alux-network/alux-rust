@@ -91,13 +91,13 @@ where
             // The report as it is stored.
             .get("/raw", self.op(Alg::report_raw).bytes())
             // A recording, which creates something and says so.
-            .post("/record", self.op(Alg::report_record).body::<u32>().json().status::<201>())
+            .post("/record", self.op(Alg::report_record).body::<u32>().status::<201>().json())
             // A removal, which answers with nothing at all.
             .delete("/record", self.op(Alg::report_forget).empty())
             // Where the report actually lives.
             .get("/elsewhere", self.op(Alg::report_elsewhere).redirect())
             // One identified reading, or what its failure means.
-            .get("/find/{id}", self.op(Alg::report_find).path::<u32>().json().result())
+            .get("/find/{id}", self.op(Alg::report_find).path::<u32>().result().json())
     }
 }
 

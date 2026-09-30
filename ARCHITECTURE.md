@@ -274,7 +274,7 @@ An endpoint binds an operation `op : Args → Out` to HTTP without changing it. 
 ```text
             f  (contravariant)              op                g  (covariant)
 Request  ───────────────────────▶  Args ────────▶ Out ───────────────────────▶  Response
-          .path().body().cookie()                   .json().status().out_headers().result()
+          .path().body().cookie()                   .out_headers().result().status().json()
 ```
 
 - `f` is the interpreter's product of extractors that the input roles select through `InterpretInputsAlg`. Roles append to one argument product, so inputs read flat and in declaration order. Extraction can fail, and a failure answers the request without applying `op`, so `f` is `Request → Result<Args, Response>`.
@@ -290,11 +290,11 @@ let output = handler.apply(context, inputs).await;                       // op
 Ok::<Response, poem::Error>(Answering::output(output).into_response())   // g
 ```
 
-The output wrappers are the structure `g` is built from, each one operation of the output algebra with its own trait:
+The output wrappers are the structure `g` is built from, each one operation of the output algebra with its own trait. A declaration states them from the outside in and closes with its kind, so the order they are written in is the order they apply in, and the handler's result reads the same way: `.out_header::<ETag>().result().json()` is `HeaderOut<ResultOut<JsonOut>, ETag>`, answered by `(etag, Result<body, E>)`. `Pending` holds the wrappers until the kind folds them around itself; a wrapper after the kind is a compile error.
 
 - `StatusOut` post-composes an edit of the response. It reads nothing, so it does not change `Out`.
 - `HeaderOut` and `HeadersOut` are strength (`second'`): a converter of `Rest` becomes a converter of `(Value, Rest)`, which writes `Value` as headers and passes `Rest` on. Stacking `HeaderOut` nests one pair per header; `HeadersOut` writes a named product through one iso, `Headers ≅ named header values`, the twin of `.in_header` on the input side.
-- `ResultOut` is choice (`right'`): a converter of `Value` becomes a converter of `Result<Value, Error>`, and the `Err` branch is answered through `HttpErrorAlg`. Strength and choice do not commute, which is why `.out_header().result()` sends the header only on success and `.result().out_header()` sends it on both branches.
+- `ResultOut` is choice (`right'`): a converter of `Value` becomes a converter of `Result<Value, Error>`, and the `Err` branch is answered through `HttpErrorAlg`. Strength and choice do not commute, which is why `.out_header().result().json()` sends the header on both branches and `.result().out_header().json()` sends it only on success.
 
 Every interpretation preserves this structure. An executing interpretation runs `f`, `op`, and `g`; text and `OpenAPI` map the same structure to descriptions, reading `f` as parameters and `g` as responses. That is why one declaration gives agreeing interpretations. Routes sit one level above: a route is a coproduct of endpoints, and a selector restricts the request side before `f`.
 

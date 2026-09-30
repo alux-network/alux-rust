@@ -182,11 +182,11 @@ where
     {
         self.routes()
             // One identified reading, its id taken from the path in Poem's spelling.
-            .get("/item/:id", self.op(Alg::shop_item).path::<u32>().json().result())
+            .get("/item/:id", self.op(Alg::shop_item).path::<u32>().result().json())
             // Every reading.
             .get("/items", self.op(Alg::shop_items).json())
             // A recording sent as a document, which creates something and says so.
-            .post("/items", self.op(Alg::shop_add).body::<u32>().json().status::<201>())
+            .post("/items", self.op(Alg::shop_add).body::<u32>().status::<201>().json())
             // The same recording, sent as a form.
             .put("/items", self.op(Alg::shop_fill).form::<Amount>().json())
             // A note, taken exactly as it arrived.
@@ -204,13 +204,13 @@ where
             // What the caller says they are, taken from the headers they sent.
             .get("/agent", self.op(Alg::shop_agent).in_header::<Agent>().text())
             // Every reading, and how long a caller may keep it.
-            .get("/cached", self.op(Alg::shop_cached).json().out_header::<CacheControl>())
+            .get("/cached", self.op(Alg::shop_cached).out_header::<CacheControl>().json())
             // A session opened, kept by a cookie the answer sets.
-            .post("/session", self.op(Alg::shop_sign_in).form::<Session>().text().out_header::<SetCookie>())
+            .post("/session", self.op(Alg::shop_sign_in).form::<Session>().out_header::<SetCookie>().text())
             // A session closed, by two cookies the answer removes.
-            .delete("/session", self.op(Alg::shop_sign_out).text().out_header::<SetCookie>().out_header::<SetCookie>())
+            .delete("/session", self.op(Alg::shop_sign_out).out_header::<SetCookie>().out_header::<SetCookie>().text())
             // The readings, with the headers one named product states.
-            .get("/signed", self.op(Alg::shop_signed).json().out_headers::<Signed>())
+            .get("/signed", self.op(Alg::shop_signed).out_headers::<Signed>().json())
     }
 }
 

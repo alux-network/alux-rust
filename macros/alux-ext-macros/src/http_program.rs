@@ -6,7 +6,7 @@
 use crate::lower::{Chain, LoweredProgram, ProgramBackendAlg, expand_program};
 use crate::syntax::{Reified, lift_operation};
 use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote};
+use quote::{ToTokens, format_ident, quote};
 use syn::spanned::Spanned;
 use syn::visit_mut::{self, VisitMut};
 use syn::{Expr, ExprMethodCall, GenericArgument, Ident, ImplItemFn, Type, parse_quote_spanned};
@@ -94,52 +94,60 @@ fn endpoint_roles(declaration: &Expr) -> Option<(Vec<InputDeclaration>, TokenStr
         calls.push(call);
         current = &call.receiver;
     }
+    // A declaration reads from the outside in: wrappers first, the outermost first, and one kind
+    // last, which closes it. Each wrapper is kept as the type it makes around whatever is inside it.
     let mut inputs = Vec::new();
-    let mut transform = None;
+    let mut wrappers: Vec<Box<dyn Fn(TokenStream) -> TokenStream>> = Vec::new();
+    let mut kind = None;
     for call in calls.into_iter().rev() {
         let name = call.method.to_string();
-        if let Some(kind) = output_kind(&name) {
-            transform = Some(quote!(::alux_http::#kind));
-            continue;
-        }
         let type_argument = || {
             call.turbofish.as_ref()?.args.iter().find_map(|argument| match argument {
                 GenericArgument::Type(ty) => Some(ty.clone()),
                 _ => None,
             })
         };
-        match name.as_str() {
-            "out" => {
-                let kind = type_argument()?;
-                transform = Some(quote!(#kind));
-            }
+        let closing = match output_kind(&name) {
+            Some(built_in) => Some(quote!(::alux_http::#built_in)),
+            None if name == "out" => Some(type_argument()?.to_token_stream()),
+            None => None,
+        };
+        if let Some(closing) = closing {
+            kind = Some(closing);
+            continue;
+        }
+        // Nothing wraps a declaration its kind has closed, so a wrapper after the kind states no
+        // endpoint, and the declaration is left to report that itself.
+        let wrapper: Box<dyn Fn(TokenStream) -> TokenStream> = match name.as_str() {
             "status" => {
-                let code = call.turbofish.as_ref()?.args.iter().next()?;
-                let inner = transform?;
-                transform = Some(quote!(::alux_http::StatusOut<#inner, #code>));
+                let code = call.turbofish.as_ref()?.args.iter().next()?.clone();
+                Box::new(move |inner| quote!(::alux_http::StatusOut<#inner, #code>))
             }
             "out_header" => {
                 let header = type_argument()?;
-                let inner = transform?;
-                transform = Some(quote!(::alux_http::HeaderOut<#inner, #header>));
+                Box::new(move |inner| quote!(::alux_http::HeaderOut<#inner, #header>))
             }
             "out_headers" => {
                 let headers = type_argument()?;
-                let inner = transform?;
-                transform = Some(quote!(::alux_http::HeadersOut<#inner, #headers>));
+                Box::new(move |inner| quote!(::alux_http::HeadersOut<#inner, #headers>))
             }
-            "result" => {
-                let inner = transform?;
-                transform = Some(quote!(::alux_http::ResultOut<#inner>));
-            }
+            "result" => Box::new(|inner| quote!(::alux_http::ResultOut<#inner>)),
             "with" | "path" | "query" | "body" | "form" | "raw_body" | "multipart" | "in_header" | "cookie"
             | "auth" | "context" => {
                 inputs.push((call.method.clone(), type_argument()?));
+                continue;
             }
-            _ => {}
+            _ => continue,
+        };
+        if kind.is_some() {
+            return None;
         }
+        wrappers.push(wrapper);
     }
-    Some((inputs, transform?))
+    // The last wrapper written is innermost, so the fold starts from it.
+    let transform = wrappers.iter().rev().fold(kind?, |inner, wrapper| wrapper(inner));
+
+    Some((inputs, transform))
 }
 
 /// Lifts one endpoint declaration into the requirement it places on an interpreter.
@@ -265,7 +273,7 @@ mod tests {
             quote! {
                 impl<This> This where This: HttpRouteAlg {
                     fn cached_api<Alg>(&self) {
-                        self.routes().get("/cached", self.op(Alg::cached).json().out_headers::<Cached>())
+                        self.routes().get("/cached", self.op(Alg::cached).out_headers::<Cached>().json())
                     }
                 }
             },
@@ -313,7 +321,7 @@ mod tests {
                         This: CustomEndpointAlg<Domain>,
                     {
                         self.routes().post("/", self.op(Domain::submit)
-                            .form::<Params>().out::<CustomOut>().status::<202>().out_header::<Header>())
+                            .form::<Params>().out_header::<Header>().status::<202>().out::<CustomOut>())
                     }
                 }
             },
@@ -324,7 +332,11 @@ mod tests {
         assert!(output.contains("This : HttpRouteAlg"));
         assert!(output.contains("Domain : DomainAlg"));
         assert!(output.contains("This : CustomEndpointAlg < Domain >"));
-        assert!(output.contains(". out :: < CustomOut > () . status :: < 202 > () . out_header :: < Header > ()"));
+        assert!(output.contains(". out_header :: < Header > () . status :: < 202 > () . out :: < CustomOut > ()"));
+        // Read from the outside in: the header around the status around the downstream kind.
+        assert!(
+            output.contains(":: alux_http :: HeaderOut < :: alux_http :: StatusOut < CustomOut , 202 > , Header >")
+        );
         assert!(!output.contains("OutputKindAlg"));
         assert!(!output.contains("HandlerEndpointAlg"));
     }

@@ -82,11 +82,11 @@ where
     {
         self.routes()
             // One identified reading, or what its failure means.
-            .get("/readings/:id", self.op(Alg::reading_at).path::<u64>().json().result())
+            .get("/readings/:id", self.op(Alg::reading_at).path::<u64>().result().json())
             // A summary, its term taken from the query string.
             .get("/readings", self.op(Alg::reading_summary).query::<Term>().text())
             // A recording, which creates something and says so.
-            .post("/readings", self.op(Alg::reading_record).body::<Reading>().json().status::<201>())
+            .post("/readings", self.op(Alg::reading_record).body::<Reading>().status::<201>().json())
             // A removal, which answers with nothing at all.
             .delete("/readings", self.op(Alg::reading_forget).empty())
     }
