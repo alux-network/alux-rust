@@ -239,7 +239,7 @@ fn respond<'r>(answered: RocketAnswer) -> Response<'r> {
     let mut response = Response::build();
     response.status(Status::new(answered.status.code()));
     for (name, value) in answered.headers {
-        response.raw_header(name, value);
+        response.raw_header_adjoin(name, value);
     }
     match answered.body {
         RocketBody::Stated(body) => response.sized_body(body.len(), Cursor::new(body)),

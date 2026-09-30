@@ -1,20 +1,16 @@
-//! HTTP program backend for extension defunctionalization.
+//! Reifies HTTP declarations and derives what each asks of an interpretation.
 //!
-//! The backend states what an HTTP declaration means: each route handler is reified as a typed
-//! operation, its input roles and output kind become interpreter evidence, and the route tree is
-//! compiled through `HttpProgramAlg`. Everything shared with other transports lives in
-//! [`crate::lower`] and [`crate::syntax`].
+//! An endpoint asks for an `HttpOperationAlg` over its operation, input roles, and output kind, so a
+//! declaration states only the route algebra and its domain.
 
 use crate::lower::{Chain, LoweredProgram, ProgramBackendAlg, expand_program};
 use crate::syntax::{Reified, lift_operation};
-use proc_macro2::Span;
-use proc_macro2::TokenStream;
-use quote::{format_ident, quote, quote_spanned};
+use proc_macro2::{Span, TokenStream};
+use quote::{ToTokens, format_ident, quote};
 use syn::spanned::Spanned;
 use syn::visit_mut::{self, VisitMut};
-use syn::{Expr, ExprMethodCall, GenericArgument, Ident, ImplItemFn, Type, parse_quote, parse_quote_spanned};
+use syn::{Expr, ExprMethodCall, GenericArgument, Ident, ImplItemFn, Type, parse_quote_spanned};
 
-/// Interprets the shared lowering as an HTTP route program.
 struct HttpBackend;
 
 /// Names each authored declaration method and the method marker it denotes.
@@ -55,16 +51,6 @@ fn output_kind(name: &str) -> Option<Ident> {
     OUTPUTS.iter().find(|(output, _)| *output == name).map(|(_, kind)| format_ident!("{kind}"))
 }
 
-/// Records one output kind stated around the kind an endpoint already selected.
-enum OutputWrapper {
-    /// States the status the endpoint answers with.
-    Status(TokenStream),
-    /// States a header the endpoint answers with beside its body.
-    ResponseHeader(TokenStream),
-    /// States that the handler can fail.
-    Result,
-}
-
 /// Carries one route's operation, ordered input roles, output kind, and where it was written.
 ///
 /// The span is where the endpoint itself was written, so an obligation it fails to meet names that
@@ -81,7 +67,9 @@ struct Routes<'a>(&'a mut Vec<RouteRequirement>);
 
 impl VisitMut for Routes<'_> {
     fn visit_expr_method_call_mut(&mut self, call: &mut ExprMethodCall) {
-        if method_marker(&call.method.to_string()).is_some()
+        // A method held as a type parameter, `.method::<Get, ..>(path, op)`, states an endpoint the
+        // same way the named declarations do.
+        if (method_marker(&call.method.to_string()).is_some() || call.method == "method")
             && let Some(declaration) = call.args.iter_mut().nth(1)
         {
             let written = declaration.span();
@@ -98,61 +86,70 @@ impl VisitMut for Routes<'_> {
 /// A declaration without an output kind selects nothing an interpreter could convert, so it denotes
 /// no endpoint and is left as authored.
 fn endpoint_roles(declaration: &Expr) -> Option<(Vec<InputDeclaration>, TokenStream)> {
-    let mut inputs = Vec::new();
-    let mut transform = None;
-    let mut wrappers: Vec<OutputWrapper> = Vec::new();
+    let mut calls = Vec::new();
     let mut current = declaration;
     loop {
         let Expr::MethodCall(call) = current else { return None };
-        let name = call.method.to_string();
-        if let Some(kind) = output_kind(&name) {
-            transform = Some(quote!(::alux_http::#kind));
-            current = &call.receiver;
-            continue;
+        if call.method == "op" {
+            break;
         }
-        match name.as_str() {
-            "op" => {
-                inputs.reverse();
-                // The declaration was read from the outside in, so the kind it states is wrapped
-                // from the inside out.
-                let transform = wrappers.iter().rev().fold(transform?, |inner, wrapper| match wrapper {
-                    OutputWrapper::Status(code) => quote!(::alux_http::StatusOut<#inner, #code>),
-                    OutputWrapper::ResponseHeader(name) => quote!(::alux_http::HeaderOut<#inner, #name>),
-                    OutputWrapper::Result => quote!(::alux_http::ResultOut<#inner>),
-                });
-
-                return Some((inputs, transform));
-            }
-            "status" => {
-                let arguments = call.turbofish.as_ref()?;
-                let code = arguments.args.iter().find_map(|argument| match argument {
-                    GenericArgument::Const(code) => Some(code.clone()),
-                    _ => None,
-                })?;
-                wrappers.push(OutputWrapper::Status(quote!(#code)));
-            }
-            "out_header" => {
-                let arguments = call.turbofish.as_ref()?;
-                let name = arguments.args.iter().find_map(|argument| match argument {
-                    GenericArgument::Type(name) => Some(name.clone()),
-                    _ => None,
-                })?;
-                wrappers.push(OutputWrapper::ResponseHeader(quote!(#name)));
-            }
-            "result" => wrappers.push(OutputWrapper::Result),
-            "with" | "path" | "query" | "body" | "form" | "raw_body" | "multipart" | "in_header" | "cookie"
-            | "auth" | "context" => {
-                let arguments = call.turbofish.as_ref()?;
-                let input = arguments.args.iter().find_map(|argument| match argument {
-                    GenericArgument::Type(input) => Some(input.clone()),
-                    _ => None,
-                })?;
-                inputs.push((call.method.clone(), input));
-            }
-            _ => {}
-        }
+        calls.push(call);
         current = &call.receiver;
     }
+    // A declaration reads from the outside in: wrappers first, the outermost first, and one kind
+    // last, which closes it. Each wrapper is kept as the type it makes around whatever is inside it.
+    let mut inputs = Vec::new();
+    let mut wrappers: Vec<Box<dyn Fn(TokenStream) -> TokenStream>> = Vec::new();
+    let mut kind = None;
+    for call in calls.into_iter().rev() {
+        let name = call.method.to_string();
+        let type_argument = || {
+            call.turbofish.as_ref()?.args.iter().find_map(|argument| match argument {
+                GenericArgument::Type(ty) => Some(ty.clone()),
+                _ => None,
+            })
+        };
+        let closing = match output_kind(&name) {
+            Some(built_in) => Some(quote!(::alux_http::#built_in)),
+            None if name == "out" => Some(type_argument()?.to_token_stream()),
+            None => None,
+        };
+        if let Some(closing) = closing {
+            kind = Some(closing);
+            continue;
+        }
+        // Nothing wraps a declaration its kind has closed, so a wrapper after the kind states no
+        // endpoint, and the declaration is left to report that itself.
+        let wrapper: Box<dyn Fn(TokenStream) -> TokenStream> = match name.as_str() {
+            "status" => {
+                let code = call.turbofish.as_ref()?.args.iter().next()?.clone();
+                Box::new(move |inner| quote!(::alux_http::StatusOut<#inner, #code>))
+            }
+            "out_header" => {
+                let header = type_argument()?;
+                Box::new(move |inner| quote!(::alux_http::HeaderOut<#inner, #header>))
+            }
+            "out_headers" => {
+                let headers = type_argument()?;
+                Box::new(move |inner| quote!(::alux_http::HeadersOut<#inner, #headers>))
+            }
+            "result" => Box::new(|inner| quote!(::alux_http::ResultOut<#inner>)),
+            "with" | "path" | "query" | "body" | "form" | "raw_body" | "multipart" | "in_header" | "cookie"
+            | "auth" | "context" => {
+                inputs.push((call.method.clone(), type_argument()?));
+                continue;
+            }
+            _ => continue,
+        };
+        if kind.is_some() {
+            return None;
+        }
+        wrappers.push(wrapper);
+    }
+    // The last wrapper written is innermost, so the fold starts from it.
+    let transform = wrappers.iter().rev().fold(kind?, |inner, wrapper| wrapper(inner));
+
+    Some((inputs, transform))
 }
 
 /// Lifts one endpoint declaration into the requirement it places on an interpreter.
@@ -164,60 +161,38 @@ fn lift_route(declaration: &mut Expr) -> Option<(Reified, Vec<InputDeclaration>,
 }
 
 impl ProgramBackendAlg for HttpBackend {
-    /// An HTTP program states nothing once for all of its routes.
     type Defaults = ();
 
     const NESTED_SUFFIX: &'static str = "_api";
     const REJECTED_PARAM: &'static str = "HTTP programs currently support type parameters only";
 
-    fn require_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
+    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
         let mut requirements = Vec::new();
         Routes(&mut requirements).visit_block_mut(&mut method.block);
-        let where_clause = method.sig.generics.make_where_clause();
-        // One handle obligation per distinct domain, however many operations name it.
-        let mut carriers: Vec<Ident> = Vec::new();
-        for reified in &requirements {
-            let carrier = &reified.0.carrier;
-            if !carriers.contains(carrier) {
-                carriers.push(carrier.clone());
-            }
-        }
-        for carrier in carriers {
-            where_clause.predicates.push(parse_quote!(This: ::alux_ext::HandlerContextAlg<#carrier>));
-        }
-        for (Reified { operation, carrier }, inputs, transform, written) in requirements {
-            let input_types = inputs.iter().map(|(_, input)| input);
-            let args = if inputs.is_empty() { quote!(()) } else { quote!((#(#input_types,)*)) };
-            let roles = inputs.iter().map(|(role, input)| match role.to_string().as_str() {
-                "with" => quote!(#input),
-                "path" => quote!(<This as ::alux_http::HttpInputAlg>::Path<#input>),
-                "query" => quote!(<This as ::alux_http::HttpInputAlg>::Query<#input>),
-                "body" => quote!(<This as ::alux_http::HttpInputAlg>::Body<#input>),
-                "form" => quote!(<This as ::alux_http::HttpInputAlg>::Form<#input>),
-                "multipart" => quote!(<This as ::alux_http::HttpInputAlg>::Multipart<#input>),
-                "raw_body" => quote!(<This as ::alux_http::HttpInputAlg>::RawBody<#input>),
-                "in_header" => quote!(<This as ::alux_http::HttpInputAlg>::Header<#input>),
-                "cookie" => quote!(<This as ::alux_http::HttpInputAlg>::Cookie<#input>),
-                "auth" => quote!(<This as ::alux_http::HttpInputAlg>::Auth<#input>),
-                "context" => quote!(<This as ::alux_http::HttpInputAlg>::Context<#input>),
-                _ => unreachable!(),
+        let clause = method.sig.generics.make_where_clause();
+        for (Reified { operation, .. }, inputs, kind, written) in requirements {
+            let roles = inputs.iter().map(|(role, input)| {
+                let marker = match role.to_string().as_str() {
+                    "with" => "Direct",
+                    "path" => "Path",
+                    "query" => "Query",
+                    "body" => "Body",
+                    "form" => "Form",
+                    "raw_body" => "RawBody",
+                    "multipart" => "Multipart",
+                    "in_header" => "Header",
+                    "cookie" => "Cookie",
+                    "auth" => "Auth",
+                    "context" => "Context",
+                    _ => unreachable!(),
+                };
+                let marker = format_ident!("{marker}");
+                quote!(::alux_http::#marker<#input>)
             });
-            let roles = if inputs.is_empty() { quote!(()) } else { quote!((#(#roles,)*)) };
-            where_clause.predicates.push(parse_quote_spanned! { written =>
-                #operation: ::alux_ext::ApplyAlg<<This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle, #args>
-                    + Send + Sync + 'static
-            });
-            where_clause.predicates.push(parse_quote_spanned! { written =>
-                This: ::alux_http::HandlerEndpointAlg<
-                    <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
-                    #roles,
-                    #args,
-                    #transform,
-                    <#operation as ::alux_ext::ApplyAlg<
-                        <This as ::alux_ext::HandlerContextAlg<#carrier>>::Handle,
-                        #args,
-                    >>::Output
-                >
+            let roles = quote!((#(#roles,)*));
+            clause.predicates.push(parse_quote_spanned! { written =>
+                This: ::alux_http::HttpOperationAlg<#operation, #roles, #kind,
+                    Endpoint = <This as ::alux_http::RouteAlg>::Endpoint>
             });
         }
     }
@@ -228,34 +203,13 @@ impl ProgramBackendAlg for HttpBackend {
         }
     }
 
-    fn read_link(call: &ExprMethodCall) -> Option<TokenStream> {
-        let name = call.method.to_string();
-        let arguments = call.args.iter().collect::<Vec<_>>();
-        // A link the declaration writes is read rather than kept, so what replaces it is spanned
-        // where it was written. An editor then resolves the authored call to what it denotes.
-        let written = call.method.span();
-        // A declared endpoint is one endpoint on its own, at the path and method it answers on. It
-        // is stated under the same name the declaration wrote, so an editor resolves that name to a
-        // declaration of the method it names rather than to the general one it delegates to.
-        if let [path, operation] = arguments.as_slice()
-            && method_marker(&name).is_some()
-        {
-            let method = Ident::new(&name, written);
-
-            return Some(quote_spanned!(written => #operation.#method(#path)));
-        }
-
-        match (name.as_str(), arguments.as_slice()) {
-            // A nested program is one program below a prefix, and a merged one states itself.
-            ("nest", [prefix, program]) => Some(quote_spanned!(written => #program.under(#prefix))),
-            ("merge", [program]) => Some(quote_spanned!(written => #program.into_program())),
-            _ => None,
-        }
+    fn read_link(_call: &ExprMethodCall) -> Option<TokenStream> {
+        None
     }
 
     fn compile_program(lowered: &LoweredProgram) -> TokenStream {
         let LoweredProgram { program_type, compiler_params, predicates, chain } = lowered;
-        let Chain { leading, root, leaves } = chain;
+        let Chain { leading, root, .. } = chain;
         quote! {
             impl<This, #compiler_params> ::alux_http::HttpProgramAlg<This> for #program_type
             where
@@ -264,29 +218,18 @@ impl ProgramBackendAlg for HttpBackend {
                 type Route = <This as ::alux_http::RouteAlg>::Route;
 
                 fn compile_http(self, compiler: &This) -> Self::Route {
-                    let _ = self;
-                    let builder = ::alux_http::HttpProgramBuilder;
+                    #[allow(unused_imports)]
+                    use ::alux_http::{RouteAlgExt as _, HttpOperationExt as _, HttpProgramExt as _};
+                    let builder = compiler;
                     #(#leading)*
-                    // Every endpoint joins the one route the interpreter states, so no type here
-                    // grows with how many endpoints the declaration has.
-                    let route =
-                        ::alux_http::CompileRouteProgram::compile_route((#root).into_program(), compiler);
-                    #(
-                        let route = ::alux_http::RouteAlg::coproduct(
-                            compiler,
-                            route,
-                            ::alux_http::CompileRouteProgram::compile_route(#leaves, compiler),
-                        );
-                    )*
-
-                    route
+                    (#root).into_route()
                 }
             }
         }
     }
 }
 
-/// Expands the facade macro after converting compiler token streams into testable tokens.
+/// Expands an HTTP declaration into its program, stating each endpoint's `HttpOperationAlg` bound.
 pub(crate) fn http_program_defunc_internal(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     expand_program::<HttpBackend>(attr, item, &())
 }
@@ -297,115 +240,42 @@ mod tests {
     use quote::quote;
 
     #[test]
-    fn generates_a_program_and_its_interpreter_evidence() {
+    fn preserves_authored_bounds_and_output_expressions() {
         let output = http_program_defunc_internal(
             quote!(name = StatusApiExt),
             quote! {
-                impl<This> This
-                where
-                    This: HttpApiAlg + JsonOutAlg,
-                {
-                    fn status_api<Alg>(&self) -> Routes<'_, This>
-                    where
-                        Alg: StatusAlg,
-                    {
-                        self.routes().get("/status", self.op(Alg::status_current).json())
-                    }
-                }
-            },
-        )
-        .unwrap()
-        .to_string();
-
-        assert!(output.contains("struct StatusApiProgram"));
-        assert!(output.contains("alux_http :: HttpProgramAlg"));
-        assert!(output.contains("StatusCurrentOperation < Alg >"));
-        assert!(output.contains("default"));
-        assert!(output.contains("CompileRouteProgram :: compile_route"));
-        // One route per endpoint, joined into the interpreter's route, and no nested program type.
-        assert_eq!(output.matches("coproduct").count(), 1);
-        assert_eq!(output.matches(". get (\"/status\")").count(), 1);
-        assert!(!output.contains("let program ="), "the endpoints were left as one nested type");
-    }
-
-    #[test]
-    fn declares_an_endpoint_under_the_marker_its_method_names() {
-        let output = http_program_defunc_internal(
-            quote!(name = StatusApiExt),
-            quote! {
-                impl<This> This
-                where
-                    This: HttpApiAlg + JsonOutAlg,
-                {
+                impl<This> This where This: HttpRouteAlg {
                     fn status_api<Alg>(&self)
                     where
                         Alg: StatusAlg,
+                        This: HttpOperationAlg<StatusCurrentOperation<Alg>, (), LoginOut,
+                            Endpoint = <This as RouteAlg>::Endpoint>,
                     {
-                        self.routes()
-                            .put("/status", self.op(Alg::status_replaced).body::<u32>().json())
-                            .patch("/status", self.op(Alg::status_moved).body::<i32>().json())
-                            .delete("/status/:id", self.op(Alg::status_cleared).path::<u32>().json())
+                        self.routes().get("/status", self.op(Alg::status_current).out::<LoginOut>())
                     }
                 }
             },
         )
         .unwrap()
         .to_string();
-
-        // Every method reaches the same lowering, so each states one endpoint and its evidence.
-        for method in ["put", "patch", "delete"] {
-            assert_eq!(output.matches(&format!(". {method} (")).count(), 1);
-        }
-        // One route per endpoint joined into the interpreter's route, however many methods.
-        assert_eq!(output.matches("coproduct").count(), 3);
-        assert!(output.contains("HttpInputAlg > :: Body < u32 >"));
-        assert!(output.contains("HttpInputAlg > :: Path < u32 >"));
+        assert!(output.contains("struct StatusApiProgram"));
+        assert!(output.contains("StatusCurrentOperation < Alg >"));
+        assert!(output.contains("out :: < LoginOut >"));
+        assert!(output.contains("let builder = compiler"));
+        assert!(!output.contains("HttpProgramBuilder"));
+        assert!(!output.contains("HandlerContextAlg"));
+        assert!(!output.contains("HandlerEndpointAlg"));
+        assert!(!output.contains("ApplyAlg"));
     }
 
     #[test]
-    fn states_the_output_a_declaration_wraps_around_the_kind_it_selects() {
-        let output = http_program_defunc_internal(
-            quote!(name = ReportApiExt),
-            quote! {
-                impl<This> This
-                where
-                    This: HttpApiAlg + JsonOutAlg,
-                {
-                    fn report_api<Alg>(&self)
-                    where
-                        Alg: ReportAlg,
-                    {
-                        self.routes()
-                            .post("/record", self.op(Alg::report_record).body::<u32>().json().status::<201>())
-                            .get("/find", self.op(Alg::report_find).json().result())
-                            .delete("/record", self.op(Alg::report_forget).empty())
-                    }
-                }
-            },
-        )
-        .unwrap()
-        .to_string();
-
-        // A declaration is read from the outside in and the kind it states is wrapped inside out.
-        assert!(output.contains(":: alux_http :: StatusOut < :: alux_http :: JsonOut , 201 >"));
-        assert!(output.contains(":: alux_http :: ResultOut < :: alux_http :: JsonOut >"));
-        assert!(output.contains(":: alux_http :: EmptyOut"));
-    }
-
-    #[test]
-    fn names_the_domain_the_author_named() {
+    fn reads_an_endpoint_declared_under_a_method_type_parameter() {
         let output = http_program_defunc_internal(
             quote!(name = StatusApiExt),
             quote! {
-                impl<This> This
-                where
-                    This: HttpApiAlg + JsonOutAlg,
-                {
-                    fn status_api<Domain>(&self)
-                    where
-                        Domain: StatusAlg,
-                    {
-                        self.routes().get("/status", self.op(Domain::status_current).json())
+                impl<This> This where This: HttpRouteAlg {
+                    fn status_api<Alg>(&self) {
+                        self.routes().method::<::alux_http::Get, _, _, _, _>("/status", self.op(Alg::status_current).json())
                     }
                 }
             },
@@ -413,85 +283,93 @@ mod tests {
         .unwrap()
         .to_string();
 
-        // The expansion reuses the authored parameter rather than inventing one.
-        assert!(output.contains("StatusCurrentOperation < Domain >"));
-        assert!(output.contains("HandlerContextAlg < Domain >"));
-        assert!(!output.contains("< Alg >"), "a hardcoded `Alg` leaked into the expansion");
+        assert!(output.contains(
+            "This : :: alux_http :: HttpOperationAlg < StatusCurrentOperation < Alg > , () , :: alux_http :: JsonOut"
+        ));
     }
 
     #[test]
-    fn reads_bounds_on_the_generic_parameter_as_a_where_clause() {
-        let expand = |item| http_program_defunc_internal(quote!(name = StatusApiExt), item).unwrap().to_string();
-        let on_parameter = expand(quote! {
-            impl<This: HttpApiAlg + JsonOutAlg> This {
-                fn status_api<Alg: StatusAlg>(&self) {
-                    self.routes().get("/status", self.op(Alg::status_current).json())
+    fn reads_the_headers_a_named_product_states_as_an_output_wrapper() {
+        let output = http_program_defunc_internal(
+            quote!(name = CachedApiExt),
+            quote! {
+                impl<This> This where This: HttpRouteAlg {
+                    fn cached_api<Alg>(&self) {
+                        self.routes().get("/cached", self.op(Alg::cached).out_headers::<Cached>().json())
+                    }
                 }
-            }
-        });
-        let in_where_clause = expand(quote! {
-            impl<This> This
-            where
-                This: HttpApiAlg + JsonOutAlg,
-            {
-                fn status_api<Alg>(&self)
-                where
-                    Alg: StatusAlg,
-                {
-                    self.routes().get("/status", self.op(Alg::status_current).json())
-                }
-            }
-        });
+            },
+        )
+        .unwrap()
+        .to_string();
 
-        for output in [&on_parameter, &in_where_clause] {
-            // Both spellings state the same obligations on the interpretation.
-            assert!(output.contains("where This : HttpApiAlg + JsonOutAlg , Alg : StatusAlg ,"));
-            // Neither states them on the program type, which needs no algebra to exist.
-            assert!(output.contains("struct StatusApiProgram < Alg > (core :: marker :: PhantomData"));
-        }
+        assert!(output.contains(":: alux_http :: HeadersOut < :: alux_http :: JsonOut , Cached >"), "{output}");
     }
 
     #[test]
-    fn composes_any_method_declared_by_the_same_extension() {
+    fn states_the_endpoint_and_nested_program_bounds() {
         let output = http_program_defunc_internal(
             quote!(name = RootApiExt),
             quote! {
-                impl<This> This
-                where
-                    This: HttpApiAlg,
-                {
-                    fn health_routes(&self) -> Routes<'_, This> {
+                impl<This> This where This: HttpRouteAlg {
+                    fn root_api<Alg>(&self) {
                         self.routes()
-                    }
-
-                    fn root_routes(&self) -> Routes<'_, This> {
-                        self.routes().nest("/api", self.health_routes())
+                            .get("/status", self.op(Alg::status_current).json())
+                            .merge(self.other_api::<Alg>())
                     }
                 }
             },
         )
         .unwrap()
         .to_string();
+        // The `.json()` endpoint states its capability, and `other_api`, named by its `_api` suffix,
+        // states the program it nests.
+        assert!(output.contains(
+            "This : :: alux_http :: HttpOperationAlg < StatusCurrentOperation < Alg > , () , :: alux_http :: JsonOut"
+        ));
+        assert!(output.contains("OtherApiProgram < Alg > : :: alux_http :: HttpProgramAlg < This"));
+        assert!(output.contains(". json ()"));
+        assert!(output.contains(". program ("));
+    }
 
-        assert!(output.contains("struct HealthRoutesProgram"));
-        assert!(output.contains("struct RootRoutesProgram"));
-        assert!(output.contains("builder . program (builder . health_routes"));
+    #[test]
+    fn retains_composed_output_calls_and_inline_bounds() {
+        let output = http_program_defunc_internal(
+            quote!(name = CustomApiExt),
+            quote! {
+                impl<This: HttpRouteAlg> This {
+                    fn custom_api<Domain: DomainAlg>(&self)
+                    where
+                        This: CustomEndpointAlg<Domain>,
+                    {
+                        self.routes().post("/", self.op(Domain::submit)
+                            .form::<Params>().out_header::<Header>().status::<202>().out::<CustomOut>())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+        assert!(output.contains("SubmitOperation < Domain >"));
+        assert!(output.contains("This : HttpRouteAlg"));
+        assert!(output.contains("Domain : DomainAlg"));
+        assert!(output.contains("This : CustomEndpointAlg < Domain >"));
+        assert!(output.contains(". out_header :: < Header > () . status :: < 202 > () . out :: < CustomOut > ()"));
+        // Read from the outside in: the header around the status around the downstream kind.
+        assert!(
+            output.contains(":: alux_http :: HeaderOut < :: alux_http :: StatusOut < CustomOut , 202 > , Header >")
+        );
+        assert!(!output.contains("OutputKindAlg"));
+        assert!(!output.contains("HandlerEndpointAlg"));
     }
 
     #[test]
     fn rejects_non_type_program_parameters() {
         let error = http_program_defunc_internal(
             quote!(name = InvalidApiExt),
-            quote! {
-                impl<This> This {
-                    fn invalid_api<const N: usize>(&self) -> Routes<'_, This> {
-                        self.routes()
-                    }
-                }
-            },
+            quote! { impl<This> This { fn invalid_api<const N: usize>(&self) { self.routes() } } },
         )
         .unwrap_err();
-
         assert!(error.to_string().contains("type parameters only"));
     }
 }

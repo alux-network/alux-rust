@@ -28,3 +28,13 @@ cannot describe different surfaces.
 The source declaration may write `/readings/:id`. The `OpenAPI` interpreter converts that portable
 path segment to the `/readings/{id}` spelling used in the generated document.
 
+
+## Downstream output kinds and response alternatives
+
+Implement `OutputKindAlg<OpenApiHandlerImpl<Context>, Result>` for a downstream kind. Its selected
+transform implements `OpenApiOutputAlg<Result>` and returns every supported `OpenApiAnswer`, with
+status, header names, and optional body media type and schema. No runtime result or execution
+converter is needed to describe those alternatives. A redirect can be described by its status and
+`location` header, alongside `set-cookie` when the handler supplies it; another alternative may
+carry an HTML body. The [custom-output scenario](../alux-http-poem/tests/custom_output.rs) verifies
+that an unchanged declaration agrees with Poem execution and text metadata.

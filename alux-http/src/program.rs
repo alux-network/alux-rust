@@ -1,7 +1,8 @@
 use crate::{
-    BytesOut, Connect, Delete, EmptyOut, FileOut, Get, HandlerEndpointAlg, Head, HeaderOut, HtmlOut, HttpApiAlg,
-    HttpInputAlg, HttpMethodAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, NamedValuesAlg, Options, Patch, Post, Put,
-    RedirectOut, ResultOut, RouteAlg, RoutePath, StatusOut, StreamOut, TextOut, Trace, WithAlg,
+    BytesOut, CloseAlg, Connect, Delete, EmptyOut, FileOut, Get, HandlerAlg, HandlerEndpointAlg, Head, HeaderOut,
+    HeadersOut, HtmlOut, HttpInputAlg, HttpMethodAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, NamedValuesAlg, OpenAlg,
+    Options, Patch, Post, Put, RedirectOut, ResultOut, RouteAlg, RoutePath, StatusOut, StreamOut, TextOut, Trace,
+    WithAlg,
 };
 use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use core::marker::PhantomData;
@@ -16,6 +17,51 @@ pub trait CompileRouteProgram<Compiler> {
     /// Endpoint construction happens here, after composition has preserved all
     /// handler, input, argument, and output-transform types.
     fn compile_route(self, compiler: &Compiler) -> Self::Route;
+}
+
+/// Interprets an operation with its declared HTTP input roles and output kind.
+///
+/// A tagless-final specification states this capability for each endpoint it uses. Application,
+/// runtime handles, extraction, and conversion are obligations of the interpreter implementation.
+/// Built-in and downstream output kinds use exactly the same capability.
+///
+/// A JSON declaration cannot be justified by a text-output capability:
+///
+/// ```compile_fail,E0277
+/// use alux_ext::ext;
+/// use alux_http::{HttpOperationAlg, HttpOperationExt, HttpRouteAlg, RouteAlg, RouteAlgExt, Routes, TextOut};
+/// #[ext(name = MissingJsonExt)]
+/// impl<This> This
+/// where
+///     This: HttpRouteAlg
+///         + HttpOperationAlg<(), (), TextOut, Endpoint = <This as RouteAlg>::Endpoint>,
+/// {
+///     fn api(&self) -> Routes<'_, This> {
+///         self.routes().get("/", self.op(()).json())
+///     }
+/// }
+/// ```
+pub trait HttpOperationAlg<Handler, Inputs, Kind> {
+    /// The endpoint representation produced by this interpretation.
+    type Endpoint;
+
+    /// Interprets the operation under its declared input and output roles.
+    fn http_operation(&self, handler: Handler) -> Self::Endpoint;
+}
+
+impl<Compiler, Handler, Inputs, Kind, Handle> HttpOperationAlg<Handler, Inputs, Kind> for Compiler
+where
+    Compiler: HandlerAlg
+        + HandlerContextAlg<Handler::Context, Handle = Handle>
+        + HandlerEndpointAlg<Handle, Inputs::Inputs, Inputs::Args, Kind, Handler::Output>,
+    Handler: OperationAlg + ApplyAlg<Handle, Inputs::Args> + Send + Sync + 'static,
+    Inputs: InterpretInputsAlg<Compiler>,
+{
+    type Endpoint = <Compiler as HandlerAlg>::Endpoint;
+
+    fn http_operation(&self, handler: Handler) -> Self::Endpoint {
+        self.finish_handler(handler)
+    }
 }
 
 /// Represents the empty route program.
@@ -51,7 +97,7 @@ pub struct Endpoint<Method, Handler, Inputs, Args, Transform> {
 /// Carries a typed operation declaration as first-order data.
 #[derive(Debug)]
 pub struct Operation<Handler, Inputs = (), Args = (), Transform = ()> {
-    handler: Handler,
+    pub(crate) handler: Handler,
     marker: PhantomData<fn(Inputs, Args, Transform)>,
 }
 
@@ -62,6 +108,13 @@ pub struct RouteProgram<Program>(Program);
 /// Constructs neutral HTTP route programs.
 #[derive(Debug, Default)]
 pub struct HttpProgramBuilder;
+
+impl<Handler> Operation<Handler> {
+    /// Carries an operation before selecting its HTTP input and output roles.
+    pub fn new(handler: Handler) -> Self {
+        Self { handler, marker: PhantomData }
+    }
+}
 
 /// Marks an input supplied directly by an interpreter.
 pub struct Direct<Input>(PhantomData<Input>);
@@ -100,14 +153,19 @@ pub struct Context<Input>(PhantomData<Input>);
 pub trait InterpretInputsAlg<Compiler> {
     /// The extractor product understood by `Compiler`.
     type Inputs;
+
+    /// The argument product supplied by these input roles.
+    type Args;
 }
 
 impl<Compiler> InterpretInputsAlg<Compiler> for () {
     type Inputs = ();
+    type Args = ();
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Direct<Input> {
     type Inputs = Input;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Path<Input>
@@ -115,6 +173,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Path<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Query<Input>
@@ -122,6 +181,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Query<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Body<Input>
@@ -129,6 +189,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Body<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Form<Input>
@@ -136,6 +197,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Form<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for RawBody<Input>
@@ -143,6 +205,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::RawBody<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Header<Input>
@@ -150,6 +213,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Header<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Cookie<Input>
@@ -157,6 +221,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Cookie<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Multipart<Input>
@@ -164,6 +229,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Multipart<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Auth<Input>
@@ -171,6 +237,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Auth<Input>;
+    type Args = Input;
 }
 
 impl<Compiler, Input> InterpretInputsAlg<Compiler> for Context<Input>
@@ -178,6 +245,7 @@ where
     Compiler: HttpInputAlg,
 {
     type Inputs = Compiler::Context<Input>;
+    type Args = Input;
 }
 
 macro_rules! interpret_inputs {
@@ -187,6 +255,7 @@ macro_rules! interpret_inputs {
             $($input: InterpretInputsAlg<Compiler>,)+
         {
             type Inputs = ($($input::Inputs,)+);
+            type Args = ($($input::Args,)+);
         }
     };
 }
@@ -222,7 +291,7 @@ impl HttpProgramBuilder {
     /// Input roles and an output kind can then be attached while the handler's
     /// result type remains inferred through `ApplyAlg`.
     pub fn op<Handler>(&self, handler: Handler) -> Operation<Handler> {
-        Operation { handler, marker: PhantomData }
+        Operation::new(handler)
     }
 
     /// Includes a named HTTP program as an uninterpreted composition node.
@@ -241,17 +310,6 @@ pub type WithInput<Handler, Inputs, Args, Transform, Extractor, Arg> =
 /// Carries a route program with one additional typed endpoint.
 pub type WithEndpoint<Program, Method, Handler, Inputs, Args, Transform> =
     RouteProgram<Merge<Program, Endpoint<Method, Handler, Inputs, Args, Transform>>>;
-
-macro_rules! output_methods {
-    ($($method:ident => $kind:ident, $alg:ident, $selected:ident, $meaning:literal),+ $(,)?) => {
-        $(
-            #[doc = concat!("Marks the inferred handler result for ", $meaning, " interpretation.")]
-            pub fn $method(self) -> Operation<Handler, Inputs, Args, $kind> {
-                self.out()
-            }
-        )+
-    };
-}
 
 /// States the nine method declarations on both a program and a standalone operation.
 ///
@@ -272,7 +330,11 @@ macro_rules! route_methods {
             )+
         }
 
-        impl<Handler, Inputs, Args, Transform> Operation<Handler, Inputs, Args, Transform> {
+        impl<Handler, Inputs, Args, Transform> Operation<Handler, Inputs, Args, Transform>
+        where
+            Inputs: WithAlg,
+            Args: WithAlg,
+        {
             $(
                 #[doc = concat!("Declares this operation at an exact path, answered under `", $label, "`.")]
                 ///
@@ -375,37 +437,86 @@ where
         self.with_as::<Context<Input>, Input>()
     }
 
-    /// Replaces the declaration's output-kind marker without converting a value.
-    ///
-    /// The selected kind is interpreted only after the handler result type is
-    /// known at the compilation boundary.
-    pub fn out<NewTransform>(self) -> Operation<Handler, Inputs, Args, NewTransform> {
+    // Changes only the declaration's phantom output kind while preserving the first-order handler.
+    fn retag<NewTransform>(self) -> Operation<Handler, Inputs, Args, NewTransform> {
         Operation { handler: self.handler, marker: PhantomData }
     }
 
-    with_output_kinds!(output_methods);
-
-    /// Answers with `CODE` and the body already stated.
-    pub fn status<const CODE: u16>(self) -> Operation<Handler, Inputs, Args, StatusOut<Transform, CODE>> {
-        self.out()
+    /// Closes the declaration with the output kind `Kind`, inside every wrapper already stated.
+    ///
+    /// The kind is interpreted only after the handler result type is known at the compilation
+    /// boundary, so a downstream kind closes a declaration exactly as a built-in one does.
+    pub fn out<Kind>(self) -> Operation<Handler, Inputs, Args, <Transform as CloseAlg<Kind>>::Closed>
+    where
+        Transform: CloseAlg<Kind>,
+    {
+        self.retag()
     }
 
-    /// Answers with an outgoing response header the handler states, beside the body already stated.
-    ///
-    /// The handler answers with the header's value and the body, so a value an endpoint cannot know
-    /// is one the handler still states.
-    pub fn out_header<Name>(self) -> Operation<Handler, Inputs, Args, HeaderOut<Transform, Name>> {
-        self.out()
+    /// Answers with `CODE`, around what the rest of the declaration states.
+    pub fn status<const CODE: u16>(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, StatusOut<(), CODE>>>
+    where
+        Transform: OpenAlg,
+    {
+        self.retag()
     }
 
-    /// Answers with what the handler's failure means when it fails.
+    /// Answers with the handler's header value, around what the rest of the declaration states.
     ///
-    /// The kind already stated answers the successful result, so `.json().result()` states JSON on
-    /// success and the meaning of the failure otherwise.
-    pub fn result(self) -> Operation<Handler, Inputs, Args, ResultOut<Transform>> {
-        self.out()
+    /// The handler answers with the value and then with what the rest states: `(value, rest)`.
+    pub fn out_header<Name>(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, HeaderOut<(), Name>>>
+    where
+        Transform: OpenAlg,
+    {
+        self.retag()
+    }
+
+    /// Answers with the headers the handler's named product states, around what the rest states.
+    ///
+    /// The output twin of [`Operation::in_header`]: each member of `Headers` is one header, named by
+    /// its member name, and the handler answers with `(headers, rest)`.
+    pub fn out_headers<Headers>(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, HeadersOut<(), Headers>>>
+    where
+        Transform: OpenAlg,
+        Headers: NamedValuesAlg,
+    {
+        self.retag()
+    }
+
+    /// Answers with what the rest of the declaration states when the handler succeeded, and with
+    /// what its failure means otherwise.
+    pub fn result(self) -> Operation<Handler, Inputs, Args, OpenWith<Transform, ResultOut<()>>>
+    where
+        Transform: OpenAlg,
+    {
+        self.retag()
     }
 }
+
+/// Carries a declaration with one more wrapper inside those it already states.
+pub type OpenWith<Transform, Wrapper> = <Transform as OpenAlg>::With<Wrapper>;
+
+macro_rules! output_methods {
+    ($($method:ident => $kind:ident, $alg:ident, $selected:ident, $meaning:literal),+ $(,)?) => {
+        impl<Handler, Inputs, Args, Transform> Operation<Handler, Inputs, Args, Transform>
+        where
+            Inputs: WithAlg,
+            Args: WithAlg,
+        {
+            $(
+                #[doc = concat!("Closes the declaration with ", $meaning, " output meaning.")]
+                pub fn $method(self) -> Operation<Handler, Inputs, Args, <Transform as CloseAlg<$kind>>::Closed>
+                where
+                    Transform: CloseAlg<$kind>,
+                {
+                    self.out()
+                }
+            )+
+        }
+    };
+}
+
+with_output_kinds!(output_methods);
 
 impl<Program> RouteProgram<Program> {
     /// Reads this program below an HTTP path prefix, with no program around it.
@@ -504,22 +615,17 @@ where
     }
 }
 
-impl<Compiler, Method, Handler, Inputs, Args, Transform, Handle> CompileRouteProgram<Compiler>
+impl<Compiler, Method, Handler, Inputs, Args, Transform> CompileRouteProgram<Compiler>
     for Endpoint<Method, Handler, Inputs, Args, Transform>
 where
-    Compiler: HttpApiAlg
-        + HandlerContextAlg<Handler::Context, Handle = Handle>
-        + HandlerEndpointAlg<Handle, Inputs::Inputs, Args, Transform, Handler::Output>,
+    Compiler: HttpRouteAlg + HttpOperationAlg<Handler, Inputs, Transform, Endpoint = <Compiler as RouteAlg>::Endpoint>,
     Method: HttpMethodAlg,
-    Handler: OperationAlg + ApplyAlg<Handle, Args> + Send + Sync + 'static,
-    Inputs: InterpretInputsAlg<Compiler>,
 {
     type Route = Compiler::Route;
 
     fn compile_route(self, compiler: &Compiler) -> Self::Route {
         let selector = compiler.compose(compiler.http_method(Method::METHOD), compiler.http_path(&self.path));
-        let endpoint = compiler.finish_handler(self.handler);
-
+        let endpoint = compiler.http_operation(self.handler);
         compiler.precompose(selector, compiler.lift(endpoint))
     }
 }

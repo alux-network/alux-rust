@@ -5,17 +5,17 @@
 //! application through `ApplyAlg`; `defunc(via = backend)` delegates to an
 //! attribute-macro backend while retaining the same extension surface.
 
-use crate::extension::extension;
+use crate::extension::{extension, stated};
 use crate::http_program::http_program_defunc_internal;
 use crate::syntax::{ExtensionImpl, doc_text, documentation, operation_ident};
 use proc_macro2::TokenStream;
-use quote::{ToTokens, format_ident, quote};
-use syn::parse::{Parse, ParseStream, Parser};
+use quote::{format_ident, quote};
+use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::VisitMut;
 use syn::{
-    Expr, ExprMethodCall, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path, ReceiverKind, ReturnType,
-    Token, Type, TypeParamBound, Visibility, parse_quote,
+    ExprMethodCall, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path, ReceiverKind, ReturnType, Token,
+    Type, Visibility, parse_quote,
 };
 
 enum Defunc {
@@ -24,7 +24,7 @@ enum Defunc {
     Via(Path),
 }
 
-/// Separates the DD-specific flag from arguments forwarded to `extend::ext`.
+/// Separates the DD-specific flag from the arguments the extension itself reads.
 struct ExtArgs {
     forwarded: Vec<Meta>,
     defunc: Defunc,
@@ -194,55 +194,11 @@ fn defunctionalize(
     })
 }
 
-/// Reads the trait name a block stated.
-fn stated_name(arguments: &[Meta]) -> Option<Ident> {
-    arguments.iter().find_map(|argument| match argument {
-        Meta::NameValue(argument) if argument.path.is_ident("name") => match &argument.value {
-            Expr::Path(named) => named.path.get_ident().cloned(),
-            _ => None,
-        },
-        _ => None,
-    })
-}
-
-/// Reads the supertraits a block stated.
-fn stated_supertraits(arguments: &[Meta]) -> Option<syn::Result<Punctuated<TypeParamBound, Token![+]>>> {
-    arguments.iter().find_map(|argument| match argument {
-        Meta::NameValue(argument) if argument.path.is_ident("supertraits") => {
-            Some(Punctuated::parse_terminated.parse2(argument.value.to_token_stream()))
-        }
-        _ => None,
-    })
-}
-
-/// States every `async fn` as the future it answers, for the `extend::ext` path.
-///
-/// `Send` is not stated, since only a body satisfies it.
-fn state_the_futures(item: &mut ItemImpl) {
-    for method in item.items.iter_mut().filter_map(|item| match item {
-        ImplItem::Fn(method) => Some(method),
-        _ => None,
-    }) {
-        if method.sig.asyncness.take().is_none() {
-            continue;
-        }
-
-        let answered = match &method.sig.output {
-            ReturnType::Default => parse_quote!(()),
-            ReturnType::Type(_, answered) => answered.clone(),
-        };
-        let body = &method.block;
-        method.sig.output = parse_quote!(-> impl ::core::future::Future<Output = #answered>);
-        method.block = parse_quote!({ async move #body });
-    }
-}
-
 /// Expands the facade macro after converting compiler token streams into testable tokens.
 pub(crate) fn ext_internal(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     let arguments = syn::parse2::<ExtArgs>(attr)?;
     if let Defunc::Via(via) = &arguments.defunc {
-        // A backend states its own trait, so what it extends is its business rather than read off
-        // the carrier here.
+        // The backend lowers the methods first and then generates the trait and the impl the same way.
         let forwarded = &arguments.forwarded;
         return Ok(quote! {
             #[#via(#(#forwarded),*)]
@@ -270,24 +226,7 @@ pub(crate) fn ext_internal(attr: TokenStream, item: TokenStream) -> syn::Result<
     } else {
         Vec::new()
     };
-    let supertraits = stated_supertraits(&arguments.forwarded).transpose()?;
-
-    // A block stating no name is named by `extend`, which reads a name off any carrier. Everything
-    // else is stated here, where the trait and the impl can differ.
-    let Some(name) = stated_name(&arguments.forwarded) else {
-        let arguments = &arguments.forwarded;
-        let forwarded = input.forwarded(quote!(#(#arguments),*));
-        // After the operations, which read whether a method was written as `async fn`.
-        let mut item = input.item;
-        state_the_futures(&mut item);
-
-        return Ok(quote! {
-            #[::alux_ext::extend::ext(#forwarded)]
-            #item
-            #(#operations)*
-        });
-    };
-    let extension = extension(&visibility, &name, supertraits, &input.item)?;
+    let extension = extension(&visibility, stated(&arguments.forwarded, &input.item)?, &input.item)?;
 
     Ok(quote! {
         #extension
@@ -301,7 +240,7 @@ mod tests {
     use quote::quote;
 
     #[test]
-    fn declares_over_the_carrier_rather_than_over_self() {
+    fn keeps_self_as_the_block_wrote_it() {
         let output = ext_internal(
             quote!(name = ValueExt),
             quote! {
@@ -316,9 +255,9 @@ mod tests {
         .unwrap()
         .to_string();
 
-        // Both halves name the carrier, which the block's own bounds resolve. No supertrait states
-        // what bounds `Self`.
-        assert_eq!(output.matches("< This > :: Value").count(), 2, "{output}");
+        // Both halves state `Self` as written, as `extend::ext` does. No supertrait is added.
+        assert_eq!(output.matches("Self :: Value").count(), 2, "{output}");
+        assert!(!output.contains("< This > :: Value"), "{output}");
         assert!(!output.contains("trait ValueExt < This > :"), "{output}");
     }
 
@@ -393,6 +332,90 @@ mod tests {
             "{output}"
         );
         assert!(output.contains("async fn value (& self) -> u32"), "{output}");
+    }
+
+    #[test]
+    fn expands_a_block_stating_no_name_as_one_stating_its_bound_name() {
+        let block = quote! {
+            impl<This> This
+            where
+                This: ValueAlg,
+            {
+                async fn value(mut self, mut increment: u32) -> This::Value { self.value() }
+            }
+        };
+        let unnamed = ext_internal(quote!(), block.clone()).unwrap().to_string();
+        let named = ext_internal(quote!(name = ValueAlgExt), block).unwrap().to_string();
+
+        // The name is the only thing a block leaves to its bound.
+        assert_eq!(unnamed, named);
+    }
+
+    #[test]
+    fn names_a_trait_after_the_first_bound_that_is_not_a_basic_trait() {
+        let name = |block| {
+            let output = ext_internal(quote!(), block).unwrap().to_string();
+            output.split_whitespace().skip_while(|token| *token != "trait").nth(1).unwrap().to_owned()
+        };
+
+        assert_eq!(
+            name(quote!(
+                impl<This> This where This: Send + ChunksAlg + FieldAlg {}
+            )),
+            "ChunksAlgExt"
+        );
+        assert_eq!(
+            name(quote!(
+                impl<This: ?Sized + 'static + alux::ShapeAlg> This where This: FieldAlg {}
+            )),
+            "ShapeAlgExt"
+        );
+        assert_eq!(
+            name(quote!(
+                impl<This: HandlerContextAlg<Context>> This {}
+            )),
+            "HandlerContextAlgExt"
+        );
+        assert_eq!(
+            name(quote!(
+                impl<This> This where This: Send {}
+            )),
+            "SendExt"
+        );
+        assert_eq!(
+            name(quote!(
+                impl<This> This where This: Clone + Debug + Copy + core::panic::RefUnwindSafe + Sync + ChunksAlg {}
+            )),
+            "ChunksAlgExt"
+        );
+        assert_eq!(
+            name(quote!(
+                impl<This: ?Sized + 'static> This where This: Clone + Default {}
+            )),
+            "CloneExt"
+        );
+        assert_eq!(
+            name(quote!(
+                impl<This> This {}
+            )),
+            "ThisExt"
+        );
+    }
+
+    #[test]
+    fn names_a_trait_after_its_carrier() {
+        let output = ext_internal(
+            quote!(),
+            quote! {
+                impl<T> &mut Vec<T> {
+                    fn first_one(&self) -> u32 { 1 }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("trait RefMutVecTExt < T >"), "{output}");
     }
 
     #[test]
@@ -479,7 +502,7 @@ mod tests {
             quote! {
                 pub impl<This> This
                 where
-                    This: HttpApiAlg + JsonOutAlg,
+                    This: HttpApiAlg,
                 {
                     fn direct_api<Alg>(&self)
                     where
@@ -544,7 +567,7 @@ mod tests {
             quote! {
                 impl<This> This
                 where
-                    This: HttpApiAlg + JsonOutAlg,
+                    This: HttpApiAlg,
                 {
                     fn status_routes<Alg>(&self)
                     where

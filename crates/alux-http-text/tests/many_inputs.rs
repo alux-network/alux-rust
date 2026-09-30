@@ -6,7 +6,7 @@
 //! may appear more than once.
 
 use alux_ext::ext;
-use alux_http::{HttpApiAlg, HttpProgramExt, JsonOutAlg, NamedValuesAlg, http};
+use alux_http::{HttpApiAlg, HttpProgramExt, NamedValuesAlg, http};
 use alux_http_text::TextHandlerImpl;
 use core::future::Future;
 
@@ -64,7 +64,7 @@ where
 #[ext(name = ReadApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint reading sixteen arguments, across every role a caller can state.
     fn read_api<Alg>(&self)

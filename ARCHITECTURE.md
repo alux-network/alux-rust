@@ -85,8 +85,7 @@ A specification crate depends only on `alux-ext`. Interpreter crates depend on t
 they witness plus their framework; nothing depends on an interpreter in order to declare a program.
 
 The proc-macro crate does not depend on product crates. It emits references to their public
-surfaces, and generated extension code names `alux_ext::extend`, so a crate using `#[ext]` needs no
-separate `extend` dependency. Program crates re-export their applicable backend attributes from
+surfaces. Program crates re-export their applicable backend attributes from
 `alux_ext::macros`, so authored code imports meaningful entry points such as `alux_http::http`
 rather than the implementation crate.
 
@@ -176,6 +175,23 @@ procedural macro.
 
 ## HTTP program algebra
 
+### Tagless-final declarations
+
+An HTTP extension composes `HttpRouteAlg` with one `HttpOperationAlg<Operation, Inputs, Kind>`
+capability per endpoint. `Routes` interprets that composition using ordinary Rust methods. The HTTP
+macro reifies operation references, names the program, and states each endpoint's `HttpOperationAlg`
+bound from its authored input roles and output kind, and each nested program's `HttpProgramAlg`
+bound. A declaration authors only the route algebra and its domain.
+
+The direct first-order syntax fold uses the same operation capability. Its blanket implementation
+connects neutral input roles to `InterpretInputsAlg` (including the argument product), chooses a
+runtime handle through `HandlerContextAlg`, and delegates to `HandlerEndpointAlg`. Those mechanics
+belong to the interpreter implementation rather than generated API bounds.
+
+`Operation` owns selection of an output kind. The built-in methods are derived neutral selections:
+`.json()` is `.out::<JsonOut>()`. Downstream kinds use `.out::<Kind>()` and their own
+`OutputKindAlg` implementations, including converters describing multiple OpenAPI answers.
+
 ### Inputs and outputs
 
 `HttpInputAlg` lets each interpreter select extractor representations for:
@@ -241,6 +257,8 @@ result as the header's value and the body. A header is a name and nothing more t
 marker a domain writes for itself: every interpretation already witnesses `HeaderOutAlg` once and
 answers with whichever name reaches it.
 
+`HeadersOut<Kind, Headers>` is the output twin of reading headers into a product: the handler answers with a named product and the body, and each member is one header named by its member name. A member stating nothing writes no header and a member stating many writes one per value, so several `set-cookie` headers are one member rather than nested `HeaderOut` pairs. Executing interpretations write the product through `alux_http_parts::write_headers`, and `OpenAPI` reads the header names from the product's shape.
+
 Two kinds read the kind beneath them rather than the handler. `StatusOut<Kind, CODE>` answers with a
 declared status around the body `Kind` states, because the status of a created resource is a
 property of the endpoint rather than a decision inside a handler. `ResultOut<Kind>` reads a handler
@@ -248,6 +266,37 @@ that returns `Result`: the success answers with `Kind`, and the failure answers 
 `HttpErrorAlg` says it means, as a portable `HttpStatus` and a message. A domain states its
 failures, and `HttpErrorAlg` states how they are answered, which keeps status vocabulary out of the
 domain and domain vocabulary out of the interpreters.
+
+### An endpoint as `dimap`
+
+An endpoint binds an operation `op : Args → Out` to HTTP without changing it. Input roles adapt its argument side and output kinds adapt its result side, so an endpoint is the profunctor map `dimap f g op = g ∘ op ∘ f`:
+
+```text
+            f  (contravariant)              op                g  (covariant)
+Request  ───────────────────────▶  Args ────────▶ Out ───────────────────────▶  Response
+          .path().body().cookie()                   .out_headers().result().status().json()
+```
+
+- `f` is the interpreter's product of extractors that the input roles select through `InterpretInputsAlg`. Roles append to one argument product, so inputs read flat and in declaration order. Extraction can fail, and a failure answers the request without applying `op`, so `f` is `Request → Result<Args, Response>`.
+- `op` is `ApplyAlg::apply` on the reified extension method. No binding changes it.
+- `g` is the converter an output kind folds to through `OutputKindAlg`: a type implementing `OutputAlg<Out>`, whose `output` goes from the handler result to what the framework answers with.
+
+Each executing interpreter composes the three in `finish_handler`. In Poem:
+
+```rust ignore
+let (request, mut body) = request.split();
+let inputs = Inputs::extract(&request, &mut body).await?;                // f
+let output = handler.apply(context, inputs).await;                       // op
+Ok::<Response, poem::Error>(Answering::output(output).into_response())   // g
+```
+
+The output wrappers are the structure `g` is built from, each one operation of the output algebra with its own trait. A declaration states them from the outside in and closes with its kind, so the order they are written in is the order they apply in, and the handler's result reads the same way: `.out_header::<ETag>().result().json()` is `HeaderOut<ResultOut<JsonOut>, ETag>`, answered by `(etag, Result<body, E>)`. `Pending` holds the wrappers until the kind folds them around itself; a wrapper after the kind is a compile error.
+
+- `StatusOut` post-composes an edit of the response. It reads nothing, so it does not change `Out`.
+- `HeaderOut` and `HeadersOut` are strength (`second'`): a converter of `Rest` becomes a converter of `(Value, Rest)`, which writes `Value` as headers and passes `Rest` on. Stacking `HeaderOut` nests one pair per header; `HeadersOut` writes a named product through one iso, `Headers ≅ named header values`, the twin of `.in_header` on the input side.
+- `ResultOut` is choice (`right'`): a converter of `Value` becomes a converter of `Result<Value, Error>`, and the `Err` branch is answered through `HttpErrorAlg`. Strength and choice do not commute, which is why `.out_header().result().json()` sends the header on both branches and `.result().out_header().json()` sends it only on success.
+
+Every interpretation preserves this structure. An executing interpretation runs `f`, `op`, and `g`; text and `OpenAPI` map the same structure to descriptions, reading `f` as parameters and `g` as responses. That is why one declaration gives agreeing interpretations. Routes sit one level above: a route is a coproduct of endpoints, and a selector restricts the request side before `f`.
 
 ### Selectors and routes
 

@@ -1,8 +1,10 @@
 use crate::AxumHandlerImpl;
 use alux_http::{
-    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg,
-    HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg,
+    HttpErrorAlg, HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg,
+    TextOutAlg,
 };
+use alux_http_parts::write_headers;
 use axum::Json;
 use axum::body::Body;
 use axum::http::{HeaderName, HeaderValue, StatusCode, header};
@@ -10,6 +12,7 @@ use axum::response::{Html, IntoResponse, Redirect, Response};
 use core::fmt::Display;
 use core::marker::PhantomData;
 use futures::{Stream, TryStreamExt};
+use serde::Serialize;
 use std::io::Error as IoError;
 
 /// Interprets a portable status as the one axum answers with.
@@ -148,7 +151,7 @@ where
     fn into_response(self) -> Response {
         let mut response = self.body.into_response();
         if let Ok(value) = HeaderValue::from_str(&self.value) {
-            response.headers_mut().insert(HeaderName::from_static(Name::HEADER_NAME), value);
+            response.headers_mut().append(HeaderName::from_static(Name::HEADER_NAME), value);
         }
 
         response
@@ -272,6 +275,50 @@ axum_outputs! {
 
 impl<Context> HeaderOutAlg for AxumHandlerImpl<Context> {
     type Header<Inner, Name> = AxumHeaderOutput<Inner, Name>;
+}
+
+/// Answers with the headers a named product states, beside the body the handler stated.
+///
+/// A product that is not one of named values, or a name or value no header can carry, writes no
+/// header, as a single header does.
+pub struct AxumHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+/// Carries a converted body and the headers written for it until Axum writes them.
+pub struct AxumCarryingAll<Output> {
+    body: Output,
+    headers: Vec<(String, String)>,
+}
+
+impl<Inner, Headers, Rest> OutputAlg<(Headers, Rest)> for AxumHeadersOutput<Inner, Headers>
+where
+    Inner: OutputAlg<Rest>,
+    Headers: Serialize,
+{
+    type Output = AxumCarryingAll<Inner::Output>;
+
+    fn output((headers, rest): (Headers, Rest)) -> Self::Output {
+        AxumCarryingAll { body: Inner::output(rest), headers: write_headers(&headers).unwrap_or_default() }
+    }
+}
+
+impl<Output> IntoResponse for AxumCarryingAll<Output>
+where
+    Output: IntoResponse,
+{
+    fn into_response(self) -> Response {
+        let mut response = self.body.into_response();
+        for (name, value) in self.headers {
+            if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
+                response.headers_mut().append(name, value);
+            }
+        }
+
+        response
+    }
+}
+
+impl<Context> HeadersOutAlg for AxumHandlerImpl<Context> {
+    type Headers<Inner, Headers> = AxumHeadersOutput<Inner, Headers>;
 }
 
 impl<Context> StatusOutAlg for AxumHandlerImpl<Context> {

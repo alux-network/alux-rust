@@ -6,10 +6,7 @@
 //! chosen by the framework.
 
 use alux_ext::ext;
-use alux_http::{
-    BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, RedirectOutAlg, ResultOutAlg,
-    StatusOutAlg, TextOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpProgramExt, http};
 use alux_http_poem::PoemHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use core::future::Future;
@@ -79,15 +76,7 @@ where
 #[ext(name = ReportApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg
-        + JsonOutAlg
-        + TextOutAlg
-        + HtmlOutAlg
-        + BytesOutAlg
-        + EmptyOutAlg
-        + RedirectOutAlg
-        + StatusOutAlg
-        + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint per output kind the specification names.
     fn report_api<Alg>(&self)
@@ -102,13 +91,13 @@ where
             // The report as it is stored.
             .get("/raw", self.op(Alg::report_raw).bytes())
             // A recording, which creates something and says so.
-            .post("/record", self.op(Alg::report_record).body::<u32>().json().status::<201>())
+            .post("/record", self.op(Alg::report_record).body::<u32>().status::<201>().json())
             // A removal, which answers with nothing at all.
             .delete("/record", self.op(Alg::report_forget).empty())
             // Where the report actually lives.
             .get("/elsewhere", self.op(Alg::report_elsewhere).redirect())
             // One identified reading, or what its failure means.
-            .get("/find/{id}", self.op(Alg::report_find).path::<u32>().json().result())
+            .get("/find/{id}", self.op(Alg::report_find).path::<u32>().result().json())
     }
 }
 

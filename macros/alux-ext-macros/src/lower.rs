@@ -1,21 +1,23 @@
 //! Lowers a fluent program declaration into a first-order program type.
 //!
 //! The lowering is the same for every transport: each declaration method becomes a zero-sized
-//! program type, the authored body becomes the program that type compiles, and the obligations
-//! discovered in the body become the `where` clause of one interpretation. A backend supplies only
-//! what its own transport means.
+//! program type and the authored body becomes the program that type interprets. Each backend states
+//! the interpretation evidence its declarations need and the obligation a nested program places on
+//! its parent. A backend supplies only what its own transport means.
 
+use crate::extension::{extension, stated};
 use crate::syntax::{
     ExtensionImpl, ReplaceSelf, Subprograms, documentation, method_names, predicates, program_ident,
     program_type_params, unbind,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::visit_mut::VisitMut;
 use syn::{
-    Block, Expr, ExprMethodCall, GenericParam, Ident, ImplItem, ImplItemFn, Stmt, Token, Visibility, WherePredicate,
-    parse_quote,
+    Block, Expr, ExprMethodCall, GenericParam, Ident, ImplItem, ImplItemFn, Meta, Stmt, Token, Visibility,
+    WherePredicate, parse_quote,
 };
 
 /// Carries the parts of a lowered program that no backend chooses.
@@ -24,7 +26,7 @@ pub(crate) struct LoweredProgram {
     pub(crate) program_type: TokenStream,
     /// The declaration's own generic parameters, interpreted alongside `This`.
     pub(crate) compiler_params: Punctuated<GenericParam, Token![,]>,
-    /// Every obligation the declaration implies, in declaration order.
+    /// The interpretation obligations, in declaration order.
     pub(crate) predicates: Vec<TokenStream>,
     /// The rewritten body, read as the program it starts from and what it declares on top.
     pub(crate) chain: Chain,
@@ -84,8 +86,11 @@ pub(crate) trait ProgramBackendAlg {
     /// Explains a rejected generic parameter in this transport's vocabulary.
     const REJECTED_PARAM: &'static str;
 
-    /// Adds the interpreter evidence implied by the declarations in one method body.
-    fn require_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults);
+    /// Whether this backend derives nested-program obligations from the body.
+    const INFER_SUBPROGRAM_BOUNDS: bool = true;
+
+    /// Prepares operation references and any backend-specific interpretation evidence.
+    fn prepare_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults);
 
     /// States the obligation carried by a nested program value.
     fn require_subprogram(program: &TokenStream) -> TokenStream;
@@ -109,10 +114,10 @@ where
     let input = syn::parse2::<ExtensionImpl>(item)?;
     let visibility = input.item_visibility();
     let impl_predicates = input.impl_predicates();
-    let mut extension = input.unbounded_item();
-    let methods = method_names(&extension);
+    let mut block = input.unbounded_item();
+    let methods = method_names(&block);
     let mut generated = Vec::new();
-    for item in &mut extension.items {
+    for item in &mut block.items {
         if let ImplItem::Fn(method) = item {
             let (constructor, program) =
                 lower_program::<Backend>(method, &methods, &visibility, &impl_predicates, defaults)?;
@@ -120,10 +125,10 @@ where
             generated.push(program);
         }
     }
-    let forwarded = input.forwarded(attr);
+    let arguments = Punctuated::<Meta, Token![,]>::parse_terminated.parse2(attr)?.into_iter().collect::<Vec<_>>();
+    let extension = extension(&visibility, stated(&arguments, &input.item)?, &block)?;
 
     Ok(quote! {
-        #[::alux_ext::extend::ext(#forwarded)]
         #extension
         #(#generated)*
     })
@@ -152,6 +157,9 @@ where
     // The authored method keeps its name and parameters but now returns the program value.
     let mut constructor = method.clone();
     constructor.sig.output = parse_quote!(-> #program_type);
+    if !Backend::INFER_SUBPROGRAM_BOUNDS {
+        unbind(&mut constructor.sig.generics);
+    }
     constructor.block = parse_quote!({ #program::default() });
 
     // The same method read again as the program's compilation: nested programs first, then the
@@ -159,7 +167,7 @@ where
     let mut compiler = method.clone();
     let mut subprograms = Subprograms::new(methods, Backend::NESTED_SUFFIX);
     subprograms.visit_block_mut(&mut compiler.block);
-    Backend::require_declarations(&mut compiler, defaults);
+    Backend::prepare_declarations(&mut compiler, defaults);
     ReplaceSelf.visit_block_mut(&mut compiler.block);
 
     // The bounds move to the interpretation; the parameters they introduce stay.
@@ -169,7 +177,9 @@ where
         .iter()
         .map(|predicate| quote!(#predicate))
         .chain(method_predicates.iter().map(|predicate| quote!(#predicate)))
-        .chain(subprograms.programs().iter().map(Backend::require_subprogram))
+        .chain(
+            subprograms.programs().iter().filter(|_| Backend::INFER_SUBPROGRAM_BOUNDS).map(Backend::require_subprogram),
+        )
         .collect();
     let lowered = LoweredProgram {
         program_type,

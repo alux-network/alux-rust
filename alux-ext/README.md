@@ -9,8 +9,8 @@ the code you write, the code the macro adds, and how the two fit together.
 
 ## The problem the `ext` attribute solves
 
-Rust does not let you add a method to a type defined in another crate. The standard workaround is an
-*extension trait*: declare a trait with the method, then implement it for the types you want. That
+Rust does not let you add a method to a type defined in another crate (see the [orphan rules](https://doc.rust-lang.org/reference/items/implementations.html#orphan-rules)). The standard workaround is an
+*extension trait* ([RFC 445](https://rust-lang.github.io/rfcs/0445-extension-trait-conventions.html)): declare a trait with the method, then implement it for the types you want. That
 means writing every signature twice — once in the trait, once in the implementation — and keeping
 them in sync forever.
 
@@ -36,47 +36,77 @@ trait ValueExt<This> { fn describe(&self) -> String; }
 impl<This> ValueExt<This> for This where This: ValueAlg { /* the body you wrote */ }
 ```
 
-`alux_ext::ext` takes the same arguments as `extend::ext`: `name`, `supertraits`, and a visibility.
-It generates the trait and the impl itself, except for a block stating no `name`, which it passes to
-`extend::ext`. The `extend` crate is re-exported as `alux_ext::extend`, which is the path that
-generated code names — that is why crates using `#[ext]` do not list `extend` as a dependency
-themselves.
+`alux_ext::ext` takes the same arguments as `extend::ext`: `name`, `supertraits`, and a visibility written before `impl`.
 
 ## What the attribute generates
 
-`#[ext]` writes the trait and the impl itself, from one block, so each half says what it is for:
-
-- **The trait** declares the future a method answers, which is what a caller can bound. `Send` is
-  declared only where the block wrote it, since only a body satisfies it. Arguments are declared by
-  name, without `mut`, and a pattern is declared as `_`, since how a body binds an argument is the
-  body's business.
-- **The impl** states the same method as the `async fn` it is, with the bindings the body asks for.
-
-Either spelling in the block reaches both halves:
+From this block:
 
 ```rust ignore
-// Written as `async fn`, and declared as the future it answers.
-async fn gathered(mut self) -> Result<Vec<Self::Chunk>, Self::Error> { … }
-fn gathered(self) -> impl core::future::Future<Output = Result<Vec<This::Chunk>, This::Error>>;
-
-// Written as a future, which is how a method says its future is `Send`, and carried as the body
-// the `async` block is made of.
-fn gathered(mut self) -> impl Future<Output = …> + Send { async move { … } }
-fn gathered(self) -> impl Future<Output = …> + Send;              // declared
-async fn gathered(mut self) -> Result<Vec<This::Chunk>, This::Error> { … }   // carried
+/// The operations a chunked body derives.
+#[ext(name = ChunksExt)]
+pub impl<This> This
+where
+    This: ChunksAlg,
+{
+    /// Reads every chunk.
+    async fn gathered(mut self) -> Result<Vec<This::Chunk>, This::Error> {
+        /* body */
+    }
+}
 ```
 
-A future the block did not build here, such as one forwarding another call, is carried as written.
+it generates:
 
-Both halves name the carrier where the block wrote `Self`. The trait is generic over the carrier, so
-`Self::Chunk` would need a bound on `Self`, while `This::Chunk` is resolved by the bounds the block
-already states. A nested item states its own `Self` and is left alone.
+```rust ignore
+/// The operations a chunked body derives.
+pub trait ChunksExt<This>
+where
+    This: ChunksAlg,
+{
+    /// Reads every chunk.
+    fn gathered(self) -> impl core::future::Future<Output = Result<Vec<This::Chunk>, This::Error>>;
+}
 
-`supertraits` is what the trait extends, and nothing is added to it.
+/// The operations a chunked body derives.
+impl<This> ChunksExt<This> for This
+where
+    This: ChunksAlg,
+{
+    /// Reads every chunk.
+    async fn gathered(mut self) -> Result<Vec<This::Chunk>, This::Error> {
+        /* body */
+    }
+}
+```
 
-With `defunc`, one operation type per method is generated beside the two halves. A block handed to a
-backend with `defunc(via = path)` is left to the backend, which states its own trait, and a block
-stating no `name` is passed to `extend::ext`, which reads a name off the carrier.
+The trait gets the block's generics and `where` clause, each method's signature, and each const's type. The impl gets the same generics and `where` clause, plus the bodies and const values. Attributes written on the block, such as its documentation, go on both the trait and the impl. Attributes written on a method go on that method in both. `supertraits` becomes the trait's supertraits.
+
+The trait declaration differs from what you wrote in three ways:
+
+1. **`async fn` becomes a future.** The trait declares `fn m(..) -> impl Future<Output = T>` in place of `async fn m(..) -> T`. A caller can name and bound that return type, and the [`async_fn_in_trait`](https://doc.rust-lang.org/rustc/lints/listing/warn-by-default.html#async-fn-in-trait) lint has nothing to warn about. The impl keeps `async fn` as you wrote it.
+2. **`mut` and patterns are dropped.** A declaration has no body, so `mut self`, `mut x` and `ref x` are declared as `self` and `x`, and a destructuring pattern such as `(a, b): (u32, u32)` is declared as `_: (u32, u32)`. The impl keeps the bindings as you wrote them.
+3. **`#[inline]` is dropped.** It applies to a body, so it stays only on the impl.
+
+Everything else is copied as written, including `Self`, exactly as `extend::ext` does. `Self` in the trait is the implementing type with no bounds, so `Self::Chunk` does not compile there. Write `This::Chunk`, which the block's `where` clause resolves.
+
+`name` is optional; without it the trait is named after the carrier's first trait bound that is not a basic Rust trait such as `Send` or `Clone` (`ChunksAlgExt`), its first bound when all are basic (`SendExt`), or the carrier itself when it has none (`ThisExt`).
+
+### Requiring a `Send` future
+
+`async fn` cannot say that its future is `Send`. To require it, write the method as a future:
+
+```rust ignore
+fn gathered(mut self) -> impl Future<Output = Result<Vec<This::Chunk>, This::Error>> + Send {
+    async move { /* body */ }
+}
+```
+
+The trait declares exactly that signature, `+ Send` included. When the body is a single `async` block, the impl states it as `async fn gathered(mut self) -> Result<..>` with that block's contents as the body. A body that is anything else, such as a call returning another future, is copied as written.
+
+### With `defunc`
+
+`defunc` generates one operation type per method next to the trait and the impl; the next section explains it. `defunc(via = path)` hands the block to that backend, which replaces each method by the constructor of its program. The trait and the impl are then generated as described above.
 
 ## What `alux-ext` adds on top
 

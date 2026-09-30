@@ -5,8 +5,8 @@
 
 use alux_ext::{ApplyAlg, ext};
 use alux_http::{
-    CompileRouteProgram, FileOutAlg, HttpApiAlg, HttpMethod, HttpProgramBuilder, HttpProgramExt, HttpSelectorAlg,
-    JsonOutAlg, NamedValuesAlg, RouteAlg, RouteAlgExt, RoutePath, SelectorAlg, http,
+    CompileRouteProgram, HttpApiAlg, HttpMethod, HttpProgramBuilder, HttpProgramExt, HttpSelectorAlg, NamedValuesAlg,
+    RouteAlg, RouteAlgExt, RoutePath, SelectorAlg, http,
 };
 use alux_http_text::TextHandlerImpl;
 use core::convert::Infallible;
@@ -94,7 +94,7 @@ where
 #[ext(name = StatusApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the status surface, one route per input role.
     fn status_api<Alg>(&self)
@@ -116,7 +116,7 @@ where
 #[ext(name = DownloadApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + FileOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the download surface, whose output kind is streamed rather than JSON.
     fn download_api<Alg>(&self)
@@ -131,7 +131,7 @@ where
 #[ext(name = MethodApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one route per request method, so every method the specification names is witnessed.
     fn method_api<Alg>(&self)

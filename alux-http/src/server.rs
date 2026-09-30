@@ -143,9 +143,9 @@ where
     This: HttpServerAlg,
 {
     /// Interprets lifecycle commands as the ordered transitions this server makes.
-    fn lifecycle<Commands>(self, commands: Commands) -> impl Stream<Item = HttpServerEvent<Self::Error>>
+    fn lifecycle<Commands>(self, commands: Commands) -> impl Stream<Item = HttpServerEvent<This::Error>>
     where
-        Commands: Stream<Item = HttpServerCommand<Self::Program>> + Unpin,
+        Commands: Stream<Item = HttpServerCommand<This::Program>> + Unpin,
     {
         stream::unfold((self, commands, None, None), |(mut server, mut commands, mut open, mut pending)| async move {
             loop {

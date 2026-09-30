@@ -27,14 +27,14 @@ pub struct Exchange {
     pub status: HttpStatus,
     /// The body the answer must carry, where the exchange states one.
     pub body: Option<&'static str>,
-    /// A header the answer must carry, where the exchange states one.
-    pub header: Option<(&'static str, &'static str)>,
+    /// The headers the answer must carry, each name with every value it carries in order.
+    pub headers: Vec<(&'static str, &'static str)>,
 }
 
 impl Exchange {
     /// States an exchange asking for something, with no body sent.
     fn asked(what: &'static str, method: HttpMethod, path: &str, status: HttpStatus) -> Self {
-        Self { what, request: DirectRequest::new(method, path), status, body: None, header: None }
+        Self { what, request: DirectRequest::new(method, path), status, body: None, headers: Vec::new() }
     }
 
     /// States one header the caller sends.
@@ -55,7 +55,7 @@ impl Exchange {
     ) -> Self {
         let request = DirectRequest::new(method, path).with_header("content-type", content_type).with_body(body);
 
-        Self { what, request, status, body: None, header: None }
+        Self { what, request, status, body: None, headers: Vec::new() }
     }
 
     /// States the body this exchange must be answered with.
@@ -65,10 +65,12 @@ impl Exchange {
         self
     }
 
-    /// States a header this exchange must be answered with.
+    /// States a header this exchange must be answered with, after any stated before it.
+    ///
+    /// A name stated more than once must be carried that many times, with those values in order.
     #[must_use]
     fn carrying(mut self, name: &'static str, value: &'static str) -> Self {
-        self.header = Some((name, value));
+        self.headers.push((name, value));
         self
     }
 
@@ -84,13 +86,23 @@ impl Exchange {
         {
             found.push(format!("{what}: answered `{}` where `{body}` was stated", answer.text()));
         }
-        if let Some((name, value)) = self.header
-            && answer.header(name) != Some(value)
-        {
-            found.push(format!(
-                "{what}: answered `{name}: {}` where `{name}: {value}` was stated",
-                answer.header(name).unwrap_or("nothing")
-            ));
+        let mut names = Vec::new();
+        for (name, _) in &self.headers {
+            if !names.contains(name) {
+                names.push(*name);
+            }
+        }
+        for name in names {
+            let stated = self.headers.iter().filter(|(stated, _)| *stated == name).map(|(_, value)| *value);
+            let stated = stated.collect::<Vec<_>>();
+            let carried = answer
+                .headers()
+                .filter(|(carried, _)| carried.eq_ignore_ascii_case(name))
+                .map(|(_, value)| value)
+                .collect::<Vec<_>>();
+            if carried != stated {
+                found.push(format!("{what}: answered `{name}` as {carried:?} where {stated:?} was stated"));
+            }
         }
 
         found
@@ -147,6 +159,27 @@ pub fn exchanges() -> Vec<Exchange> {
         Exchange::asked("a header an answer carries", HttpMethod::Get, "/cached", HttpStatus::OK)
             .answering("[7]")
             .carrying("cache-control", "max-age=60"),
+        Exchange::sent(
+            "a cookie an answer sets",
+            HttpMethod::Post,
+            "/session",
+            "application/x-www-form-urlencoded",
+            "session=abc",
+            HttpStatus::OK,
+        )
+        .answering("signed in as abc")
+        .carrying("set-cookie", "session=abc; Path=/; HttpOnly"),
+        // Two headers under one name are both carried, the inner one first.
+        Exchange::asked("two cookies an answer removes", HttpMethod::Delete, "/session", HttpStatus::OK)
+            .answering("signed out")
+            .carrying("set-cookie", "session=; Max-Age=0")
+            .carrying("set-cookie", "theme=; Max-Age=0"),
+        // Each member of a named product is a header, and a member stating nothing writes none.
+        Exchange::asked("the headers a named product states", HttpMethod::Get, "/signed", HttpStatus::OK)
+            .answering("[7]")
+            .carrying("cache-control", "no-store")
+            .carrying("set-cookie", "session=abc; Path=/")
+            .carrying("set-cookie", "theme=dark; Path=/"),
         // A header name is words the wire spells with `-` and an argument spells with `_`.
         Exchange::asked("what the headers a caller sent state", HttpMethod::Get, "/agent", HttpStatus::OK)
             .sending("user-agent", "probe")

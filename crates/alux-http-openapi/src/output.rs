@@ -1,9 +1,11 @@
 //! States what each output kind answers with, in the vocabulary a document reads.
 
 use crate::OpenApiHandlerImpl;
+use crate::input::{OpenApiStated, named_values};
 use alux_http::{
-    BytesOutAlg, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg, HttpStatus,
-    JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg, HttpErrorAlg,
+    HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    write_header_name,
 };
 use alux_shape::ShapeOf;
 use alux_shape_jsonschema::{JsonSchema, JsonSchemaShape};
@@ -22,7 +24,7 @@ pub struct OpenApiAnswer {
     /// The status this answer carries.
     pub status: HttpStatus,
     /// Every header this answer carries beside its body.
-    pub headers: Vec<&'static str>,
+    pub headers: Vec<String>,
     /// The media type this answer is written as, where it has a body.
     pub content_type: Option<&'static str>,
     /// The schema this answer's body carries, where it has one.
@@ -170,11 +172,15 @@ impl<From> OpenApiOutputAlg<From> for OpenApiRedirectOutput {
     fn answers(_schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
         // Where a caller is sent is what a redirect answers, and it is carried by this header, so
         // a document that omits it describes an answer no interpretation produces.
-        vec![OpenApiAnswer { headers: vec![LOCATION], ..OpenApiAnswer::bodiless(HttpStatus::SEE_OTHER) }]
+        vec![OpenApiAnswer { headers: vec![LOCATION.to_owned()], ..OpenApiAnswer::bodiless(HttpStatus::SEE_OTHER) }]
     }
 }
 
 /// Describes a header an answer carries, beside the body it states.
+///
+/// The header is written around whatever the kind inside answers with, so every answer that kind
+/// states carries it: `.out_header::<ETag>().result().json()` states `etag` on success and failure
+/// alike, and `.result().out_header::<ETag>().json()` only on success.
 pub struct OpenApiHeaderOutput<Inner, Name>(PhantomData<fn(Inner, Name)>);
 
 impl<Inner, Name, From> OutputAlg<From> for OpenApiHeaderOutput<Inner, Name> {
@@ -193,13 +199,10 @@ where
     fn answers(schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
         Inner::answers(schema)
             .into_iter()
-            .map(|answer| {
-                let mut carried = answer;
-                if carried.status.is_success() {
-                    carried.headers.push(Name::HEADER_NAME);
-                }
+            .map(|mut answer| {
+                answer.headers.push(Name::HEADER_NAME.to_owned());
 
-                carried
+                answer
             })
             .collect()
     }
@@ -207,6 +210,46 @@ where
 
 impl<Context> HeaderOutAlg for OpenApiHandlerImpl<Context> {
     type Header<Inner, Name> = OpenApiHeaderOutput<Inner, Name>;
+}
+
+/// Describes the headers a named product states beside the answer a kind already states.
+///
+/// Each member is one header every answer of the kind inside carries, named by the words its member
+/// name states, so the document keys it exactly as the answer writes it.
+pub struct OpenApiHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+impl<Inner, Headers, From> OutputAlg<From> for OpenApiHeadersOutput<Inner, Headers> {
+    type Output = From;
+
+    fn output(from: From) -> From {
+        from
+    }
+}
+
+impl<Inner, Headers, Rest> OpenApiOutputAlg<(Headers, Rest)> for OpenApiHeadersOutput<Inner, Headers>
+where
+    Inner: OpenApiOutputAlg<Rest>,
+    Headers: ShapeOf<JsonSchemaShape, Shape = JsonSchema>,
+{
+    fn answers(schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
+        let names = match named_values(schema, Headers::shape_of(schema).into_value()) {
+            OpenApiStated::Named(named) => named.into_iter().map(|named| write_header_name(&named.name)).collect(),
+            OpenApiStated::Whole(_) => Vec::new(),
+        };
+
+        Inner::answers(schema)
+            .into_iter()
+            .map(|mut answer| {
+                answer.headers.extend(names.iter().cloned());
+
+                answer
+            })
+            .collect()
+    }
+}
+
+impl<Context> HeadersOutAlg for OpenApiHandlerImpl<Context> {
+    type Headers<Inner, Headers> = OpenApiHeadersOutput<Inner, Headers>;
 }
 
 /// Describes a declared status around the answer a kind already states.

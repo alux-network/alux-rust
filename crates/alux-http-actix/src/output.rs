@@ -6,9 +6,11 @@ use actix_web::http::StatusCode;
 use actix_web::http::header::{self, HeaderName, HeaderValue};
 use actix_web::web::Bytes;
 use alux_http::{
-    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg,
-    HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg,
+    HttpErrorAlg, HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg,
+    TextOutAlg,
 };
+use alux_http_parts::write_headers;
 use core::fmt::Display;
 use core::marker::PhantomData;
 use futures::{Stream, TryStreamExt};
@@ -169,7 +171,7 @@ where
     fn output((value, rest): (Value, Rest)) -> Self::Output {
         let mut answer = Inner::output(rest);
         if let Ok(value) = HeaderValue::from_str(&value.to_string()) {
-            answer.headers_mut().insert(HeaderName::from_static(Name::HEADER_NAME), value);
+            answer.headers_mut().append(HeaderName::from_static(Name::HEADER_NAME), value);
         }
 
         answer
@@ -236,6 +238,35 @@ actix_outputs! {
 
 impl<Context> HeaderOutAlg for ActixHandlerImpl<Context> {
     type Header<Inner, Name> = ActixHeaderOutput<Inner, Name>;
+}
+
+/// Answers with the headers a named product states, beside the body the handler stated.
+///
+/// A product that is not one of named values, or a name or value no header can carry, writes no
+/// header, as a single header does.
+pub struct ActixHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+impl<Inner, Headers, Rest> OutputAlg<(Headers, Rest)> for ActixHeadersOutput<Inner, Headers>
+where
+    Inner: OutputAlg<Rest, Output = HttpResponse>,
+    Headers: Serialize,
+{
+    type Output = HttpResponse;
+
+    fn output((headers, rest): (Headers, Rest)) -> Self::Output {
+        let mut answer = Inner::output(rest);
+        for (name, value) in write_headers(&headers).unwrap_or_default() {
+            if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
+                answer.headers_mut().append(name, value);
+            }
+        }
+
+        answer
+    }
+}
+
+impl<Context> HeadersOutAlg for ActixHandlerImpl<Context> {
+    type Headers<Inner, Headers> = ActixHeadersOutput<Inner, Headers>;
 }
 
 impl<Context> StatusOutAlg for ActixHandlerImpl<Context> {

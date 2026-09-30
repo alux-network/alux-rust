@@ -6,9 +6,7 @@
 //! restated: it is the same declaration the executing interpretations compile.
 
 use alux_ext::ext;
-use alux_http::{
-    EmptyOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, NamedValuesAlg, ResultOutAlg, StatusOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpProgramExt, NamedValuesAlg, http};
 use alux_http_openapi::OpenApiHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use alux_shape::Shape;
@@ -78,7 +76,7 @@ where
 #[ext(name = ReadingsApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg + EmptyOutAlg + StatusOutAlg + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the readings surface.
     fn readings_api<Alg>(&self)
@@ -87,11 +85,11 @@ where
     {
         self.routes()
             // One identified reading, or what its failure means.
-            .get("/readings/:id", self.op(Alg::reading_at).path::<u64>().json().result())
+            .get("/readings/:id", self.op(Alg::reading_at).path::<u64>().result().json())
             // A search, its term taken from the query string.
             .get("/readings", self.op(Alg::reading_search).query::<Term>().json())
             // A recording, which creates something and says so.
-            .post("/readings", self.op(Alg::reading_record).body::<Reading>().json().status::<201>())
+            .post("/readings", self.op(Alg::reading_record).body::<Reading>().status::<201>().json())
             // A removal, which answers with nothing at all.
             .delete("/readings", self.op(Alg::reading_forget).empty())
     }
@@ -330,7 +328,7 @@ where
 #[ext(name = FilteredApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint narrowed by a query string read into a product.
     fn filtered_api<Alg>(&self)

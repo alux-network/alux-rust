@@ -12,7 +12,7 @@ never changes the declaration.
 
 ```rust
 use alux_ext::{OperationAlg, ext};
-use alux_http::{HttpApiAlg, HttpProgramBuilder, JsonOutAlg, http};
+use alux_http::{HttpProgramBuilder, HttpRouteAlg, http};
 use core::future::Future;
 
 /// A downstream specification owns its primitive domain meaning.
@@ -42,7 +42,7 @@ where
 #[ext(name = StatusApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpRouteAlg,
 {
     /// Declares the status surface: the current reading and one identified reading.
     fn status_api<Alg>(&self)
@@ -84,6 +84,28 @@ let _nested = builder.routes().nest("/api", builder.program(program)).into_progr
 // Argument names and order survive from the authored method into the program.
 assert_eq!(<StatusForIdOperation<App> as OperationAlg>::ARG_NAMES, ["id"]);
 ```
+
+## Interpretation capabilities
+
+The extension above is tagless-final: `This` chooses the route and endpoint representations.
+`defunc(via = http)` reads each endpoint's input roles and output kind and states one
+`HttpOperationAlg<Operation, Inputs, Kind>` bound per endpoint, so the declaration names only
+`HttpRouteAlg` and its domain. The operation already carries its domain context, argument signature,
+argument names, and result; these are not repeated in the HTTP capability.
+
+`Operation::out::<Kind>()` selects output meaning. `.json()`, `.text()`, and the other built-in
+spellings are ordinary neutral methods on the operation declaration. A downstream
+`.out::<LoginOut>()` follows the same path; the interpreter proves its converter when the endpoint
+is folded.
+
+The interpreter implements `OutputKindAlg<Interpreter, From>` for a custom kind to select its
+conversion. Execution and text interpretations require the selected converter's `OutputAlg<From>`;
+`OpenAPI` requires `OpenApiOutputAlg<From>` and can enumerate several response alternatives. Built-in
+families such as `TextOutAlg` remain interpreter implementation capabilities, not additional bounds
+that every API declaration must repeat.
+
+The direct syntax builder remains available for constructing first-order trees explicitly. Both
+forms use the same `HttpOperationAlg` interpretation.
 
 ## Methods
 
@@ -138,14 +160,12 @@ returning `()` and rejects one returning data, so you cannot quietly throw a val
 [`ChunksAlg`](ChunksAlg), which says what a chunk is and how to take the next one, so you are not
 committed to any particular stream type.
 
-Three kinds wrap the one before them:
+Four wrappers come before the kind. A declaration reads from the outside in and the kind closes it, so `.out_header::<ETag>().result().json()` answers with an `ETag` header around a result around a JSON body, and its handler returns `(etag, Result<body, E>)`: the header is sent whether the handler succeeded or not. Written the other way round, `.result().out_header::<ETag>().json()`, the handler returns `Result<(etag, body), E>` and the header is sent only on success. A wrapper after the kind does not compile.
 
-- **`.status::<201>()`** sets the status code. Which code a created resource answers with belongs to
-  the endpoint, not the handler.
-- **`.result()`** handles a handler returning `Result`. Success answers with the kind you already
-  chose; a failure answers with the status and message its `HttpErrorAlg` impl gives.
-- **`.out_header::<CacheControl>()`** adds a response header. The handler returns `(value, body)`,
-  because only the handler knows an `ETag` or a cache lifetime.
+- **`.status::<201>()`** sets the status code. Which code a created resource answers with belongs to the endpoint, not the handler.
+- **`.result()`** handles a handler returning `Result`. Success answers with what follows; a failure answers with the status and message its `HttpErrorAlg` impl gives.
+- **`.out_header::<CacheControl>()`** adds a response header. The handler returns `(value, rest)`, because only the handler knows an `ETag` or a cache lifetime.
+- **`.out_headers::<Signed>()`** adds every header a named product states, the output twin of `.in_header::<Agent>()`. The handler returns `(headers, rest)`. Each member is one header named by its member name, so `cache_control` is `cache-control`; an `Option` that is `None` writes nothing, and a `Vec` writes one header per value, which is how several `set-cookie` headers are stated. Prefer it over stacking `.out_header`, which adds one pair per header.
 
 A header is just a name, so one this crate does not already ship is three lines of your own and no
 interpreter changes:
@@ -162,11 +182,24 @@ impl HeaderNameAlg for RequestId {
 ```
 
 ```rust ignore
+#[derive(Serialize, Shape)]
+struct Signed {
+    cache_control: String,
+    etag: Option<String>,
+    set_cookie: Vec<String>,
+}
+
+impl NamedValuesAlg for Signed {}
+```
+
+```rust ignore
 self.routes()
     // A recording, which creates something and says so.
-    .post("/record", self.op(Alg::record).body::<u32>().json().status::<201>())
+    .post("/record", self.op(Alg::record).body::<u32>().status::<201>().json())
     // One identified reading, or what its failure means.
-    .get("/find/{id}", self.op(Alg::find).path::<u32>().json().result())
+    .get("/find/{id}", self.op(Alg::find).path::<u32>().result().json())
+    // The readings, with every header one product states: the handler returns `(Signed, body)`.
+    .get("/readings", self.op(Alg::readings).out_headers::<Signed>().json())
 ```
 
 ## Paths
@@ -187,7 +220,7 @@ shared route table, no registry, and no framework in the picture yet.
 
 ```rust
 use alux_ext::ext;
-use alux_http::{HttpApiAlg, JsonOutAlg, http};
+use alux_http::{HttpRouteAlg, http};
 use core::future::Future;
 
 trait StatusAlg {
@@ -224,11 +257,11 @@ where
     }
 }
 
-/// One surface fragment. Its bounds name only what it uses: status, and JSON output.
+/// One surface fragment. Its bounds name only the route algebra; the macro states its endpoint.
 #[ext(name = StatusApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpRouteAlg,
 {
     /// Declares the status route.
     fn status_api<Alg>(&self)
@@ -244,7 +277,7 @@ where
 #[ext(name = ItemsApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpRouteAlg,
 {
     /// Declares the item route.
     fn items_api<Alg>(&self)
@@ -260,7 +293,7 @@ where
 #[ext(name = ServiceApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg,
+    This: HttpRouteAlg,
 {
     /// Declares `/status` beside `/v1/items`.
     fn service_api<Alg>(&self)
@@ -282,8 +315,8 @@ one under a prefix, including a declaration from another crate.
 
 That gives you:
 
-- **Fragments that state their own needs.** `status_api` requires `JsonOutAlg`; a fragment answering
-  with a file requires `FileOutAlg` instead. Neither imposes its needs on the other, and
+- **Fragments that state their own needs.** `status_api` requires a JSON endpoint for its operation; a
+  fragment answering with a file requires a file endpoint instead. Neither imposes its needs on the other, and
   `service_api` requires exactly the union.
 - **One surface everywhere.** `service_api` is a value, so the served API, the `OpenAPI` document and
   the generated client are the same merged surface and cannot drift apart.

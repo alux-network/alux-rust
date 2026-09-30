@@ -5,10 +5,7 @@
 //! what is answered when nothing is declared there.
 
 use alux_ext::ext;
-use alux_http::{
-    BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpMethod, HttpProgramExt, HttpStatus, JsonOutAlg,
-    RedirectOutAlg, ResultOutAlg, StatusOutAlg, TextOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpMethod, HttpProgramExt, HttpStatus, http};
 use alux_http_direct::{DirectHandlerImpl, DirectRequest, DirectResponse, DirectRoute};
 use alux_http_text::TextHandlerImpl;
 use core::future::Future;
@@ -102,15 +99,7 @@ where
 #[ext(name = ShopApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg
-        + JsonOutAlg
-        + TextOutAlg
-        + HtmlOutAlg
-        + BytesOutAlg
-        + EmptyOutAlg
-        + RedirectOutAlg
-        + StatusOutAlg
-        + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the whole surface: every method, every body role, every output kind it uses.
     fn shop_api<Alg>(&self)
@@ -119,11 +108,11 @@ where
     {
         self.routes()
             // One identified reading, its id taken from the path in Poem's spelling.
-            .get("/item/:id", self.op(Alg::shop_item).path::<u32>().json().result())
+            .get("/item/:id", self.op(Alg::shop_item).path::<u32>().result().json())
             // Every reading.
             .get("/items", self.op(Alg::shop_items).json())
             // A recording sent as a document, which creates something and says so.
-            .post("/items", self.op(Alg::shop_add).body::<u32>().json().status::<201>())
+            .post("/items", self.op(Alg::shop_add).body::<u32>().status::<201>().json())
             // The same recording, sent as a form.
             .put("/items", self.op(Alg::shop_fill).form::<Amount>().json())
             // A note, taken exactly as it arrived.

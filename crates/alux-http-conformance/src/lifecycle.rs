@@ -56,7 +56,7 @@ where
     /// did not return, or a request the reopened server did not answer.
     async fn expect_reopening<Compile>(mut self, mut compile: Compile) -> Result<(), LifecycleError>
     where
-        Compile: FnMut() -> Self::Program,
+        Compile: FnMut() -> This::Program,
     {
         // Several interpretations serve from tasks that are not `Send`, so every scenario runs on a
         // local task set. It is theirs rather than the caller's, which is why it is stated here.
@@ -90,7 +90,7 @@ where
     /// closing server never produced, or a request the reopened server did not answer.
     async fn expect_answering_what_is_in_flight<Compile>(mut self, mut compile: Compile) -> Result<(), LifecycleError>
     where
-        Compile: FnMut() -> Self::Program,
+        Compile: FnMut() -> This::Program,
     {
         LocalSet::new()
             .run_until(async move {
@@ -132,7 +132,7 @@ where
         mut compile: Compile,
     ) -> Result<(), LifecycleError>
     where
-        Compile: FnMut() -> Self::Program,
+        Compile: FnMut() -> This::Program,
     {
         LocalSet::new()
             .run_until(async move {
@@ -172,7 +172,7 @@ where
         asking_for: &'static str,
     ) -> Result<Measured, LifecycleError>
     where
-        Compile: FnMut() -> Self::Program,
+        Compile: FnMut() -> This::Program,
     {
         LocalSet::new()
             .run_until(async move {
@@ -217,7 +217,7 @@ where
     /// # Errors
     ///
     /// States a close that failed, and a close that did not return in time.
-    async fn expect_closing(&mut self, open: &mut Self::Open) -> Result<(), LifecycleError> {
+    async fn expect_closing(&mut self, open: &mut This::Open) -> Result<(), LifecycleError> {
         let closing = Instant::now();
         let closed = tokio::time::timeout(LIMIT, self.close(open))
             .await
@@ -231,7 +231,7 @@ where
     /// # Errors
     ///
     /// States an end that failed, and an end that did not return in time.
-    async fn expect_ending(&mut self, open: &mut Self::Open) -> Result<(), LifecycleError> {
+    async fn expect_ending(&mut self, open: &mut This::Open) -> Result<(), LifecycleError> {
         let ending = Instant::now();
         let ended = tokio::time::timeout(LIMIT, self.end(open))
             .await
@@ -257,7 +257,7 @@ where
         mut compile: Compile,
     ) -> Result<(), LifecycleError>
     where
-        Compile: FnMut() -> Self::Program,
+        Compile: FnMut() -> This::Program,
     {
         LocalSet::new()
             .run_until(async move {

@@ -6,7 +6,7 @@
 //! declaration denotes.
 
 use alux_ext::ext;
-use alux_http::{HttpApiAlg, JsonOutAlg, http};
+use alux_http::{HttpApiAlg, http};
 use core::future::Future;
 
 /// Reads whatever the domain holds.
@@ -2529,7 +2529,7 @@ where
 #[ext(name = ManyApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares all 500 routes.
     fn many_api<Alg>(&self)

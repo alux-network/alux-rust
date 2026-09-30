@@ -153,16 +153,20 @@ framework:
 #[ext(name = PriceApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpRouteAlg,
 {
     fn price_api<Alg>(&self)
     where
         Alg: PriceAlg,
     {
-        self.routes().get("/price/:asset", self.op(Alg::price_current).path::<String>().json());
+        self.routes().get("/price/:asset", self.op(Alg::price_current).path::<String>().json())
     }
 }
 ```
+
+The macro derives the endpoint's `HttpOperationAlg` bound from the authored input roles and output
+kind, so the declaration states only the route algebra and its domain. Built-in output methods are
+derived on the neutral `Operation`, and custom output kinds have the same standing.
 
 This program preserves the route selector, extraction role, operation, and output role. Poem is one
 interpretation. Text documentation, OpenAPI metadata, a client generator, or another server can be

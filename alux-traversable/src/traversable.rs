@@ -1,4 +1,4 @@
-use extend::ext;
+use alux_ext::ext;
 
 /// Extends optional values with traversal operations.
 #[ext(name = OptionTraversableExt)]

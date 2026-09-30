@@ -16,7 +16,6 @@ workspace = true
 
 [dependencies]
 alux-ext-macros.workspace = true
-extend.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

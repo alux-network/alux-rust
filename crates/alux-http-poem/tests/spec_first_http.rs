@@ -7,7 +7,7 @@ mod common;
 mod expect;
 
 use alux_ext::ext;
-use alux_http::{FileOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, http};
+use alux_http::{HttpApiAlg, HttpProgramExt, http};
 use alux_http_poem::PoemHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use common::{
@@ -19,7 +19,7 @@ use expect::expect_example_api;
 #[ext(name = ExampleApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg + FileOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the whole surface: three status routes and one download.
     fn example_api<Alg>(&self)

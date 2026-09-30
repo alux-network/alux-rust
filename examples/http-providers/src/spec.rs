@@ -1,5 +1,5 @@
 use alux_ext::ext;
-use alux_http::{HttpApiAlg, RedirectOutAlg, TextOutAlg, http};
+use alux_http::{HttpApiAlg, http};
 use alux_shape::Shape;
 use core::future::Future;
 use serde::{Deserialize, Serialize};
@@ -70,7 +70,7 @@ where
 #[ext(name = ExampleApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + RedirectOutAlg + TextOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the shared API endpoints.
     fn example_api<Alg>(&self)

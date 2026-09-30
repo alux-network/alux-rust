@@ -5,7 +5,7 @@
 //! declaration says which.
 
 use alux_ext::ext;
-use alux_http::{HttpApiAlg, HttpProgramExt, JsonOutAlg, TextOutAlg, http};
+use alux_http::{HttpApiAlg, HttpProgramExt, http};
 use alux_http_poem::PoemHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use core::future::Future;
@@ -51,7 +51,7 @@ where
 #[ext(name = IntakeApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg + TextOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint per body role, all reaching the same reading.
     fn intake_api<Alg>(&self)

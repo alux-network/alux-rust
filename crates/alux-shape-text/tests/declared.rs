@@ -18,12 +18,12 @@ where
     This: ShapeAlg,
 {
     /// A 32-byte checksum, as this domain writes one.
-    fn checksum(&self) -> Self::Ty {
+    fn checksum(&self) -> This::Ty {
         self.bytes_hex(Some(32))
     }
 
     /// An amount: a `u128`, so decimal text.
-    fn amount(&self) -> Self::Ty {
+    fn amount(&self) -> This::Ty {
         self.int_decimal(false, 128)
     }
 }

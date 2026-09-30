@@ -18,3 +18,11 @@ println!("{}", routes.lines().join("\n"));
 The same program value can be compiled by any other interpreter, such as
 [`alux-http-poem`](https://docs.rs/alux-http-poem), without restating its routes.
 
+
+## Downstream output kinds
+
+Implement `OutputKindAlg<TextHandlerImpl, Result>` for a downstream kind and select an
+`OutputAlg<Result>` converter. The text interpreter records the converter and output types without
+executing the operation or conversion. An identity converter is sufficient when its type names the
+output meaning. The same `.out::<Kind>()` declaration is used for execution and metadata;
+see [the shared custom-output scenario](../alux-http-poem/tests/custom_output.rs).

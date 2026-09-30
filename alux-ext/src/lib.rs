@@ -8,11 +8,6 @@ extern crate self as alux_ext;
 /// generated code refer to the same macro implementation without depending on it directly.
 pub use alux_ext_macros as macros;
 pub use alux_ext_macros::ext;
-/// Re-exports the extension-method implementation referenced by generated code.
-///
-/// Expansion of [`ext`] names this path, so a crate using the attribute needs no separate
-/// `extend` dependency.
-pub use extend;
 
 mod operation;
 

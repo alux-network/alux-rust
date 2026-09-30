@@ -24,6 +24,9 @@ fn calls_the_shared_surface() {
             "shopItems",
             "shopNote",
             "shopPage",
+            "shopSignIn",
+            "shopSignOut",
+            "shopSigned",
             "shopStored",
             "shopWho",
         ]

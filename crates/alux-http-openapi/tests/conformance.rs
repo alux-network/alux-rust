@@ -21,6 +21,11 @@ fn documents_the_shared_surface() {
         "Records one reading and returns it."
     );
     assert_eq!(document["paths"]["/items"]["delete"]["responses"]["204"]["description"], "Forgets every reading.");
+    // Each member of a named product is a header the answer carries, under the name it writes.
+    let signed = &document["paths"]["/signed"]["get"]["responses"]["200"]["headers"];
+    for header in ["cache-control", "etag", "set-cookie"] {
+        assert!(signed[header].is_object(), "{signed}");
+    }
 }
 
 #[test]

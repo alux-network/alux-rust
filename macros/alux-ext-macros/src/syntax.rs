@@ -15,7 +15,7 @@ use syn::{
     Meta, PathArguments, Token, Type, TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
 };
 
-/// Parses the visibility syntax accepted by `extend::ext` before an inherent impl.
+/// Parses an extension block, with the visibility written before `impl`.
 pub(crate) struct ExtensionImpl {
     pub(crate) visibility: Option<Visibility>,
     pub(crate) item: ItemImpl,
@@ -52,14 +52,6 @@ impl ExtensionImpl {
         unbind(&mut item.generics);
 
         item
-    }
-
-    /// Returns the attribute arguments forwarded to `extend::ext`, authored visibility first.
-    pub(crate) fn forwarded(&self, attr: TokenStream) -> TokenStream {
-        match &self.visibility {
-            Some(visibility) => quote!(#visibility, #attr),
-            None => attr,
-        }
     }
 }
 

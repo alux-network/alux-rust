@@ -36,14 +36,14 @@ where
     This: ShapeAlg + FieldAlg,
 {
     /// Opens the product a declaration states, under the name the declaration carries.
-    fn record<'a>(&'a self, words: Words<'a>) -> Record<'a, Self> {
+    fn record<'a>(&'a self, words: Words<'a>) -> Record<'a, This> {
         Record { alg: self, words, members: Vec::new() }
     }
 
     /// The shape another declaration states, folded here.
-    fn program<Program>(&self, program: Program) -> Self::Ty
+    fn program<Program>(&self, program: Program) -> This::Ty
     where
-        Program: ShapeProgramAlg<Self, Ty = Self::Ty>,
+        Program: ShapeProgramAlg<This, Ty = This::Ty>,
     {
         program.compile_shape(self)
     }
