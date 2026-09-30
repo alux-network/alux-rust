@@ -5,10 +5,7 @@
 
 use crate::SETTLE;
 use alux_ext::ext;
-use alux_http::{
-    CacheControl, ChunksAlg, ChunksExt, FromPartsAlg, HttpApiAlg, JsonOutAlg, NamedValuesAlg, PartAlg, StreamOutAlg,
-    TextOutAlg, http,
-};
+use alux_http::{CacheControl, ChunksAlg, ChunksExt, FromPartsAlg, HttpApiAlg, NamedValuesAlg, PartAlg, http};
 use alux_shape::Shape;
 use core::convert::Infallible;
 use core::fmt::Display;
@@ -292,7 +289,7 @@ where
 #[ext(name = WideApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + TextOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint reading sixteen arguments.
     fn wide_api<Alg>(&self)
@@ -375,7 +372,7 @@ where
 #[ext(name = StreamApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + StreamOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint answering with a body produced over time.
     fn stream_api<Alg>(&self)
@@ -463,7 +460,7 @@ where
 #[ext(name = LifecycleApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg + TextOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint answering at once and one taking longer than any drain.
     fn lifecycle_api<Alg>(&self)
@@ -544,7 +541,7 @@ where
 #[ext(name = MultipartApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + TextOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint reading a body that arrives as parts.
     fn multipart_api<Alg>(&self)

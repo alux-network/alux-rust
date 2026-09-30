@@ -7,7 +7,7 @@ mod common;
 mod expect;
 
 use alux_ext::ext;
-use alux_http::{FileOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, http};
+use alux_http::{HttpApiAlg, HttpProgramExt, http};
 use alux_http_poem::PoemHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use common::{
@@ -19,7 +19,7 @@ use expect::expect_example_api;
 #[ext(name = StatusApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the status surface: the current reading, one identified reading, and an adjustment.
     fn status_api<Alg>(&self)
@@ -45,7 +45,7 @@ where
 #[ext(name = DownloadApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + FileOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the download surface, whose output kind only a framework can convert.
     fn download_api<Alg>(&self)

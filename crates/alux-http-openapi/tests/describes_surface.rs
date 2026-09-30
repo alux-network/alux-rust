@@ -6,9 +6,7 @@
 //! restated: it is the same declaration the executing interpretations compile.
 
 use alux_ext::ext;
-use alux_http::{
-    EmptyOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, NamedValuesAlg, ResultOutAlg, StatusOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpProgramExt, NamedValuesAlg, http};
 use alux_http_openapi::OpenApiHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use alux_shape::Shape;
@@ -78,7 +76,7 @@ where
 #[ext(name = ReadingsApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg + EmptyOutAlg + StatusOutAlg + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the readings surface.
     fn readings_api<Alg>(&self)
@@ -330,7 +328,7 @@ where
 #[ext(name = FilteredApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint narrowed by a query string read into a product.
     fn filtered_api<Alg>(&self)

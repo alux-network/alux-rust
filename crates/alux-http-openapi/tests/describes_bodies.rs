@@ -6,7 +6,7 @@
 //! reading its file can fail as.
 
 use alux_ext::ext;
-use alux_http::{FileOutAlg, HttpApiAlg, HttpErrorAlg, HttpProgramExt, HttpStatus, http};
+use alux_http::{HttpApiAlg, HttpErrorAlg, HttpProgramExt, HttpStatus, http};
 use alux_http_conformance::{Shop, StreamApiExt};
 use alux_http_openapi::OpenApiHandlerImpl;
 use core::future::Future;
@@ -41,7 +41,7 @@ where
 #[ext(name = DownloadApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + FileOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint answering with a file.
     fn download_api<Alg>(&self)

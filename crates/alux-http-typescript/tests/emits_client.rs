@@ -5,9 +5,7 @@
 //! unable to disagree about it.
 
 use alux_ext::ext;
-use alux_http::{
-    EmptyOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, NamedValuesAlg, ResultOutAlg, StatusOutAlg, TextOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpProgramExt, NamedValuesAlg, http};
 use alux_http_text::TextHandlerImpl;
 use alux_http_typescript::TsHttpClient;
 use alux_shape::{Shape, Spelling};
@@ -75,7 +73,7 @@ where
 #[ext(name = ReadingsApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg + TextOutAlg + EmptyOutAlg + StatusOutAlg + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the readings surface.
     fn readings_api<Alg>(&self)

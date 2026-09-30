@@ -5,10 +5,7 @@
 //! what is answered when nothing is declared there.
 
 use alux_ext::ext;
-use alux_http::{
-    BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpMethod, HttpProgramExt, HttpStatus, JsonOutAlg,
-    RedirectOutAlg, ResultOutAlg, StatusOutAlg, TextOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpMethod, HttpProgramExt, HttpStatus, http};
 use alux_http_direct::{DirectHandlerImpl, DirectRequest, DirectResponse, DirectRoute};
 use alux_http_text::TextHandlerImpl;
 use core::future::Future;
@@ -102,15 +99,7 @@ where
 #[ext(name = ShopApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg
-        + JsonOutAlg
-        + TextOutAlg
-        + HtmlOutAlg
-        + BytesOutAlg
-        + EmptyOutAlg
-        + RedirectOutAlg
-        + StatusOutAlg
-        + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the whole surface: every method, every body role, every output kind it uses.
     fn shop_api<Alg>(&self)

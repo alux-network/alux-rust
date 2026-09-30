@@ -5,10 +5,7 @@
 //! Poem service would be compiled from, and axum answers it.
 
 use alux_ext::ext;
-use alux_http::{
-    BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, RedirectOutAlg, ResultOutAlg,
-    StatusOutAlg, TextOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpProgramExt, http};
 use alux_http_axum::AxumHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use axum::Router;
@@ -100,15 +97,7 @@ where
 #[ext(name = ShopApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg
-        + JsonOutAlg
-        + TextOutAlg
-        + HtmlOutAlg
-        + BytesOutAlg
-        + EmptyOutAlg
-        + RedirectOutAlg
-        + StatusOutAlg
-        + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the whole surface: every method, every body role, every output kind it uses.
     fn shop_api<Alg>(&self)

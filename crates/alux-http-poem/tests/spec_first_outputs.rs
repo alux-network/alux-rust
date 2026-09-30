@@ -6,10 +6,7 @@
 //! chosen by the framework.
 
 use alux_ext::ext;
-use alux_http::{
-    BytesOutAlg, EmptyOutAlg, HtmlOutAlg, HttpApiAlg, HttpProgramExt, JsonOutAlg, RedirectOutAlg, ResultOutAlg,
-    StatusOutAlg, TextOutAlg, http,
-};
+use alux_http::{HttpApiAlg, HttpProgramExt, http};
 use alux_http_poem::PoemHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use core::future::Future;
@@ -79,15 +76,7 @@ where
 #[ext(name = ReportApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg
-        + JsonOutAlg
-        + TextOutAlg
-        + HtmlOutAlg
-        + BytesOutAlg
-        + EmptyOutAlg
-        + RedirectOutAlg
-        + StatusOutAlg
-        + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares one endpoint per output kind the specification names.
     fn report_api<Alg>(&self)
