@@ -1,7 +1,7 @@
-//! Reifies HTTP declarations and derives their mechanical endpoint compatibility obligations.
+//! Reifies HTTP declarations and derives what each asks of an interpretation.
 //!
-//! Output capabilities remain authored bounds. The fluent operations check those capabilities
-//! through ordinary Rust trait resolution, including downstream capability aliases.
+//! An endpoint asks for an `HttpOperationAlg` over its operation, input roles, and output kind, so a
+//! declaration states only the route algebra and its domain.
 
 use crate::lower::{Chain, LoweredProgram, ProgramBackendAlg, expand_program};
 use crate::syntax::{Reified, lift_operation};
@@ -175,8 +175,6 @@ impl ProgramBackendAlg for HttpBackend {
                 quote!(::alux_http::#marker<#input>)
             });
             let roles = quote!((#(#roles,)*));
-            // Endpoint admissibility is mechanical evidence. It does not grant any output
-            // capability: the ordinary fluent calls still require the authored family bounds.
             clause.predicates.push(parse_quote_spanned! { written =>
                 This: ::alux_http::HttpOperationAlg<#operation, #roles, #kind,
                     Endpoint = <This as ::alux_http::RouteAlg>::Endpoint>
@@ -216,7 +214,7 @@ impl ProgramBackendAlg for HttpBackend {
     }
 }
 
-/// Expands the facade while leaving semantic output capabilities to the author.
+/// Expands an HTTP declaration into its program, stating each endpoint's `HttpOperationAlg` bound.
 pub(crate) fn http_program_defunc_internal(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     expand_program::<HttpBackend>(attr, item, &())
 }

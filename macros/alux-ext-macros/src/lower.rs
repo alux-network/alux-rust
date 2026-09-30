@@ -1,9 +1,9 @@
 //! Lowers a fluent program declaration into a first-order program type.
 //!
 //! The lowering is the same for every transport: each declaration method becomes a zero-sized
-//! program type and the authored body becomes the program that type interprets. HTTP preserves
-//! authored capability bounds; backends for other transports may still derive interpretation
-//! evidence. A backend supplies only what its own transport means.
+//! program type and the authored body becomes the program that type interprets. Each backend states
+//! the interpretation evidence its declarations need and the obligation a nested program places on
+//! its parent. A backend supplies only what its own transport means.
 
 use crate::extension::{extension, stated};
 use crate::syntax::{
