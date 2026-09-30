@@ -1,6 +1,6 @@
 [package]
 name = "alux-bench-criterion"
-version = "0.1.0"
+version = "0.2.0"
 description = "Criterion interpreter for alux-bench benchmark programs"
 documentation = "https://docs.rs/alux-bench-criterion"
 authors.workspace = true

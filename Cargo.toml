@@ -13,7 +13,7 @@ rust-version = "1.97"
 
 [workspace.dependencies]
 alux-bench = { version = "0.2.0", path = "alux-bench" }
-alux-bench-criterion = { version = "0.1.0", path = "crates/alux-bench-criterion" }
+alux-bench-criterion = { version = "0.2.0", path = "crates/alux-bench-criterion" }
 alux-bench-direct = { version = "0.1.0", path = "crates/alux-bench-direct" }
 alux-ext = { version = "0.2.0", path = "alux-ext" }
 alux-ext-macros = { version = "0.2.0", path = "macros/alux-ext-macros" }
