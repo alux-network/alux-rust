@@ -10,8 +10,10 @@
 //! into each of them. Nothing about a framework is named: what arrives is bytes, and what comes out
 //! is [`alux_http::ChunksAlg`] of [`alux_http::PartAlg`], the same as everywhere else.
 
+mod headers;
 mod message;
 mod read;
 
+pub use headers::*;
 pub use message::*;
 pub use read::*;

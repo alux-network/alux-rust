@@ -93,6 +93,29 @@ where
     type Transform = Interpreter::Header<Kind::Transform, Name>;
 }
 
+/// Selects the converter used to answer with the headers a named product states, beside a body.
+pub trait HeadersOutAlg {
+    /// The converter writing each value `Headers` states beside the body `Inner` states.
+    type Headers<Inner, Headers>;
+}
+
+/// Answers with the headers a named product states, beside the body `Kind` states.
+///
+/// The output twin of reading headers into a product: each member is a header, named by the words
+/// its member name states, so `cache_control` is `cache-control`. A member stating nothing is not
+/// written, and a member stating many values writes one header for each, as `set-cookie` needs. The
+/// handler answers with the product and the body, in that order.
+#[derive(Debug, Default)]
+pub struct HeadersOut<Kind, Headers>(PhantomData<fn(Kind, Headers)>);
+
+impl<Interpreter, Headers, Rest, Kind> OutputKindAlg<Interpreter, (Headers, Rest)> for HeadersOut<Kind, Headers>
+where
+    Interpreter: HeadersOutAlg + ?Sized,
+    Kind: OutputKindAlg<Interpreter, Rest>,
+{
+    type Transform = Interpreter::Headers<Kind::Transform, Headers>;
+}
+
 /// Selects the converter used for a handler that can fail.
 pub trait ResultOutAlg {
     /// The converter answering with `Inner` on success and with what `Error` means otherwise.

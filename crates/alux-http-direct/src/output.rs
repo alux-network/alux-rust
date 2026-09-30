@@ -2,9 +2,11 @@
 
 use crate::{DirectHandlerImpl, DirectResponse};
 use alux_http::{
-    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg,
-    HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg,
+    HttpErrorAlg, HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg,
+    TextOutAlg,
 };
+use alux_http_parts::write_headers;
 use core::fmt::Display;
 use core::marker::PhantomData;
 use futures::TryStreamExt;
@@ -213,6 +215,29 @@ direct_outputs! {
 
 impl<Context> HeaderOutAlg for DirectHandlerImpl<Context> {
     type Header<Inner, Name> = DirectHeaderOutput<Inner, Name>;
+}
+
+/// Answers with the headers a named product states, beside the body the handler stated.
+///
+/// A product that is not one of named values writes no header, as a single header does.
+pub struct DirectHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+impl<Inner, Headers, Rest> OutputAlg<(Headers, Rest)> for DirectHeadersOutput<Inner, Headers>
+where
+    Inner: OutputAlg<Rest, Output = DirectResponse>,
+    Headers: Serialize,
+{
+    type Output = DirectResponse;
+
+    fn output((headers, rest): (Headers, Rest)) -> Self::Output {
+        let written = write_headers(&headers).unwrap_or_default();
+
+        written.iter().fold(Inner::output(rest), |answer, (name, value)| answer.with_header(name, value))
+    }
+}
+
+impl<Context> HeadersOutAlg for DirectHandlerImpl<Context> {
+    type Headers<Inner, Headers> = DirectHeadersOutput<Inner, Headers>;
 }
 
 impl<Context> StatusOutAlg for DirectHandlerImpl<Context> {

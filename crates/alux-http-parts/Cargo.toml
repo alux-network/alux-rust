@@ -19,6 +19,8 @@ alux-http.workspace = true
 bytes.workspace = true
 futures.workspace = true
 multer.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

@@ -133,7 +133,7 @@ impl OpenApiEndpoint {
                 && let Some(described) = described.as_object_mut()
             {
                 let carried =
-                    answer.headers.iter().map(|name| ((*name).to_owned(), json!({ "schema": { "type": "string" } })));
+                    answer.headers.iter().map(|name| (name.clone(), json!({ "schema": { "type": "string" } })));
                 described.insert("headers".into(), Value::Object(carried.collect()));
             }
             responses.insert(answer.status.code().to_string(), described);

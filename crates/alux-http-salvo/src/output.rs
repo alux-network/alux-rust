@@ -2,9 +2,11 @@
 
 use crate::SalvoHandlerImpl;
 use alux_http::{
-    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg,
-    HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg,
+    HttpErrorAlg, HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg,
+    TextOutAlg,
 };
+use alux_http_parts::write_headers;
 use core::fmt::Display;
 use core::marker::PhantomData;
 use futures::{Stream, TryStreamExt};
@@ -270,6 +272,35 @@ salvo_outputs! {
 
 impl<Context> HeaderOutAlg for SalvoHandlerImpl<Context> {
     type Header<Inner, Name> = SalvoHeaderOutput<Inner, Name>;
+}
+
+/// Answers with the headers a named product states, beside the body the handler stated.
+///
+/// A product that is not one of named values, or a name or value no header can carry, writes no
+/// header, as a single header does.
+pub struct SalvoHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+impl<Inner, Headers, Rest> OutputAlg<(Headers, Rest)> for SalvoHeadersOutput<Inner, Headers>
+where
+    Inner: OutputAlg<Rest, Output = Response>,
+    Headers: Serialize,
+{
+    type Output = Response;
+
+    fn output((headers, rest): (Headers, Rest)) -> Self::Output {
+        let mut answer = Inner::output(rest);
+        for (name, value) in write_headers(&headers).unwrap_or_default() {
+            if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
+                answer.headers_mut().append(name, value);
+            }
+        }
+
+        answer
+    }
+}
+
+impl<Context> HeadersOutAlg for SalvoHandlerImpl<Context> {
+    type Headers<Inner, Headers> = SalvoHeadersOutput<Inner, Headers>;
 }
 
 impl<Context> StatusOutAlg for SalvoHandlerImpl<Context> {

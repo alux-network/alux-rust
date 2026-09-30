@@ -132,7 +132,7 @@ impl<Context> OutputKindAlg<OpenApiHandlerImpl<Context>, LoginAnswer> for LoginO
 impl OpenApiOutputAlg<LoginAnswer> for OpenApiLoginOutput {
     fn answers(_schema: &JsonSchemaShape) -> Vec<OpenApiAnswer> {
         let mut accepted = OpenApiAnswer::bodiless(HttpStatus::new(302));
-        accepted.headers = vec!["location", "set-cookie"];
+        accepted.headers = vec!["location".to_owned(), "set-cookie".to_owned()];
         vec![accepted, OpenApiAnswer::content(HttpStatus::OK, "text/html", json!({"type": "string"}))]
     }
 }

@@ -2,8 +2,8 @@
 
 use crate::TsHttpClient;
 use alux_http::{
-    BytesOutAlg, EmptyOutAlg, FileOutAlg, HeaderOutAlg, HtmlOutAlg, JsonOutAlg, OutputAlg, RedirectOutAlg,
-    ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, EmptyOutAlg, FileOutAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg, JsonOutAlg, OutputAlg,
+    RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
 };
 use alux_shape::{ShapeAlg, ShapeOf};
 use alux_shape_typescript::{TsShape, TsType};
@@ -119,6 +119,31 @@ where
 
 impl HeaderOutAlg for TsHttpClient {
     type Header<Inner, Name> = TsHeaderOutput<Inner, Name>;
+}
+
+/// Answers with what the kind beneath states, since the headers a product states reach a caller
+/// beside it.
+pub struct TsHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+impl<Inner, Headers, From> OutputAlg<From> for TsHeadersOutput<Inner, Headers> {
+    type Output = From;
+
+    fn output(from: From) -> From {
+        from
+    }
+}
+
+impl<Inner, Headers, Rest> TsOutputAlg<(Headers, Rest)> for TsHeadersOutput<Inner, Headers>
+where
+    Inner: TsOutputAlg<Rest>,
+{
+    fn answer(shapes: &TsShape) -> TsType {
+        Inner::answer(shapes)
+    }
+}
+
+impl HeadersOutAlg for TsHttpClient {
+    type Headers<Inner, Headers> = TsHeadersOutput<Inner, Headers>;
 }
 
 /// Answers with what the kind beneath states, whatever status the endpoint declared.

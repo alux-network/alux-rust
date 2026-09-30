@@ -2,9 +2,11 @@
 
 use crate::RocketHandlerImpl;
 use alux_http::{
-    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg,
-    HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg,
+    HttpErrorAlg, HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg,
+    TextOutAlg,
 };
+use alux_http_parts::write_headers;
 use core::fmt::{self, Debug, Display};
 use core::marker::PhantomData;
 use core::pin::Pin;
@@ -277,6 +279,29 @@ rocket_outputs! {
 
 impl<Context> HeaderOutAlg for RocketHandlerImpl<Context> {
     type Header<Inner, Name> = RocketHeaderOutput<Inner, Name>;
+}
+
+/// Answers with the headers a named product states, beside the body the handler stated.
+///
+/// A product that is not one of named values writes no header, as a single header does.
+pub struct RocketHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+impl<Inner, Headers, Rest> OutputAlg<(Headers, Rest)> for RocketHeadersOutput<Inner, Headers>
+where
+    Inner: OutputAlg<Rest, Output = RocketAnswer>,
+    Headers: Serialize,
+{
+    type Output = RocketAnswer;
+
+    fn output((headers, rest): (Headers, Rest)) -> Self::Output {
+        let written = write_headers(&headers).unwrap_or_default();
+
+        written.iter().fold(Inner::output(rest), |answer, (name, value)| answer.with_header(name, value))
+    }
+}
+
+impl<Context> HeadersOutAlg for RocketHandlerImpl<Context> {
+    type Headers<Inner, Headers> = RocketHeadersOutput<Inner, Headers>;
 }
 
 impl<Context> StatusOutAlg for RocketHandlerImpl<Context> {

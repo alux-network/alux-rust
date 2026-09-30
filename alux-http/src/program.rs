@@ -1,7 +1,7 @@
 use crate::{
-    BytesOut, Connect, Delete, EmptyOut, FileOut, Get, HandlerAlg, HandlerEndpointAlg, Head, HeaderOut, HtmlOut,
-    HttpInputAlg, HttpMethodAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, NamedValuesAlg, Options, Patch, Post, Put,
-    RedirectOut, ResultOut, RouteAlg, RoutePath, StatusOut, StreamOut, TextOut, Trace, WithAlg,
+    BytesOut, Connect, Delete, EmptyOut, FileOut, Get, HandlerAlg, HandlerEndpointAlg, Head, HeaderOut, HeadersOut,
+    HtmlOut, HttpInputAlg, HttpMethodAlg, HttpProgramAlg, HttpRouteAlg, JsonOut, NamedValuesAlg, Options, Patch, Post,
+    Put, RedirectOut, ResultOut, RouteAlg, RoutePath, StatusOut, StreamOut, TextOut, Trace, WithAlg,
 };
 use alux_ext::{ApplyAlg, HandlerContextAlg, OperationAlg};
 use core::marker::PhantomData;
@@ -451,6 +451,17 @@ where
 
     /// Answers with the handler's header value beside the body already stated.
     pub fn out_header<Name>(self) -> Operation<Handler, Inputs, Args, HeaderOut<Transform, Name>> {
+        self.out()
+    }
+
+    /// Answers with the headers the handler's named product states, beside the body already stated.
+    ///
+    /// The output twin of [`Operation::in_header`]: each member of `Headers` is one header, named by
+    /// its member name.
+    pub fn out_headers<Headers>(self) -> Operation<Handler, Inputs, Args, HeadersOut<Transform, Headers>>
+    where
+        Headers: NamedValuesAlg,
+    {
         self.out()
     }
 

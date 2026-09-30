@@ -160,7 +160,7 @@ returning `()` and rejects one returning data, so you cannot quietly throw a val
 [`ChunksAlg`](ChunksAlg), which says what a chunk is and how to take the next one, so you are not
 committed to any particular stream type.
 
-Three kinds wrap the one before them:
+Four kinds wrap the one before them:
 
 - **`.status::<201>()`** sets the status code. Which code a created resource answers with belongs to
   the endpoint, not the handler.
@@ -168,6 +168,7 @@ Three kinds wrap the one before them:
   chose; a failure answers with the status and message its `HttpErrorAlg` impl gives.
 - **`.out_header::<CacheControl>()`** adds a response header. The handler returns `(value, body)`,
   because only the handler knows an `ETag` or a cache lifetime.
+- **`.out_headers::<Signed>()`** adds every header a named product states, the output twin of `.in_header::<Agent>()`. The handler returns `(headers, body)`. Each member is one header named by its member name, so `cache_control` is `cache-control`; an `Option` that is `None` writes nothing, and a `Vec` writes one header per value, which is how several `set-cookie` headers are stated. Prefer it over stacking `.out_header`, whose values nest one pair per header.
 
 A header is just a name, so one this crate does not already ship is three lines of your own and no
 interpreter changes:
@@ -184,11 +185,24 @@ impl HeaderNameAlg for RequestId {
 ```
 
 ```rust ignore
+#[derive(Serialize, Shape)]
+struct Signed {
+    cache_control: String,
+    etag: Option<String>,
+    set_cookie: Vec<String>,
+}
+
+impl NamedValuesAlg for Signed {}
+```
+
+```rust ignore
 self.routes()
     // A recording, which creates something and says so.
     .post("/record", self.op(Alg::record).body::<u32>().json().status::<201>())
     // One identified reading, or what its failure means.
     .get("/find/{id}", self.op(Alg::find).path::<u32>().json().result())
+    // The readings, with every header one product states: the handler returns `(Signed, body)`.
+    .get("/readings", self.op(Alg::readings).json().out_headers::<Signed>())
 ```
 
 ## Paths

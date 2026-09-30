@@ -59,7 +59,7 @@ pub struct OpenApiNamed {
 ///
 /// A product read from names and values is one parameter per member, not one parameter carrying the
 /// product. Anything else is stated whole, which is the only thing a document can say about it.
-fn named_values(schema: &JsonSchemaShape, stated: Value) -> OpenApiStated {
+pub(crate) fn named_values(schema: &JsonSchemaShape, stated: Value) -> OpenApiStated {
     let resolved = resolved(schema, &stated);
     let Some(object) = resolved.as_object() else {
         return OpenApiStated::Whole(stated);

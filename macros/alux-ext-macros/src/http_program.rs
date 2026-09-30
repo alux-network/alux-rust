@@ -123,6 +123,11 @@ fn endpoint_roles(declaration: &Expr) -> Option<(Vec<InputDeclaration>, TokenStr
                 let inner = transform?;
                 transform = Some(quote!(::alux_http::HeaderOut<#inner, #header>));
             }
+            "out_headers" => {
+                let headers = type_argument()?;
+                let inner = transform?;
+                transform = Some(quote!(::alux_http::HeadersOut<#inner, #headers>));
+            }
             "result" => {
                 let inner = transform?;
                 transform = Some(quote!(::alux_http::ResultOut<#inner>));
@@ -251,6 +256,24 @@ mod tests {
         assert!(!output.contains("HandlerContextAlg"));
         assert!(!output.contains("HandlerEndpointAlg"));
         assert!(!output.contains("ApplyAlg"));
+    }
+
+    #[test]
+    fn reads_the_headers_a_named_product_states_as_an_output_wrapper() {
+        let output = http_program_defunc_internal(
+            quote!(name = CachedApiExt),
+            quote! {
+                impl<This> This where This: HttpRouteAlg {
+                    fn cached_api<Alg>(&self) {
+                        self.routes().get("/cached", self.op(Alg::cached).json().out_headers::<Cached>())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains(":: alux_http :: HeadersOut < :: alux_http :: JsonOut , Cached >"), "{output}");
     }
 
     #[test]

@@ -257,6 +257,8 @@ result as the header's value and the body. A header is a name and nothing more t
 marker a domain writes for itself: every interpretation already witnesses `HeaderOutAlg` once and
 answers with whichever name reaches it.
 
+`HeadersOut<Kind, Headers>` is the output twin of reading headers into a product: the handler answers with a named product and the body, and each member is one header named by its member name. A member stating nothing writes no header and a member stating many writes one per value, so several `set-cookie` headers are one member rather than nested `HeaderOut` pairs. Executing interpretations write the product through `alux_http_parts::write_headers`, and `OpenAPI` reads the header names from the product's shape.
+
 Two kinds read the kind beneath them rather than the handler. `StatusOut<Kind, CODE>` answers with a
 declared status around the body `Kind` states, because the status of a created resource is a
 property of the endpoint rather than a decision inside a handler. `ResultOut<Kind>` reads a handler

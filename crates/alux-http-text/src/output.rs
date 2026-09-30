@@ -2,8 +2,8 @@
 
 use crate::TextHandlerImpl;
 use alux_http::{
-    BytesOutAlg, EmptyOutAlg, FileOutAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg, HttpStatus, JsonOutAlg, OutputAlg,
-    RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, EmptyOutAlg, FileOutAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg, HttpErrorAlg, HttpStatus,
+    JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
 };
 use core::marker::PhantomData;
 
@@ -70,6 +70,24 @@ where
 
 impl HeaderOutAlg for TextHandlerImpl {
     type Header<Inner, Name> = TextHeaderOutput<Inner, Name>;
+}
+
+/// Interprets the headers a named product states, in text descriptions.
+pub struct TextHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+impl<Inner, Headers, Rest> OutputAlg<(Headers, Rest)> for TextHeadersOutput<Inner, Headers>
+where
+    Inner: OutputAlg<Rest>,
+{
+    type Output = Inner::Output;
+
+    fn output((_headers, rest): (Headers, Rest)) -> Self::Output {
+        Inner::output(rest)
+    }
+}
+
+impl HeadersOutAlg for TextHandlerImpl {
+    type Headers<Inner, Headers> = TextHeadersOutput<Inner, Headers>;
 }
 
 /// Interprets a declared status in text descriptions.

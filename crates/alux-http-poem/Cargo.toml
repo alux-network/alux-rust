@@ -17,6 +17,7 @@ workspace = true
 [dependencies]
 alux-ext.workspace = true
 alux-http.workspace = true
+alux-http-parts.workspace = true
 futures.workspace = true
 poem.workspace = true
 serde_urlencoded.workspace = true

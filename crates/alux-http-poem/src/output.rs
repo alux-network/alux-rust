@@ -1,14 +1,17 @@
 use crate::PoemHandlerImpl;
 use alux_http::{
-    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HtmlOutAlg, HttpErrorAlg,
-    HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg,
+    BytesOutAlg, ChunksAlg, ChunksExt, EmptyOutAlg, FileOutAlg, HeaderNameAlg, HeaderOutAlg, HeadersOutAlg, HtmlOutAlg,
+    HttpErrorAlg, HttpStatus, JsonOutAlg, OutputAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg,
+    TextOutAlg,
 };
+use alux_http_parts::write_headers;
 use core::fmt::Display;
 use core::marker::PhantomData;
 use futures::{Stream, TryStreamExt};
 use poem::http::{HeaderName, HeaderValue, StatusCode, header};
 use poem::web::{Html, Json, Redirect};
 use poem::{Body, IntoResponse, Response};
+use serde::Serialize;
 use std::io::Error as IoError;
 
 /// Interprets a portable status as the one Poem answers with.
@@ -271,6 +274,50 @@ poem_outputs! {
 
 impl<Context> HeaderOutAlg for PoemHandlerImpl<Context> {
     type Header<Inner, Name> = PoemHeaderOutput<Inner, Name>;
+}
+
+/// Answers with the headers a named product states, beside the body the handler stated.
+///
+/// A product that is not one of named values, or a name or value no header can carry, writes no
+/// header, as a single header does.
+pub struct PoemHeadersOutput<Inner, Headers>(PhantomData<fn(Inner, Headers)>);
+
+/// Carries a converted body and the headers written for it until Poem writes them.
+pub struct PoemCarryingAll<Output> {
+    body: Output,
+    headers: Vec<(String, String)>,
+}
+
+impl<Inner, Headers, Rest> OutputAlg<(Headers, Rest)> for PoemHeadersOutput<Inner, Headers>
+where
+    Inner: OutputAlg<Rest>,
+    Headers: Serialize,
+{
+    type Output = PoemCarryingAll<Inner::Output>;
+
+    fn output((headers, rest): (Headers, Rest)) -> Self::Output {
+        PoemCarryingAll { body: Inner::output(rest), headers: write_headers(&headers).unwrap_or_default() }
+    }
+}
+
+impl<Output> IntoResponse for PoemCarryingAll<Output>
+where
+    Output: IntoResponse,
+{
+    fn into_response(self) -> Response {
+        let mut response = self.body.into_response();
+        for (name, value) in self.headers {
+            if let (Ok(name), Ok(value)) = (HeaderName::try_from(name), HeaderValue::try_from(value)) {
+                response.headers_mut().append(name, value);
+            }
+        }
+
+        response
+    }
+}
+
+impl<Context> HeadersOutAlg for PoemHandlerImpl<Context> {
+    type Headers<Inner, Headers> = PoemHeadersOutput<Inner, Headers>;
 }
 
 impl<Context> StatusOutAlg for PoemHandlerImpl<Context> {
