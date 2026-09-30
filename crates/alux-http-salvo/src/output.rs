@@ -98,6 +98,9 @@ impl OutputAlg<()> for SalvoEmptyOutput {
     fn output((): ()) -> Self::Output {
         let mut answer = Response::new();
         answer.status_code(salvo_status(HttpStatus::NO_CONTENT));
+        // Stated as empty rather than left unset: Salvo writes its own page into an error answer
+        // with no body, which a declared status such as `401` around nothing would otherwise get.
+        answer.body(Vec::<u8>::new());
 
         answer
     }
