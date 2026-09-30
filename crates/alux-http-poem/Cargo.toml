@@ -34,4 +34,3 @@ anyhow.workspace = true
 poem-openapi.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
-trait-set.workspace = true

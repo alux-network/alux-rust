@@ -14,7 +14,6 @@ use poem::http::{Method, StatusCode, header};
 use poem::{Endpoint, Request, Response};
 use serde::Deserialize;
 use serde_json::json;
-use trait_set::trait_set;
 
 #[derive(Deserialize, Shape)]
 struct LoginParams {
@@ -42,15 +41,11 @@ where
 
 struct LoginOut;
 
-trait_set! {
-    trait LoginHttpAlg = HttpApiAlg;
-}
-
 // The spec names its capabilities; the macro supplies endpoint compatibility evidence.
 #[ext(name = LoginApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: LoginHttpAlg,
+    This: HttpApiAlg,
 {
     fn login_api<Alg>(&self)
     where
