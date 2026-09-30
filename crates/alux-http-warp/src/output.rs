@@ -158,7 +158,7 @@ where
     fn output((value, rest): (Value, Rest)) -> Self::Output {
         let mut answer = Inner::output(rest);
         if let Ok(value) = HeaderValue::from_str(&value.to_string()) {
-            answer.headers_mut().insert(HeaderName::from_static(Name::HEADER_NAME), value);
+            answer.headers_mut().append(HeaderName::from_static(Name::HEADER_NAME), value);
         }
 
         answer

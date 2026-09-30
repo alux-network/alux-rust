@@ -147,7 +147,7 @@ where
     fn into_response(self) -> Response {
         let mut response = self.body.into_response();
         if let Ok(value) = HeaderValue::from_str(&self.value) {
-            response.headers_mut().insert(HeaderName::from_static(Name::HEADER_NAME), value);
+            response.headers_mut().append(HeaderName::from_static(Name::HEADER_NAME), value);
         }
 
         response

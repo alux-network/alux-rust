@@ -34,5 +34,6 @@ header_names! {
     Link               => "link",
     Location           => "location",
     RetryAfter         => "retry-after",
+    SetCookie          => "set-cookie",
     Vary               => "vary",
 }
