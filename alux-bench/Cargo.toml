@@ -1,6 +1,6 @@
 [package]
 name = "alux-bench"
-version = "0.1.0"
+version = "0.2.0"
 description = "Interpreter-independent benchmark programs: named cases measured in rounds"
 documentation = "https://docs.rs/alux-bench"
 authors.workspace = true
