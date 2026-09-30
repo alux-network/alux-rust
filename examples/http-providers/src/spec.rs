@@ -1,8 +1,9 @@
 use alux_ext::ext;
-use alux_http::{HttpApiAlg, RedirectOutAlg, TextOutAlg, http};
+use alux_http::{HttpApiAlg, JsonOutAlg, TextOutAlg, http};
 use alux_shape::Shape;
 use core::future::Future;
 use serde::{Deserialize, Serialize};
+use trait_set::trait_set;
 
 /// States the capability the shared HTTP specification consumes.
 pub trait ExampleAppAlg {
@@ -67,10 +68,15 @@ where
     }
 }
 
+trait_set! {
+    /// Combines the HTTP and output capabilities used by this application's API.
+    pub trait ExampleHttpAlg = HttpApiAlg + JsonOutAlg + TextOutAlg;
+}
+
 #[ext(name = ExampleApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg + RedirectOutAlg + TextOutAlg,
+    This: ExampleHttpAlg,
 {
     /// Declares the shared API endpoints.
     fn example_api<Alg>(&self)

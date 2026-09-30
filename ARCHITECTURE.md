@@ -176,6 +176,23 @@ procedural macro.
 
 ## HTTP program algebra
 
+### Tagless-final declarations
+
+An HTTP extension composes `HttpRouteAlg` with one `HttpOperationAlg<Operation, Inputs, Kind>`
+capability per endpoint. `Routes` interprets that composition using ordinary Rust methods. The HTTP
+macro reifies operation references, names the program, and states each endpoint's `HttpOperationAlg`
+bound from its authored input roles and output kind, and each nested program's `HttpProgramAlg`
+bound. A declaration authors only the route algebra and its domain.
+
+The direct first-order syntax fold uses the same operation capability. Its blanket implementation
+connects neutral input roles to `InterpretInputsAlg` (including the argument product), chooses a
+runtime handle through `HandlerContextAlg`, and delegates to `HandlerEndpointAlg`. Those mechanics
+belong to the interpreter implementation rather than generated API bounds.
+
+`Operation` owns selection of an output kind. The built-in methods are derived neutral selections:
+`.json()` is `.out::<JsonOut>()`. Downstream kinds use `.out::<Kind>()` and their own
+`OutputKindAlg` implementations, including converters describing multiple OpenAPI answers.
+
 ### Inputs and outputs
 
 `HttpInputAlg` lets each interpreter select extractor representations for:

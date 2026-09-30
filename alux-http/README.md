@@ -12,7 +12,7 @@ never changes the declaration.
 
 ```rust
 use alux_ext::{OperationAlg, ext};
-use alux_http::{HttpApiAlg, HttpProgramBuilder, JsonOutAlg, http};
+use alux_http::{HttpProgramBuilder, HttpRouteAlg, http};
 use core::future::Future;
 
 /// A downstream specification owns its primitive domain meaning.
@@ -42,7 +42,7 @@ where
 #[ext(name = StatusApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpRouteAlg,
 {
     /// Declares the status surface: the current reading and one identified reading.
     fn status_api<Alg>(&self)
@@ -84,6 +84,28 @@ let _nested = builder.routes().nest("/api", builder.program(program)).into_progr
 // Argument names and order survive from the authored method into the program.
 assert_eq!(<StatusForIdOperation<App> as OperationAlg>::ARG_NAMES, ["id"]);
 ```
+
+## Interpretation capabilities
+
+The extension above is tagless-final: `This` chooses the route and endpoint representations.
+`defunc(via = http)` reads each endpoint's input roles and output kind and states one
+`HttpOperationAlg<Operation, Inputs, Kind>` bound per endpoint, so the declaration names only
+`HttpRouteAlg` and its domain. The operation already carries its domain context, argument signature,
+argument names, and result; these are not repeated in the HTTP capability.
+
+`Operation::out::<Kind>()` selects output meaning. `.json()`, `.text()`, and the other built-in
+spellings are ordinary neutral methods on the operation declaration. A downstream
+`.out::<LoginOut>()` follows the same path; the interpreter proves its converter when the endpoint
+is folded.
+
+The interpreter implements `OutputKindAlg<Interpreter, From>` for a custom kind to select its
+conversion. Execution and text interpretations require the selected converter's `OutputAlg<From>`;
+`OpenAPI` requires `OpenApiOutputAlg<From>` and can enumerate several response alternatives. Built-in
+families such as `TextOutAlg` remain interpreter implementation capabilities, not additional bounds
+that every API declaration must repeat.
+
+The direct syntax builder remains available for constructing first-order trees explicitly. Both
+forms use the same `HttpOperationAlg` interpretation.
 
 ## Methods
 
@@ -187,7 +209,7 @@ shared route table, no registry, and no framework in the picture yet.
 
 ```rust
 use alux_ext::ext;
-use alux_http::{HttpApiAlg, JsonOutAlg, http};
+use alux_http::{HttpRouteAlg, http};
 use core::future::Future;
 
 trait StatusAlg {
@@ -224,11 +246,11 @@ where
     }
 }
 
-/// One surface fragment. Its bounds name only what it uses: status, and JSON output.
+/// One surface fragment. Its bounds name only the route algebra; the macro states its endpoint.
 #[ext(name = StatusApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpRouteAlg,
 {
     /// Declares the status route.
     fn status_api<Alg>(&self)
@@ -244,7 +266,7 @@ where
 #[ext(name = ItemsApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg + JsonOutAlg,
+    This: HttpRouteAlg,
 {
     /// Declares the item route.
     fn items_api<Alg>(&self)
@@ -260,7 +282,7 @@ where
 #[ext(name = ServiceApiExt, defunc(via = http))]
 impl<This> This
 where
-    This: HttpApiAlg,
+    This: HttpRouteAlg,
 {
     /// Declares `/status` beside `/v1/items`.
     fn service_api<Alg>(&self)
@@ -282,8 +304,8 @@ one under a prefix, including a declaration from another crate.
 
 That gives you:
 
-- **Fragments that state their own needs.** `status_api` requires `JsonOutAlg`; a fragment answering
-  with a file requires `FileOutAlg` instead. Neither imposes its needs on the other, and
+- **Fragments that state their own needs.** `status_api` requires a JSON endpoint for its operation; a
+  fragment answering with a file requires a file endpoint instead. Neither imposes its needs on the other, and
   `service_api` requires exactly the union.
 - **One surface everywhere.** `service_api` is a value, so the served API, the `OpenAPI` document and
   the generated client are the same merged surface and cannot drift apart.

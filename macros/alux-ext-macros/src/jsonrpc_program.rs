@@ -93,7 +93,7 @@ impl ProgramBackendAlg for JsonRpcBackend {
     const NESTED_SUFFIX: &'static str = "_rpc";
     const REJECTED_PARAM: &'static str = "JSON-RPC programs currently support type parameters only";
 
-    fn require_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults) {
+    fn prepare_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults) {
         let mut operations = Vec::new();
         Methods { requirements: &mut operations, defaults: *defaults }.visit_block_mut(&mut method.block);
         let where_clause = method.sig.generics.make_where_clause();

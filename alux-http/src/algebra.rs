@@ -1,4 +1,4 @@
-use crate::{HttpMethod, RoutePath};
+use crate::{HttpMethod, HttpMethodAlg, HttpOperationAlg, Operation, RoutePath};
 use alux_ext::{ApplyAlg, OperationAlg, ext};
 use trait_set::trait_set;
 
@@ -166,6 +166,24 @@ where
         Self { alg: self.alg, route }
     }
 
+    /// Interprets an operation selected by a method marker and an exact path.
+    #[must_use]
+    pub fn method<Method, Handler, Inputs, Args, Kind>(
+        self,
+        path: &str,
+        operation: Operation<Handler, Inputs, Args, Kind>,
+    ) -> Self
+    where
+        Method: HttpMethodAlg,
+        Alg: HttpOperationAlg<Handler, Inputs, Kind, Endpoint = <Alg as RouteAlg>::Endpoint>,
+    {
+        let selector =
+            self.alg.compose(self.alg.http_method(Method::METHOD), self.alg.http_path(&RoutePath::parse(path)));
+        let endpoint = self.alg.http_operation(operation.handler);
+        let route = self.alg.precompose(selector, self.alg.lift(endpoint));
+        self.append(route)
+    }
+
     /// Adds an endpoint at an exact path.
     #[must_use]
     pub fn at(self, path: &str, endpoint: Alg::Endpoint) -> Self {
@@ -201,6 +219,15 @@ where
 /// Compiles defunctionalized HTTP programs with an interpreter.
 #[ext(name = HttpProgramExt)]
 pub impl<This> This {
+    /// Interprets a named program for further route composition.
+    fn program<Program>(&self, program: Program) -> Routes<'_, This>
+    where
+        This: RouteAlg,
+        Program: HttpProgramAlg<This, Route = This::Route>,
+    {
+        self.route(program.compile_http(self))
+    }
+
     /// Compiles a named HTTP program with this interpreter.
     fn compile_http<Program>(&self, program: Program) -> Program::Route
     where
@@ -209,3 +236,38 @@ pub impl<This> This {
         program.compile_http(self)
     }
 }
+
+/// Carries operation declarations on an abstract HTTP interpreter.
+#[ext(name = HttpOperationExt)]
+pub impl<This> This {
+    /// Starts an operation declaration without choosing extraction or conversion.
+    fn op<Handler>(&self, handler: Handler) -> Operation<Handler> {
+        Operation::new(handler)
+    }
+}
+
+macro_rules! interpreted_routes {
+    ($($method:ident => $marker:ident, $label:literal),+ $(,)?) => {
+        impl<Alg> Routes<'_, Alg>
+        where
+            Alg: HttpRouteAlg,
+        {
+            $(
+                #[doc = concat!("Interprets an endpoint selected by `", $label, "` and an exact path.")]
+                #[must_use]
+                pub fn $method<Handler, Inputs, Args, Kind>(
+                    self,
+                    path: &str,
+                    operation: Operation<Handler, Inputs, Args, Kind>,
+                ) -> Self
+                where
+                    Alg: HttpOperationAlg<Handler, Inputs, Kind, Endpoint = <Alg as RouteAlg>::Endpoint>,
+                {
+                    self.method::<crate::$marker, _, _, _, _>(path, operation)
+                }
+            )+
+        }
+    };
+}
+
+with_http_methods!(interpreted_routes);

@@ -75,7 +75,7 @@ impl ProgramBackendAlg for ShapeBackend {
     const NESTED_SUFFIX: &'static str = "_shape";
     const REJECTED_PARAM: &'static str = "shape programs currently support type parameters only";
 
-    fn require_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
+    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
         // The method is the shape's name, and this is the only stage that reads it: the lowering
         // carries the derived program type from here on, not the name it came from.
         let mut named = words(&method.sig.ident);

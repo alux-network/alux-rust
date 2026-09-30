@@ -6,8 +6,8 @@
 use crate::SETTLE;
 use alux_ext::ext;
 use alux_http::{
-    BytesOutAlg, CacheControl, ChunksAlg, ChunksExt, EmptyOutAlg, FromPartsAlg, HeaderOutAlg, HtmlOutAlg, HttpApiAlg,
-    JsonOutAlg, NamedValuesAlg, PartAlg, RedirectOutAlg, ResultOutAlg, StatusOutAlg, StreamOutAlg, TextOutAlg, http,
+    CacheControl, ChunksAlg, ChunksExt, FromPartsAlg, HttpApiAlg, JsonOutAlg, NamedValuesAlg, PartAlg, StreamOutAlg,
+    TextOutAlg, http,
 };
 use alux_shape::Shape;
 use core::convert::Infallible;
@@ -140,16 +140,7 @@ where
 #[ext(name = ShopApiExt, defunc(via = http))]
 pub impl<This> This
 where
-    This: HttpApiAlg
-        + HeaderOutAlg
-        + JsonOutAlg
-        + TextOutAlg
-        + HtmlOutAlg
-        + BytesOutAlg
-        + EmptyOutAlg
-        + RedirectOutAlg
-        + StatusOutAlg
-        + ResultOutAlg,
+    This: HttpApiAlg,
 {
     /// Declares the surface every interpretation is held to.
     fn shop_api<Alg>(&self)
