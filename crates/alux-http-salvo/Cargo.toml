@@ -1,6 +1,6 @@
 [package]
 name = "alux-http-salvo"
-version = "0.1.0"
+version = "0.2.0"
 description = "Salvo interpretation of ALUX typed HTTP programs"
 documentation = "https://docs.rs/alux-http-salvo"
 authors.workspace = true

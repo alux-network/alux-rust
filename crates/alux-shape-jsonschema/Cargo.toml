@@ -1,6 +1,6 @@
 [package]
 name = "alux-shape-jsonschema"
-version = "0.1.0"
+version = "0.2.0"
 description = "JSON Schema interpretation of ALUX shapes"
 documentation = "https://docs.rs/alux-shape-jsonschema"
 authors.workspace = true

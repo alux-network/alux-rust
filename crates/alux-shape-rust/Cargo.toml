@@ -1,6 +1,6 @@
 [package]
 name = "alux-shape-rust"
-version = "0.1.0"
+version = "0.2.0"
 description = "Rust layout interpretation of ALUX data shapes"
 documentation = "https://docs.rs/alux-shape-rust"
 authors.workspace = true

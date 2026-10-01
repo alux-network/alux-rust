@@ -1,6 +1,6 @@
 [package]
 name = "alux-http-conformance"
-version = "0.1.0"
+version = "0.2.0"
 description = "One declared HTTP surface and the scenario every interpretation of it must satisfy"
 documentation = "https://docs.rs/alux-http-conformance"
 authors.workspace = true

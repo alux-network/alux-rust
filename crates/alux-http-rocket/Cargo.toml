@@ -1,6 +1,6 @@
 [package]
 name = "alux-http-rocket"
-version = "0.1.0"
+version = "0.2.0"
 description = "Rocket interpretation of ALUX typed HTTP programs"
 documentation = "https://docs.rs/alux-http-rocket"
 authors.workspace = true
