@@ -26,13 +26,30 @@ package:
 # Run the whole gate, in the order CI runs it.
 ci: fmt build clippy doc test package
 
-# Bump and publish every crate in the workspace; level is patch, minor, or major.
-release level:
-    cargo release --workspace {{level}} --execute
-
-# Bump and publish one crate; level is patch, minor, or major.
-release-crate package level:
-    cargo release --package {{package}} {{level}} --execute
+# Bumps each `package:level` (patch, minor, or major) and the requirement `[workspace.dependencies]`
+# states for it, commits every bump in one `chore: release`, publishes the crates in dependency order,
+# then tags each `<crate>-v<version>` and pushes the commit and the tags. Without `--execute` it is a
+# dry run that changes nothing, so its later steps read the versions from before the bump.
+#   just release alux-sdk:minor alux-ext:patch alux-http-poem:minor
+#   just release --execute alux-sdk:minor alux-ext:patch alux-http-poem:minor
+# Release crates, each by its own level, in one commit; a dry run without `--execute`; order does not matter.
+release +releases:
+    #!/usr/bin/env sh
+    set -eu
+    execute=""
+    packages=""
+    for release in {{releases}}; do
+        if [ "$release" = "--execute" ]; then execute="--execute"; fi
+    done
+    for release in {{releases}}; do
+        [ "$release" = "--execute" ] && continue
+        cargo release version "${release##*:}" $execute --no-confirm --package "${release%%:*}"
+        packages="$packages --package ${release%%:*}"
+    done
+    cargo release commit $execute --no-confirm
+    cargo release publish $execute --no-confirm $packages
+    cargo release tag $execute --no-confirm $packages
+    cargo release push $execute --no-confirm $packages
 
 # Remove build artifacts.
 clean:
