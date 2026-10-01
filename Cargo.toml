@@ -17,7 +17,7 @@ alux-bench-criterion = { version = "0.2.0", path = "crates/alux-bench-criterion"
 alux-bench-direct = { version = "0.2.0", path = "crates/alux-bench-direct" }
 alux-ext = { version = "0.2.0", path = "alux-ext" }
 alux-ext-macros = { version = "0.2.0", path = "macros/alux-ext-macros" }
-alux-http = { version = "0.3.0", path = "alux-http" }
+alux-http = { version = "0.4.0", path = "alux-http" }
 alux-http-actix = { version = "0.1.0", path = "crates/alux-http-actix" }
 alux-http-axum = { version = "0.1.0", path = "crates/alux-http-axum" }
 alux-http-conformance = { version = "0.1.0", path = "crates/alux-http-conformance" }
