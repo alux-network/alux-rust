@@ -14,8 +14,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::VisitMut;
 use syn::{
-    ExprMethodCall, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path, ReceiverKind, ReturnType, Token,
-    Type, Visibility, parse_quote,
+    ExprMethodCall, FnArg, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path,
+    ReceiverKind, ReturnType, Token, Type, Visibility, parse_quote,
 };
 
 enum Defunc {
@@ -103,11 +103,7 @@ fn is_direct_program(item: &ItemImpl) -> bool {
 }
 
 /// Reifies one borrowed extension method as an operation and its application meaning.
-fn defunctionalize(
-    method: &ImplItemFn,
-    visibility: &Visibility,
-    where_clause: Option<&syn::WhereClause>,
-) -> syn::Result<TokenStream> {
+fn defunctionalize(method: &ImplItemFn, visibility: &Visibility, generics: &Generics) -> syn::Result<TokenStream> {
     let operation = operation_ident(&method.sig.ident);
     // A method that writes no return type returns nothing, which is a result like any other: it is
     // what an endpoint stating no body answers with.
@@ -117,10 +113,24 @@ fn defunctionalize(
     };
     let context = format_ident!("__context");
     RenameThis.visit_type_mut(&mut output);
-    let mut predicates = where_clause.map(|clause| clause.predicates.clone()).unwrap_or_default();
+    // The parameters the block names besides its receiver are fixed by the context through its
+    // bounds, so the operation keeps them on its implementations and not on its type.
+    let named = generics
+        .params
+        .iter()
+        .filter(|param| !matches!(param, GenericParam::Type(param) if param.ident == "This"))
+        .cloned()
+        .map(|mut param| {
+            RenameThis.visit_generic_param_mut(&mut param);
+            param
+        })
+        .collect::<Vec<_>>();
+    let mut predicates = generics.where_clause.as_ref().map(|clause| clause.predicates.clone()).unwrap_or_default();
     for predicate in &mut predicates {
         RenameThis.visit_where_predicate_mut(predicate);
     }
+    // A signature without named parameters keeps stating itself for every context.
+    let signature_predicates = if named.is_empty() { None } else { Some(&predicates) };
     let mut arguments = Vec::new();
     let mut argument_types = Vec::<Type>::new();
     let mut mutable_receiver = false;
@@ -137,7 +147,9 @@ fn defunctionalize(
                     return Err(syn::Error::new_spanned(&input.pat, "defunctionalized arguments must be identifiers"));
                 };
                 arguments.push(pattern.ident.clone());
-                argument_types.push(input.ty.as_ref().clone());
+                let mut argument_type = input.ty.as_ref().clone();
+                RenameThis.visit_type_mut(&mut argument_type);
+                argument_types.push(argument_type);
             }
         }
     }
@@ -166,7 +178,10 @@ fn defunctionalize(
         }
 
         #[doc(hidden)]
-        impl<Context> ::alux_ext::OperationAlg for #operation<Context> {
+        impl<Context, #(#named),*> ::alux_ext::OperationAlg for #operation<Context>
+        where
+            #signature_predicates
+        {
             type Context = Context;
             type Args = #args;
 
@@ -176,7 +191,7 @@ fn defunctionalize(
         }
 
         #[doc(hidden)]
-        impl<Context, Handle> ::alux_ext::ApplyAlg<Handle, #args> for #operation<Context>
+        impl<Context, Handle, #(#named),*> ::alux_ext::ApplyAlg<Handle, #args> for #operation<Context>
         where
             Handle: #context_bound + Send,
             Context: Sync,
@@ -213,13 +228,13 @@ pub(crate) fn ext_internal(attr: TokenStream, item: TokenStream) -> syn::Result<
     }
     let visibility = input.visibility.clone().unwrap_or(Visibility::Inherited);
     let operations = if matches!(arguments.defunc, Defunc::Apply) {
-        let where_clause = input.item.generics.where_clause.clone();
+        let generics = &input.item.generics;
         input
             .item
             .items
             .iter()
             .filter_map(|item| match item {
-                ImplItem::Fn(method) => Some(defunctionalize(method, &visibility, where_clause.as_ref())),
+                ImplItem::Fn(method) => Some(defunctionalize(method, &visibility, generics)),
                 _ => None,
             })
             .collect::<syn::Result<Vec<_>>>()?
@@ -493,6 +508,32 @@ mod tests {
         assert!(output.contains("stringify ! (value)"));
         assert!(output.contains("alux_ext :: ApplyAlg"));
         assert!(output.contains("AsRef < Context >"));
+    }
+
+    #[test]
+    fn keeps_named_parameters_on_the_operation_implementations() {
+        let output = ext_internal(
+            quote!(name = ReadExt, defunc),
+            quote! {
+                impl<This, Item> This
+                where
+                    This: ReadAlg<Item = Item>,
+                    Item: Send,
+                {
+                    async fn echo(&self, item: Item, key: This::Key) -> Item { item }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("struct EchoOperation < Context >"), "{output}");
+        assert!(output.contains("impl < Context , Item > :: alux_ext :: OperationAlg"), "{output}");
+        assert!(output.contains("impl < Context , Handle , Item > :: alux_ext :: ApplyAlg"), "{output}");
+        assert!(output.contains("type Args = (Item , Context :: Key ,)"), "{output}");
+        assert!(output.contains("type Output = Item"), "{output}");
+        assert_eq!(output.matches("Context : ReadAlg < Item = Item >").count(), 2, "{output}");
+        assert!(output.matches("Item : Send").count() >= 2, "{output}");
     }
 
     #[test]

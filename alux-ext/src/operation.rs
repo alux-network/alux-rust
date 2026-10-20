@@ -82,6 +82,48 @@ mod tests {
         }
     }
 
+    trait ReadAlg {
+        type Item;
+        type Key;
+
+        fn read(&self, key: Self::Key) -> Self::Item;
+    }
+
+    struct Reader;
+
+    impl ReadAlg for Reader {
+        type Item = String;
+        type Key = u32;
+
+        fn read(&self, key: u32) -> String {
+            key.to_string()
+        }
+    }
+
+    #[ext(name = ReadExt, defunc)]
+    impl<This, Item, Key> This
+    where
+        This: ReadAlg<Item = Item, Key = Key>,
+        Item: Send,
+        Key: Send,
+    {
+        async fn read_suffixed(&self, key: Key, suffix: Item) -> (Item, Item) {
+            (self.read(key), suffix)
+        }
+    }
+
+    #[tokio::test]
+    async fn preserves_named_parameters_bound_through_the_context() {
+        let reader = Arc::new(Reader);
+        let operation = ReadSuffixedOperation::<Reader>::default();
+
+        assert_eq!(
+            reader.read_suffixed(4, "!".to_owned()).await,
+            operation.apply(reader.clone(), (4, "!".to_owned())).await,
+        );
+        assert_eq!(<ReadSuffixedOperation<Reader> as OperationAlg>::ARG_NAMES, &["key", "suffix"]);
+    }
+
     #[tokio::test]
     async fn preserves_extension_methods_and_defunctionalizes_their_application() {
         let value = Arc::new(Value(40));
