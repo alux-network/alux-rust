@@ -1,0 +1,14 @@
+[package]
+name = "token-stake"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+alux-ext.workspace = true
+alux-stake.workspace = true
+alux-token.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+trait-set.workspace = true

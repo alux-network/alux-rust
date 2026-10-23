@@ -21,7 +21,7 @@ doc:
 
 # Check that each crate packages cleanly.
 package:
-    cargo package --list --workspace --exclude http-providers > /dev/null
+    cargo package --list --workspace --exclude http-providers --exclude token-stake > /dev/null
 
 # Run the whole gate, in the order CI runs it.
 ci: fmt build clippy doc test package
