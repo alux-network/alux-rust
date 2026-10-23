@@ -1,0 +1,21 @@
+[package]
+name = "alux-stake-memory"
+version = "0.1.0"
+description = "Reference in-memory interpretation of the alux-stake specification"
+documentation = "https://docs.rs/alux-stake-memory"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-stake.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true

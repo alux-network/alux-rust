@@ -46,6 +46,10 @@ alux-shape-rust = { version = "0.2.0", path = "crates/alux-shape-rust" }
 alux-shape-term = { version = "0.2.0", path = "crates/alux-shape-term" }
 alux-shape-text = { version = "0.2.0", path = "crates/alux-shape-text" }
 alux-shape-typescript = { version = "0.2.0", path = "crates/alux-shape-typescript" }
+alux-stake = { version = "0.1.0", path = "alux-stake" }
+alux-stake-memory = { version = "0.1.0", path = "crates/alux-stake-memory" }
+alux-token = { version = "0.1.0", path = "alux-token" }
+alux-token-memory = { version = "0.1.0", path = "crates/alux-token-memory" }
 alux-tokio = { version = "0.4.0", path = "crates/alux-tokio" }
 alux-traversable = { version = "0.2.0", path = "alux-traversable" }
 
