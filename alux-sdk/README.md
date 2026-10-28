@@ -216,7 +216,7 @@ Either spelling requires an algebra whose methods are all asynchronous, since a 
 
 #### Open carriers
 
-An algebra may leave its carriers open as associated types, and a transport still states it — for every choice of them at once. Each associated type becomes a parameter of the impl, bounded as the trait declares it (on the associated type, or in the trait's where clause), and the impl defines the associated type as that parameter. A caller names the carriers it reads in and nothing of what carries them:
+An algebra may leave its carriers open as associated types, and a transport still states it — for every choice of them at once. Each associated type becomes a parameter of the impl, bounded as the trait declares it (on the associated type, or in the trait's where clause), and the impl defines the associated type as that parameter. A caller names the carriers it reads in and nothing of what carries them (the [`alux-tokio` README](https://docs.rs/alux-tokio#open-carriers) runs this over a channel, step by step):
 
 ```rust,ignore
 #[trait_algebra(transport)]
