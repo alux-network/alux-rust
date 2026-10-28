@@ -17,7 +17,7 @@ pub trait AlgebraCall<Operation, Reply> {
 }
 ```
 
-Both halves travel to another task, so this crate states either capability for an operation and a reply that are `Send`.
+Both halves travel to another task, so this crate states either capability for an operation and a reply that are `Send`. One channel carries one algebra, so the sender also states `AlgebraCarrier`, naming that operation and reply, which is what lets an algebra with open carriers read them off the sender.
 
 A reply is the interpreter's own value, and only interpreting the operation produces one, so holding a reply is **evidence the operation ran** — including the unit reply of a method that states no value. Nothing is stated once the interpreter is gone, which is an ordinary ending and not a failure.
 
@@ -120,7 +120,7 @@ The loop that repeatedly receives and folds operations is intentionally absent. 
 
 **Every call waits for the interpreter to run it**, which is what awaiting these signatures means where the interpreter is at hand — `add` is handed the total, and `reset` the evidence that clearing happened, which is why `tally` can read its result from the last call. An interpreter with work to leave running answers first and carries on, so how long a call waits is its to state.
 
-The proxy is cloneable when its sender is, and `BoundedAlgebraSender` is, so many callers can state one vocabulary against one interpreter. It is generated only for an algebra whose carriers are all chosen, since a value stating the trait cannot leave a carrier open.
+The proxy is cloneable when its sender is, and `BoundedAlgebraSender` is, so many callers can state one vocabulary against one interpreter. For an algebra whose carriers are still open, the proxy reads them off what its sender carries: `BoundedAlgebraSender<Operation, Reply>` states `AlgebraCarrier` for exactly that operation and reply, so a sender of `RegistryOp<u32>` is the registry of `u32` peers, and so is a proxy over it.
 
 A proxy never carries an operation nobody stays for. A caller wanting one gone and forgotten holds `BoundedAlgebraSender` itself and calls `send`.
 

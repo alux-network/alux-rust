@@ -165,7 +165,7 @@ Every method waits for its operation to be interpreted, because that is what awa
 
 #### How it works
 
-`CounterProxy<Calling>` holds one caller and states the trait's own methods, turning each call into the matching operation, `ask`ing it, and taking the value out of the reply. It is cloneable when its caller is, and is generated only for an algebra whose carriers are all chosen, since a value stating the trait cannot leave a carrier open.
+`CounterProxy<Calling>` holds one caller and states the trait's own methods, turning each call into the matching operation, `ask`ing it, and taking the value out of the reply. It is cloneable when its caller is. For an algebra whose carriers are still open, the proxy states the trait for whatever carriers its caller carries, read off [`AlgebraCarrier`](#open-carriers).
 
 Where the operations go is stated by `AlgebraCall`: one operation stated, one reply received.
 
@@ -212,4 +212,41 @@ Only the capabilities the algebra asks for appear: `AlgebraCall` where a method 
 
 Both capabilities forward through `&` and `Arc`, so a borrow and a share of a carrier are the algebra too. That is why the trait needs no `auto_impl` of its own — and why it must not carry one, since a blanket impl and `#[auto_impl(&, Arc)]` on the same trait conflict. A local type that forwards the capabilities is the algebra by the same impl; one that states the trait itself still may, because it witnesses no capability and nothing downstream can make it.
 
-Either spelling requires an algebra whose carriers are all chosen and whose methods are all asynchronous, since a carrier that *is* the trait can leave nothing open.
+Either spelling requires an algebra whose methods are all asynchronous, since a carrier that *is* the trait reaches an interpreter elsewhere.
+
+#### Open carriers
+
+An algebra may leave its carriers open as associated types, and a transport still states it — for every choice of them at once. Each associated type becomes a parameter of the impl, bounded as the trait declares it, and the impl defines the associated type as that parameter. A caller names the carriers it reads in and nothing of what carries them:
+
+```rust,ignore
+#[trait_algebra(transport)]
+trait Registry {
+    type Peer: Send;
+    async fn admit(&self, peer: Self::Peer) -> usize;
+}
+
+async fn admit_through(registry: &impl Registry<Peer = u32>) -> usize { registry.admit(3).await }
+```
+
+`transport = <Carrier>` reads the parameters off the carrier's own type, as `impl<Peer> Registry for Carrier<RegistryOp<Peer>, RegistryReply>`. Bare `transport` is headed by a type parameter, and a type parameter fixes nothing, since one carrier may witness `AlgebraCall` for several algebras. So it reads them off `AlgebraCarrier`, which names the one operation and reply type a carrier carries:
+
+```rust,ignore
+pub trait AlgebraCarrier {
+    type Operation;
+    type Reply;
+}
+
+impl<Carrier, Peer> Registry for Carrier
+where
+    Carrier: AlgebraCarrier<Operation = RegistryOp<Peer>, Reply = RegistryReply>
+        + AlgebraCall<RegistryOp<Peer>, RegistryReply>
+        + Send
+        + Sync,
+    Peer: Send,
+{
+    type Peer = Peer;
+    // …
+}
+```
+
+`AlgebraCarrier` forwards through `&` and `Arc` like the other capabilities, and `alux-tokio`'s sender states it for the algebra its channel carries. An algebra whose carriers are all chosen asks for none, so its impl is what it was. A carrier is refused where no impl could fix it: one occurring in no argument and no return, one with parameters of its own, and one named like the impl's own parameter (`Carrier`, or `Calling` for a proxy).

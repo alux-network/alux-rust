@@ -1,5 +1,5 @@
 use crate::AlgebraMessage;
-use alux_sdk::{AlgebraCall, AlgebraSend};
+use alux_sdk::{AlgebraCall, AlgebraCarrier, AlgebraSend};
 use futures::stream::AbortHandle;
 use std::fmt::{self, Debug, Formatter};
 use tokio::sync::{mpsc, oneshot};
@@ -60,6 +60,12 @@ impl<Operation, Reply> Debug for BoundedAlgebraSender<Operation, Reply> {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
         formatter.debug_struct("BoundedAlgebraSender").finish_non_exhaustive()
     }
+}
+
+/// One channel carries one algebra, the one its messages are made of.
+impl<Operation, Reply> AlgebraCarrier for BoundedAlgebraSender<Operation, Reply> {
+    type Operation = Operation;
+    type Reply = Reply;
 }
 
 /// Both halves travel to another task, which is what the capability's `Send` future is stated for.
