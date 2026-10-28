@@ -730,8 +730,10 @@ impl OpenCarriers {
                 quote!(#ident: #(#bounds)+*)
             },
         );
-        // The trait's own predicates on its carriers are obligations of every impl, so they are
-        // restated on the parameters; predicates naming no carrier are the trait's alone.
+        // The trait's own predicates are obligations of every impl. Those naming a carrier are
+        // restated on the parameters, since only this impl can name them. Those naming none (such as
+        // `Self: Clone`) and supertraits are not restated yet, as before carriers could be open, so
+        // an impl over a carrier that does not witness them fails to compile.
         let stated = definition
             .generics
             .where_clause
