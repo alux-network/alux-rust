@@ -125,10 +125,15 @@ use syn::{ItemTrait, parse_macro_input};
 /// }
 /// ```
 ///
+/// The expansions show each parameter by its carrier's name. The macro names the parameters, and
+/// the type parameter heading the capability form and the proxy, apart from every name the trait
+/// states, so a bound such as `type Error: Error` still names the imported trait. A carrier may be
+/// reached as `Self::Peer` or as `<Self as Registry>::Peer`, in a signature or in the trait's where
+/// clause.
+///
 /// An algebra whose carriers are all chosen asks for no `AlgebraCarrier`, so its impl is unchanged.
 /// A carrier is refused where no impl could state it: one occurring in no argument and no return,
-/// one with parameters or a where clause of its own, and one named like what the impl is stated for
-/// (`Carrier`, the named carrier, or `Calling` for a proxy).
+/// and one with parameters or a where clause of its own.
 ///
 /// Either way, transport is stated only for an algebra whose methods are all asynchronous.
 /// `alux-tokio` carries the generated operation and reply types over a bounded channel while leaving

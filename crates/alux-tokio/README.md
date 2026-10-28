@@ -204,7 +204,7 @@ async fn main() {
 }
 ```
 
-What `transport` states for `Registry` names the carrier by what it carries, not by its type, which is why the contract layer can state it without knowing the channel:
+What `transport` states for `Registry` names the carrier by what it carries, not by its type, which is why the contract layer can state it without knowing the channel (shown with each parameter named after its carrier; the macro names them apart from the trait's own names):
 
 ```rust,ignore
 impl<Carrier, Peer> Registry for Carrier

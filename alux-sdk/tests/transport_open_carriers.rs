@@ -201,3 +201,149 @@ async fn a_proxy_states_the_algebra_its_caller_carries() {
     assert_eq!(look_up_through(&DirectoryProxy::new(Here)).await, 4);
     assert_eq!(look_up_through(&DirectoryProxy::new(Arc::new(Here))).await, 4);
 }
+
+/// The impl's parameters are named apart from every name the trait states.
+///
+/// Each carrier here is bounded by `Error`, the trait imported under the carrier's own name, and
+/// is reached as `<Self as Trait>::Error` as well as `Self::Error`: every impl still reads `Error`
+/// as that trait and restates the qualified predicate on its parameter.
+mod named_apart {
+    use alux_sdk::{AlgebraCall, AlgebraCarrier, trait_algebra};
+    use std::error::Error;
+    use std::fmt;
+    use std::marker::PhantomData;
+
+    /// What is refused, by its code.
+    #[derive(Clone, Debug, PartialEq)]
+    pub struct Refused(u8);
+
+    impl fmt::Display for Refused {
+        fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(formatter, "refused {}", self.0)
+        }
+    }
+
+    impl Error for Refused {}
+
+    /// States a refusal, and asks of it through the trait's own qualified predicate.
+    #[trait_algebra(transport)]
+    trait Fallible
+    where
+        <Self as Fallible>::Error: Clone + Send,
+    {
+        /// What is refused.
+        type Error: Error;
+        /// States the refusal of one code.
+        async fn fail(&self, code: u8) -> Self::Error;
+    }
+
+    /// Interprets failing as refusing the code.
+    struct Refusing;
+
+    impl FallibleInterpreter for Refusing {
+        type Error = Refused;
+
+        async fn fail(&mut self, code: u8) -> Refused {
+            Refused(code)
+        }
+    }
+
+    /// A carrier that interprets where it stands.
+    struct AtHand;
+
+    impl AlgebraCarrier for AtHand {
+        type Operation = FallibleOp;
+        type Reply = FallibleReply<Refused>;
+    }
+
+    impl AlgebraCall<FallibleOp, FallibleReply<Refused>> for AtHand {
+        async fn ask(&self, operation: FallibleOp) -> Option<FallibleReply<Refused>> {
+            Some(operation.interpret(&mut Refusing).await)
+        }
+    }
+
+    #[tokio::test]
+    async fn the_capability_impl_reads_the_imported_trait_and_the_qualified_predicate() {
+        assert_eq!(AtHand.fail(3).await, Refused(3));
+    }
+
+    /// Names one carrier, and carries a refusal reached by its qualified projection.
+    #[trait_algebra(transport = Kept)]
+    trait Reported {
+        /// What is reported.
+        type Error: Error;
+        /// States the length of one report.
+        async fn report(&self, error: <Self as Reported>::Error) -> usize;
+    }
+
+    /// Holds nothing and measures each report, for whatever reports it is built for.
+    struct Kept<Operation, Reply> {
+        stated: PhantomData<fn(Operation) -> Reply>,
+    }
+
+    /// Interprets reporting as measuring the report.
+    struct Measuring<Reporting>(PhantomData<Reporting>);
+
+    impl<Reporting> ReportedInterpreter for Measuring<Reporting>
+    where
+        Reporting: Error,
+    {
+        type Error = Reporting;
+
+        async fn report(&mut self, error: Reporting) -> usize {
+            error.to_string().len()
+        }
+    }
+
+    impl<Reporting> AlgebraCall<ReportedOp<Reporting>, ReportedReply> for Kept<ReportedOp<Reporting>, ReportedReply>
+    where
+        Reporting: Error + Send,
+    {
+        async fn ask(&self, operation: ReportedOp<Reporting>) -> Option<ReportedReply> {
+            Some(operation.interpret(&mut Measuring(PhantomData)).await)
+        }
+    }
+
+    #[tokio::test]
+    async fn the_carrier_impl_reads_the_imported_trait_and_the_qualified_carrier() {
+        let kept = Kept::<ReportedOp<Refused>, ReportedReply> { stated: PhantomData };
+
+        assert_eq!(kept.report(Refused(7)).await, "refused 7".len());
+    }
+
+    /// The proxy states the same algebra for whatever its caller carries.
+    #[trait_algebra(proxy)]
+    trait Excused {
+        /// What is excused.
+        type Error: Error;
+        /// States the length of one excuse.
+        async fn excuse(&self, error: <Self as Excused>::Error) -> usize;
+    }
+
+    impl ExcusedInterpreter for Measuring<Refused> {
+        type Error = Refused;
+
+        async fn excuse(&mut self, error: Refused) -> usize {
+            error.to_string().len()
+        }
+    }
+
+    /// A caller carrying excuses of `Refused`.
+    struct Here;
+
+    impl AlgebraCarrier for Here {
+        type Operation = ExcusedOp<Refused>;
+        type Reply = ExcusedReply;
+    }
+
+    impl AlgebraCall<ExcusedOp<Refused>, ExcusedReply> for Here {
+        async fn ask(&self, operation: ExcusedOp<Refused>) -> Option<ExcusedReply> {
+            Some(operation.interpret(&mut Measuring(PhantomData)).await)
+        }
+    }
+
+    #[tokio::test]
+    async fn the_proxy_reads_the_imported_trait_and_the_qualified_carrier() {
+        assert_eq!(ExcusedProxy::new(Here).excuse(Refused(9)).await, "refused 9".len());
+    }
+}
