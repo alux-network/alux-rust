@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+mod construct;
 mod layout;
 mod shape;
 mod words;
@@ -8,8 +9,9 @@ mod written;
 use proc_macro::TokenStream;
 use syn::{DeriveInput, parse_macro_input};
 
-/// States `ShapeOf` for a layout, reading its members and their names from the type.
-#[proc_macro_derive(Shape, attributes(written))]
+/// States `ShapeOf` for a layout, reading its members and their names from the type, and how a
+/// value is made from them: `Product` for a struct, `Sum` for an enum of two to sixteen alternatives.
+#[proc_macro_derive(Shape, attributes(written, serde))]
 pub fn derive_shape(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 

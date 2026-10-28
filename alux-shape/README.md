@@ -58,6 +58,23 @@ It owns no spelling, no encoder, and no layout. Whether a member is read by its 
 position is not stated in a term either, and cannot be: a member is a lens, and which coordinate
 addresses it is settled when a shape is composed with a transport.
 
+## Making a value from its members
+
+A shape describes a value and never builds one. An interpretation that reads a value member by member, from command-line words, named parameters, or a form, also needs to make it: `Product` states a value as its fields taken together, and `Sum` as the one alternative of `Sum2` through `Sum16` it carries, an alternative with no value being `()`. Each is an isomorphism, stated by `ProductLawsExt` and `SumLawsExt`, and names its members as identifiers of the words the shape names them by.
+
+`#[derive(Shape)]` states both beside the shape, from the same layout and the same `serde` attributes:
+
+| Layout | Shape | Construction |
+|---|---|---|
+| struct with named members | yes | `Product`, one field per member |
+| member with `#[serde(skip)]` | left out | no field; made with `Default` |
+| member with `#[serde(flatten)]` | merged | one field carrying the whole value |
+| enum of 2 to 16 alternatives, each one value or none | yes | `Sum` |
+| enum of one alternative, or more than 16 | yes | none |
+| newtype or tuple struct, tuple or struct alternative, union | rejected where it is written | none |
+
+A layout with type parameters is read too: its shape holds where each member's type has one, and its construction always holds. A use that needs a construction the derive did not state names the missing `Product` or `Sum` and these rules.
+
 ## Seeing one in a language
 
 A term says nothing about how a host writes it, so what a shape looks like in a language is an
