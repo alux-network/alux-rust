@@ -216,7 +216,7 @@ Either spelling requires an algebra whose methods are all asynchronous, since a 
 
 #### Open carriers
 
-An algebra may leave its carriers open as associated types, and a transport still states it — for every choice of them at once. Each associated type becomes a parameter of the impl, bounded as the trait declares it, and the impl defines the associated type as that parameter. A caller names the carriers it reads in and nothing of what carries them:
+An algebra may leave its carriers open as associated types, and a transport still states it — for every choice of them at once. Each associated type becomes a parameter of the impl, bounded as the trait declares it (on the associated type, or in the trait's where clause), and the impl defines the associated type as that parameter. A caller names the carriers it reads in and nothing of what carries them:
 
 ```rust,ignore
 #[trait_algebra(transport)]
@@ -228,7 +228,7 @@ trait Registry {
 async fn admit_through(registry: &impl Registry<Peer = u32>) -> usize { registry.admit(3).await }
 ```
 
-`transport = <Carrier>` reads the parameters off the carrier's own type, as `impl<Peer> Registry for Carrier<RegistryOp<Peer>, RegistryReply>`. Bare `transport` is headed by a type parameter, and a type parameter fixes nothing, since one carrier may witness `AlgebraCall` for several algebras. So it reads them off `AlgebraCarrier`, which names the one operation and reply type a carrier carries:
+`transport = <Carrier>` reads the parameters off the carrier's own type, as `impl<Peer> Registry for Carrier<RegistryOp<Peer>, RegistryReply>`, and is conditioned on the capabilities that carrier witnesses: one witnessing them only for some choices, as `BoundedAlgebraSender` does only for `Send` ones, restricts the impl and leaves the algebra's bounds alone. Bare `transport` is headed by a type parameter, and a type parameter fixes nothing, since one carrier may witness `AlgebraCall` for several algebras. So it reads them off `AlgebraCarrier`, which names the one operation and reply type a carrier carries:
 
 ```rust,ignore
 pub trait AlgebraCarrier {
@@ -249,4 +249,4 @@ where
 }
 ```
 
-`AlgebraCarrier` forwards through `&` and `Arc` like the other capabilities, and `alux-tokio`'s sender states it for the algebra its channel carries. An algebra whose carriers are all chosen asks for none, so its impl is what it was. A carrier is refused where no impl could fix it: one occurring in no argument and no return, one with parameters of its own, and one named like the impl's own parameter (`Carrier`, or `Calling` for a proxy).
+`AlgebraCarrier` forwards through `&` and `Arc` like the other capabilities, and `alux-tokio`'s sender states it for the algebra its channel carries. An algebra whose carriers are all chosen asks for none, so its impl is what it was. A carrier is refused where no impl could state it: one occurring in no argument and no return, one with parameters or a where clause of its own, and one named like what the impl is stated for (`Carrier`, the named carrier, or `Calling` for a proxy).

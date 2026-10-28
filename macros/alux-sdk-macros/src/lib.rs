@@ -101,9 +101,13 @@ use syn::{ItemTrait, parse_macro_input};
 /// the blanket impl.
 ///
 /// An algebra whose carriers are still open is stated for every choice of them at once: each
-/// associated type becomes a parameter of the impl, bounded as the trait declares it, and the impl
-/// defines the associated type as that parameter. `transport = <Carrier>` reads the parameters off
-/// the carrier's own type, as `impl<Peer> Registry for Carrier<RegistryOp<Peer>, RegistryReply>`.
+/// associated type becomes a parameter of the impl, bounded as the trait declares it (on the
+/// associated type, or in the trait's where clause), and the impl defines the associated type as
+/// that parameter. `transport = <Carrier>` reads the parameters off the carrier's own type, as
+/// `impl<Peer> Registry for Carrier<RegistryOp<Peer>, RegistryReply>`, and is conditioned on the
+/// capabilities that carrier witnesses, so one witnessing them only for some choices (as
+/// `alux-tokio`'s sender does only for `Send` ones) restricts the impl rather than the algebra's
+/// bounds.
 /// Bare `transport` is headed by a type parameter, which fixes nothing, so it reads them off
 /// `AlgebraCarrier`, which names the one operation and reply type a carrier carries:
 ///
@@ -122,8 +126,9 @@ use syn::{ItemTrait, parse_macro_input};
 /// ```
 ///
 /// An algebra whose carriers are all chosen asks for no `AlgebraCarrier`, so its impl is unchanged.
-/// A carrier is refused where no impl could fix it: one occurring in no argument and no return, one
-/// with parameters of its own, and one named like the impl's own `Carrier` parameter.
+/// A carrier is refused where no impl could state it: one occurring in no argument and no return,
+/// one with parameters or a where clause of its own, and one named like what the impl is stated for
+/// (`Carrier`, the named carrier, or `Calling` for a proxy).
 ///
 /// Either way, transport is stated only for an algebra whose methods are all asynchronous.
 /// `alux-tokio` carries the generated operation and reply types over a bounded channel while leaving

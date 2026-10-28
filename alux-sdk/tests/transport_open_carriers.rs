@@ -107,10 +107,13 @@ async fn the_carried_algebra_can_be_waited_on_elsewhere() {
 }
 
 /// The carrier form names one carrier, whose own parameters fix the algebra's.
+///
+/// `Entry` is bounded by nothing: `Kept` asks only for entries that are `Send`, and the impl is
+/// conditioned on what `Kept` witnesses rather than on a bound the algebra would have to repeat.
 #[trait_algebra(transport = Kept)]
 trait Ledger {
     /// What is entered.
-    type Entry: Send;
+    type Entry;
     /// States a value carrying the carrier.
     async fn enter(&self, entry: Self::Entry) -> Self::Entry;
 }
@@ -150,10 +153,15 @@ async fn the_named_carrier_states_the_algebra_for_each_choice_of_its_carriers() 
 }
 
 /// The proxy holds a caller, and reads the carriers off what that caller carries.
+///
+/// The bound on `Name` is stated in the trait's where clause, which every impl restates.
 #[trait_algebra(proxy)]
-trait Directory {
+trait Directory
+where
+    Self::Name: Send,
+{
     /// Who is looked up.
-    type Name: Send;
+    type Name;
     /// States a value, so the proxy asks for it.
     async fn look_up(&self, name: Self::Name) -> usize;
 }
