@@ -15,46 +15,14 @@ generator without an explicit scope decision. Downstream crates own their domain
 
 ## Workspace
 
-| Crate | Responsibility |
-| --- | --- |
-| `alux-ext` | `ext` facade, first-order operation signature/application, and owned context handles |
-| `alux-ext-macros` | Parsing, validation, and lowering for extension, HTTP, and JSON-RPC programs |
-| `alux-http` | Neutral typed HTTP syntax, algebras, and folds |
-| `alux-jsonrpc` | Neutral typed JSON-RPC syntax, algebras, and folds |
-| `alux-http-text` | Text and metadata interpretation of an HTTP program |
-| `alux-http-poem` | Poem interpretation of an HTTP program |
-| `alux-http-axum` | axum interpretation of an HTTP program |
-| `alux-http-actix` | actix-web interpretation of an HTTP program |
-| `alux-http-salvo` | Salvo interpretation of an HTTP program |
-| `alux-http-warp` | warp interpretation of an HTTP program |
-| `alux-http-rocket` | Rocket interpretation of an HTTP program |
-| `alux-http-direct` | Interpretation of an HTTP program that answers it with no framework |
-| `alux-http-openapi` | OpenAPI interpretation of an HTTP program |
-| `alux-http-typescript` | TypeScript client interpretation of an HTTP program |
-| `alux-http-hyper` | Serves the direct interpretation of an HTTP program over hyper |
-| `alux-http-parts` | Reads a body arriving as parts, for interpretations whose framework does not |
-| `alux-http-conformance` | One declared HTTP surface and the scenario every interpretation satisfies |
-| `alux-jsonrpc-jsonrpsee` | jsonrpsee interpretation of a JSON-RPC program |
-| `alux-bench` | Neutral statement of what a benchmark measures, with no harness |
-| `alux-bench-direct` | Measures a stated bench by running it, saying each case as it finishes |
-| `alux-bench-criterion` | Measures a stated bench as criterion groups and functions |
+The members are listed in `Cargo.toml`, and [`README.md`](README.md) says what each crate is for.
 
-Dependency arrows point toward `alux-ext`. The specification crates declare exactly one dependency,
-`alux-ext`, and re-export the macro backends they own from `alux_ext::macros`.
+Dependency arrows point toward `alux-ext`. A specification crate depends on `alux-ext` and, when it
+is stated over another specification, on that one: `alux-cli` reads its product and sum arguments
+from `alux-shape`. Each re-exports the macro backends it owns from `alux_ext::macros`.
 
 ```text
-alux-http-text ------\
-                      -> alux-http ------\
-alux-http-poem ------|                    -> alux-ext -> alux-ext-macros
-alux-http-axum ------|
-alux-http-actix -----|
-alux-http-salvo -----|
-alux-http-warp ------|
-alux-http-rocket ----|
-alux-http-direct ----|
-alux-http-openapi ---|
-alux-http-typescript -/
-alux-jsonrpc-jsonrpsee -> alux-jsonrpc --/
+interpretation -> specification -> alux-ext -> alux-ext-macros
 ```
 
 A specification crate must never name a framework, serialization format, or runtime. Each
@@ -105,7 +73,7 @@ just test
 just package
 ```
 
-`just ci` runs all six in that order. The [`Justfile`](Justfile) holds the full command every recipe
+`just ci` runs all six in that order. The [`justfile`](justfile) holds the full command every recipe
 stands for. Run the narrowest relevant test during development and `just ci` before finishing.
 
 ## Design by Meaning
@@ -238,7 +206,8 @@ semantic god traits.
 - Compare at least two interpreters when claiming an interface is interpreter-independent.
 - Keep reusable expectation functions independent of a particular domain algebra when practical.
 - Test direct first-order syntax as well as macro-lowered convenience syntax.
-- Read a specification crate's manifest: only `alux-ext` belongs there, and no build states that.
+- Read a specification crate's manifest: only `alux-ext` and the specifications it is stated over
+  belong there, and no build states that.
 - Test each interpreter crate to prove it preserves the same program.
 - Prefer identity, associativity, nesting, ordering, round-trip, and interpretation-agreement laws.
 - Treat finite tests as executable evidence, not universal proof.
@@ -255,18 +224,10 @@ Current key witnesses are:
 
 ## Publication
 
-Packages publish in dependency order:
-
-1. `alux-ext-macros`
-2. `alux-ext`
-3. `alux-http` and `alux-jsonrpc`
-4. `alux-http-text`, `alux-http-poem`, and `alux-jsonrpc-jsonrpsee`
-
-Allow the registry index to observe each dependency before publishing the next package. Public
-traits, generated operation names, syntax types, the dependency list of a specification crate, and
-macro behavior are compatibility surface. Rejecting an authored form is part of that surface: the
-diagnostic explaining it is the only documentation a rejected form has, and accepting it later changes
-what the same source means. Use semantic versioning and document migrations for breaking changes.
+Public traits, generated operation names, syntax types, the dependency list of a specification
+crate, and macro behavior are compatibility surface. Rejecting an authored form is part of that
+surface: the diagnostic explaining it is the only documentation a rejected form has, and accepting it
+later changes what the same source means. Document migrations for breaking changes.
 
 ## Change workflow
 
