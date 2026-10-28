@@ -72,18 +72,21 @@ impl ProgramBackendAlg for ShapeBackend {
     /// A shape program states nothing once for all of its declarations.
     type Defaults = ();
 
-    const NESTED_SUFFIX: &'static str = "_shape";
+    const ROOT: &'static str = "record";
     const REJECTED_PARAM: &'static str = "shape programs currently support type parameters only";
 
-    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
+    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) -> TokenStream {
         // The method is the shape's name, and this is the only stage that reads it: the lowering
-        // carries the derived program type from here on, not the name it came from.
+        // carries the derived program type from here on, not the name it came from. A trailing
+        // `shape` names the vocabulary, not the shape, so it is not one of its words.
         let mut named = words(&method.sig.ident);
-        if named.last().is_some_and(|word| word == Self::NESTED_SUFFIX.trim_start_matches('_')) {
+        if named.last().is_some_and(|word| word == "shape") {
             named.pop();
         }
         Names.visit_block_mut(&mut method.block);
         name_record(&mut method.block, &named);
+        // This transport states its evidence in the where clause alone.
+        TokenStream::new()
     }
 
     fn require_subprogram(program: &TokenStream) -> TokenStream {
@@ -225,7 +228,9 @@ mod tests {
 
         assert!(output.contains("ProfileShapeProgram : :: alux_shape :: ShapeProgramAlg < This"));
         assert!(output.contains("TimestampsShapeProgram : :: alux_shape :: ShapeProgramAlg < This"));
-        assert!(output.contains("builder . program (builder . profile_shape"));
+        // In A-normal form, the nested shape is bound once and then named.
+        assert!(output.contains("let part0 = builder . profile_shape () ;"), "{output}");
+        assert!(output.contains("builder . program (part0)"), "{output}");
     }
 
     #[test]

@@ -200,13 +200,14 @@ where
 // --- Second half: the operation. This is what `defunc` adds. ---
 
 // The value that means "apply `value_plus`". It is zero-sized: `PhantomData` only remembers which
-// context type the operation expects, so there is no hidden state to configure or get wrong.
+// context type the operation expects, so there is no hidden state to configure or get wrong. The
+// context is held only behind a reference, so it may be unsized, a `dyn` capability or a slice.
 #[doc(hidden)]
-struct ValuePlusOperation<Context>(core::marker::PhantomData<fn() -> Context>);
+struct ValuePlusOperation<Context: ?Sized>(core::marker::PhantomData<(fn(&Context), fn() -> ())>);
 
 // Because it holds nothing, `Default` is enough to build one. Program declarations rely on this.
 #[doc(hidden)]
-impl<Context> core::default::Default for ValuePlusOperation<Context> {
+impl<Context: ?Sized> core::default::Default for ValuePlusOperation<Context> {
     fn default() -> Self {
         Self(core::marker::PhantomData)
     }
@@ -222,14 +223,16 @@ impl<Context> ::alux_ext::OperationAlg for ValuePlusOperation<Context> {
     const ARG_NAMES: &'static [&'static str] = &["increment"];
 }
 
-// Application, kept separate from the signature. `Handle` is whatever carrier the caller chose —
-// `Arc<Context>` for a server, something cheaper for a test — so `Arc`, `Send`, and executor
-// concerns live here at the boundary instead of in the method you wrote.
+// Application, kept separate from the signature. `Handle` is whatever carrier the caller chose that
+// borrows the context — `Arc<Context>` for a server, `&Context` for a test — so `Arc`, `Send`, and
+// executor concerns live here at the boundary instead of in the method you wrote. The future owns
+// each argument, so it is `Send` where they are; the method states nothing about threads.
 #[doc(hidden)]
 impl<Context, Handle> ::alux_ext::ApplyAlg<Handle, (u32,)> for ValuePlusOperation<Context>
 where
-    Handle: AsRef<Context> + Send,
+    Handle: core::borrow::Borrow<Context> + Send,
     Context: Sync,
+    u32: Send,
     Context: ValueAlg,
 {
     // Inferred from your return type, so no declaration ever restates it.
@@ -245,7 +248,7 @@ where
             let (increment,) = __args;
             // ...and the method you wrote is *called*. The body is never copied, so the operation
             // cannot drift away from the method it denotes.
-            __context.as_ref().value_plus(increment).await
+            <Handle as core::borrow::Borrow<Context>>::borrow(&__context).value_plus(increment).await
         }
     }
 }

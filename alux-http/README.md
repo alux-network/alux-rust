@@ -45,10 +45,7 @@ where
     This: HttpRouteAlg,
 {
     /// Declares the status surface: the current reading and one identified reading.
-    fn status_api<Alg>(&self)
-    where
-        Alg: StatusAlg,
-    {
+    fn status_api<Alg>(&self) {
         self.routes()
             // The reading as it stands.
             .get("/status", self.op(Alg::status_current).json())
@@ -90,7 +87,7 @@ assert_eq!(<StatusForIdOperation<App> as OperationAlg>::ARG_NAMES, ["id"]);
 The extension above is tagless-final: `This` chooses the route and endpoint representations.
 `defunc(via = http)` reads each endpoint's input roles and output kind and states one
 `HttpOperationAlg<Operation, Inputs, Kind>` bound per endpoint, so the declaration names only
-`HttpRouteAlg` and its domain. The operation already carries its domain context, argument signature,
+`HttpRouteAlg`. The operation already carries its domain context, argument signature,
 argument names, and result; these are not repeated in the HTTP capability.
 
 `Operation::out::<Kind>()` selects output meaning. `.json()`, `.text()`, and the other built-in
@@ -264,10 +261,7 @@ where
     This: HttpRouteAlg,
 {
     /// Declares the status route.
-    fn status_api<Alg>(&self)
-    where
-        Alg: StatusAlg,
-    {
+    fn status_api<Alg>(&self) {
         // The reading as it stands.
         self.routes().get("/status", self.op(Alg::status_current).json())
     }
@@ -280,10 +274,7 @@ where
     This: HttpRouteAlg,
 {
     /// Declares the item route.
-    fn items_api<Alg>(&self)
-    where
-        Alg: ItemsAlg,
-    {
+    fn items_api<Alg>(&self) {
         // Every item the domain holds.
         self.routes().get("/items", self.op(Alg::items_current).json())
     }
@@ -296,10 +287,7 @@ where
     This: HttpRouteAlg,
 {
     /// Declares `/status` beside `/v1/items`.
-    fn service_api<Alg>(&self)
-    where
-        Alg: StatusAlg + ItemsAlg,
-    {
+    fn service_api<Alg>(&self) {
         self.routes()
             // Both fragments, side by side.
             .merge(self.status_api::<Alg>())

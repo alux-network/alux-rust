@@ -155,10 +155,7 @@ impl<This> This
 where
     This: HttpRouteAlg,
 {
-    fn price_api<Alg>(&self)
-    where
-        Alg: PriceAlg,
-    {
+    fn price_api<Alg>(&self) {
         self.routes().get("/price/:asset", self.op(Alg::price_current).path::<String>().json())
     }
 }

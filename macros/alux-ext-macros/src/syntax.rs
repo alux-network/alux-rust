@@ -11,8 +11,8 @@ use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::visit_mut::{self, VisitMut};
 use syn::{
-    Attribute, Expr, ExprLit, GenericArgument, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Lit,
-    Meta, PathArguments, Token, Type, TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
+    Attribute, Expr, ExprLit, GenericArgument, GenericParam, Generics, Ident, ImplItemFn, ItemImpl, Lit, Meta,
+    PathArguments, Token, Type, TypeParam, TypePath, Visibility, WherePredicate, parse_quote,
 };
 
 /// Parses an extension block, with the visibility written before `impl`.
@@ -120,17 +120,6 @@ pub(crate) fn doc_text(attrs: &[Attribute]) -> String {
     lines.join("\n").trim().to_owned()
 }
 
-/// Returns the names of every method the extension declares.
-pub(crate) fn method_names(item: &ItemImpl) -> Vec<Ident> {
-    item.items
-        .iter()
-        .filter_map(|item| match item {
-            ImplItem::Fn(method) => Some(method.sig.ident.clone()),
-            _ => None,
-        })
-        .collect()
-}
-
 /// Derives a generated type name from an authored method name.
 pub(crate) fn pascal_ident(name: &Ident, suffix: &str) -> Ident {
     let mut pascal = String::new();
@@ -147,6 +136,11 @@ pub(crate) fn pascal_ident(name: &Ident, suffix: &str) -> Ident {
 /// Names the first-order operation reifying one method's application.
 pub(crate) fn operation_ident(method: &Ident) -> Ident {
     pascal_ident(method, "Operation")
+}
+
+/// Names the item carrying one method's argument names, which no context changes.
+pub(crate) fn arg_names_ident(method: &Ident) -> Ident {
+    pascal_ident(method, "ArgNames")
 }
 
 /// Names the first-order program produced by one declaration method.
@@ -181,6 +175,9 @@ pub(crate) struct Reified {
     pub(crate) operation: Type,
     /// The domain the operation interprets, as the author named it.
     pub(crate) carrier: Ident,
+    /// The method a reified handler names, and the item carrying its argument names; a handler
+    /// written first-order names neither.
+    pub(crate) method: Option<(Ident, Ident)>,
 }
 
 /// Reads the domain out of an already first-order handler's type arguments.
@@ -223,14 +220,21 @@ pub(crate) fn lift_operation(declaration: &mut Expr) -> Option<Reified> {
         let Expr::MethodCall(call) = current else { return None };
         if call.method == "op" {
             let handler = call.args.first()?;
+            let mut method_names = None;
             let (operation, carrier, reify) = match handler {
                 Expr::Path(handler) => {
                     // `Domain::method` names both halves; reusing them keeps the expansion hygienic.
                     let mut segments = handler.path.segments.iter().rev();
-                    let method = segments.next()?.ident.clone();
+                    let method = segments.next()?;
                     let carrier = segments.next()?.ident.clone();
-                    let operation = operation_ident(&method);
-                    (parse_quote!(#operation<#carrier>), carrier, true)
+                    let operation = operation_ident(&method.ident);
+                    method_names = Some((method.ident.clone(), arg_names_ident(&method.ident)));
+                    // Type parameters the method selects, `Domain::method::<A, B>`, select the operation's.
+                    let selected = match &method.arguments {
+                        PathArguments::AngleBracketed(arguments) => arguments.args.iter().cloned().collect(),
+                        _ => Vec::new(),
+                    };
+                    (parse_quote!(#operation<#carrier #(, #selected)*>), carrier, true)
                 }
                 handler => {
                     let operation = first_order_type(handler)?;
@@ -242,46 +246,56 @@ pub(crate) fn lift_operation(declaration: &mut Expr) -> Option<Reified> {
                 let argument: Expr = parse_quote!(<#operation>::default());
                 call.args = Punctuated::from_iter([argument]);
             }
-            return Some(Reified { operation, carrier });
+            return Some(Reified { operation, carrier, method: method_names });
         }
         current = &mut call.receiver;
     }
 }
 
-/// Collects and rewrites the calls that denote nested programs.
-pub(crate) struct Subprograms<'a> {
-    methods: &'a [Ident],
-    suffix: &'static str,
+/// Finds the programs a declaration composes, by where they are written: the program argument of
+/// `merge(program)`, `nest(name, program)`, and `within(operation, program)`.
+///
+/// A call on `self` in one of those positions denotes a program whatever its method is named, so a
+/// program declared in this block, in another block, or in another crate composes alike.
+pub(crate) struct Subprograms {
     programs: Vec<TokenStream>,
 }
 
-impl<'a> Subprograms<'a> {
-    /// Recognizes calls to `methods` and to any method whose name ends with `suffix`.
-    pub(crate) fn new(methods: &'a [Ident], suffix: &'static str) -> Self {
-        Self { methods, suffix, programs: Vec::new() }
+impl Subprograms {
+    pub(crate) fn new() -> Self {
+        Self { programs: Vec::new() }
     }
 
     /// Returns the nested program types found so far.
     pub(crate) fn programs(&self) -> &[TokenStream] {
         &self.programs
     }
+
+    /// The position of the program among a composing call's arguments, if it composes one.
+    fn program_position(method: &Ident) -> Option<usize> {
+        match method.to_string().as_str() {
+            "merge" => Some(0),
+            "nest" | "within" => Some(1),
+            _ => None,
+        }
+    }
 }
 
-impl VisitMut for Subprograms<'_> {
-    fn visit_expr_mut(&mut self, expression: &mut Expr) {
-        visit_mut::visit_expr_mut(self, expression);
-        let Expr::MethodCall(call) = expression else { return };
-        if !(self.methods.contains(&call.method) || call.method.to_string().ends_with(self.suffix))
-            || !matches!(call.receiver.as_ref(), Expr::Path(path) if path.path.is_ident("self"))
-        {
+impl VisitMut for Subprograms {
+    fn visit_expr_method_call_mut(&mut self, call: &mut syn::ExprMethodCall) {
+        visit_mut::visit_expr_method_call_mut(self, call);
+        let Some(position) = Self::program_position(&call.method) else { return };
+        let Some(argument) = call.args.iter_mut().nth(position) else { return };
+        let Expr::MethodCall(program) = &*argument else { return };
+        if !matches!(program.receiver.as_ref(), Expr::Path(path) if path.path.is_ident("self")) {
             return;
         }
-        let program = program_ident(&call.method);
-        let arguments = call.turbofish.as_ref().map(|arguments| arguments.args.clone()).unwrap_or_default();
-        let program_type = if arguments.is_empty() { quote!(#program) } else { quote!(#program<#arguments>) };
+        let name = program_ident(&program.method);
+        let arguments = program.turbofish.as_ref().map(|arguments| arguments.args.clone()).unwrap_or_default();
+        let program_type = if arguments.is_empty() { quote!(#name) } else { quote!(#name<#arguments>) };
         self.programs.push(program_type);
-        let call = call.clone();
-        *expression = parse_quote!(self.program(#call));
+        let program = program.clone();
+        *argument = parse_quote!(self.program(#program));
     }
 }
 

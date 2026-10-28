@@ -42,10 +42,7 @@ where
     This: JsonRpcApiAlg,
 {
     /// Declares the status surface: a reading and an adjustment.
-    fn status_rpc<Alg>(&self)
-    where
-        Alg: StatusAlg,
-    {
+    fn status_rpc<Alg>(&self) {
         self.methods()
             // The reading as it stands, taking no parameters.
             .method("status_current", self.op(Alg::status_current))
@@ -167,10 +164,7 @@ where
     This: JsonRpcApiAlg,
 {
     /// Declares the status methods.
-    fn status_rpc<Alg>(&self)
-    where
-        Alg: StatusAlg,
-    {
+    fn status_rpc<Alg>(&self) {
         self.methods()
             // The reading as it stands, taking no parameters.
             .method("status_current", self.op(Alg::status_current))
@@ -191,10 +185,7 @@ where
     This: JsonRpcApiAlg,
 {
     /// Declares the item method.
-    fn items_rpc<Alg>(&self)
-    where
-        Alg: ItemsAlg,
-    {
+    fn items_rpc<Alg>(&self) {
         // Every item the domain holds.
         self.methods().method("items_current", self.op(Alg::items_current))
     }
@@ -208,10 +199,7 @@ where
     This: JsonRpcApiAlg,
 {
     /// Declares the history method, whose readings answer as JSON-RPC errors.
-    fn history_rpc<Alg>(&self)
-    where
-        Alg: StatusAlg,
-    {
+    fn history_rpc<Alg>(&self) {
         // The ext-level `fallible` marker states it for every method here, so this one stays silent.
         self.methods().method("status_history", self.op(Alg::status_history))
     }
@@ -224,10 +212,7 @@ where
     This: JsonRpcApiAlg,
 {
     /// Declares every method the fragments contribute.
-    fn service_rpc<Alg>(&self)
-    where
-        Alg: StatusAlg + ItemsAlg,
-    {
+    fn service_rpc<Alg>(&self) {
         self.methods()
             .merge(self.status_rpc::<Alg>())
             .merge(self.history_rpc::<Alg>())

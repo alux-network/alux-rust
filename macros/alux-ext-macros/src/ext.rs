@@ -7,21 +7,23 @@
 
 use crate::extension::{extension, stated};
 use crate::http_program::http_program_defunc_internal;
-use crate::syntax::{ExtensionImpl, doc_text, documentation, operation_ident};
+use crate::syntax::{ExtensionImpl, arg_names_ident, doc_text, documentation, operation_ident};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
+use syn::visit::Visit;
 use syn::visit_mut::VisitMut;
 use syn::{
     ExprMethodCall, FnArg, GenericParam, Generics, Ident, ImplItem, ImplItemFn, ItemImpl, Meta, Pat, Path,
-    ReceiverKind, ReturnType, Token, Type, Visibility, parse_quote,
+    ReceiverKind, ReturnType, Token, Type, Visibility, WherePredicate, parse_quote,
 };
 
 enum Defunc {
     None,
     Apply,
-    Via(Path),
+    /// Every backend the block is lowered through, in authored order.
+    Via(Vec<Path>),
 }
 
 /// Separates the DD-specific flag from the arguments the extension itself reads.
@@ -40,15 +42,18 @@ impl Parse for ExtArgs {
                 defunc = match argument {
                     Meta::Path(_) => Defunc::Apply,
                     Meta::List(list) => {
-                        let mut via = None;
+                        let mut via = Vec::new();
                         list.parse_nested_meta(|meta| {
                             if !meta.path.is_ident("via") {
                                 return Err(meta.error("expected `via = path`"));
                             }
-                            via = Some(meta.value()?.parse::<Path>()?);
+                            via.push(meta.value()?.parse::<Path>()?);
                             Ok(())
                         })?;
-                        Defunc::Via(via.ok_or_else(|| syn::Error::new_spanned(list, "expected `via = path`"))?)
+                        if via.is_empty() {
+                            return Err(syn::Error::new_spanned(list, "expected `via = path`"));
+                        }
+                        Defunc::Via(via)
                     }
                     Meta::NameValue(argument) => {
                         return Err(syn::Error::new_spanned(argument, "use `defunc` or `defunc(via = path)`"));
@@ -70,6 +75,72 @@ impl VisitMut for RenameThis {
             *ident = format_ident!("Context");
         }
     }
+}
+
+/// Names every elided lifetime of an argument type with the operation's borrow lifetime.
+struct NameBorrow {
+    lifetime: syn::Lifetime,
+    named: bool,
+    /// The types borrowed for the lifetime, each of which must outlive it.
+    referents: Vec<Type>,
+}
+
+impl VisitMut for NameBorrow {
+    fn visit_type_reference_mut(&mut self, reference: &mut syn::TypeReference) {
+        if reference.lifetime.as_ref().is_none_or(|lifetime| lifetime.ident == "_") {
+            reference.lifetime = Some(self.lifetime.clone());
+            self.named = true;
+        }
+        syn::visit_mut::visit_type_reference_mut(self, reference);
+        if reference.lifetime.as_ref() == Some(&self.lifetime) {
+            self.referents.push(reference.elem.as_ref().clone());
+        }
+    }
+
+    fn visit_lifetime_mut(&mut self, lifetime: &mut syn::Lifetime) {
+        if lifetime.ident == "_" {
+            *lifetime = self.lifetime.clone();
+            self.named = true;
+        }
+    }
+}
+
+/// States the borrow lifetime as `'static`, the shape a signature names its borrows with.
+struct StaticBorrow<'a>(&'a syn::Lifetime);
+
+impl VisitMut for StaticBorrow<'_> {
+    fn visit_lifetime_mut(&mut self, lifetime: &mut syn::Lifetime) {
+        if lifetime == self.0 {
+            *lifetime = syn::Lifetime::new("'static", lifetime.span());
+        }
+    }
+}
+
+/// Says whether a type borrows, which an output cannot: the handle it would borrow from is
+/// consumed by the application that answers it.
+fn borrows(ty: &Type) -> bool {
+    struct Borrows(bool);
+    impl<'ast> syn::visit::Visit<'ast> for Borrows {
+        fn visit_type_reference(&mut self, reference: &'ast syn::TypeReference) {
+            self.0 |= reference.lifetime.as_ref().is_none_or(|lifetime| lifetime.ident != "static");
+            syn::visit::visit_type_reference(self, reference);
+        }
+        fn visit_lifetime(&mut self, lifetime: &'ast syn::Lifetime) {
+            self.0 |= lifetime.ident != "static";
+        }
+    }
+    let mut visitor = Borrows(false);
+    syn::visit::Visit::visit_type(&mut visitor, ty);
+    visitor.0
+}
+
+/// Says whether tokens name the context, which the renamed `This` of a signature is.
+fn mentions_context(tokens: TokenStream) -> bool {
+    tokens.into_iter().any(|token| match token {
+        proc_macro2::TokenTree::Ident(ident) => ident == "Context",
+        proc_macro2::TokenTree::Group(group) => mentions_context(group.stream()),
+        _ => false,
+    })
 }
 
 /// Recognizes a block whose methods already construct first-order route programs.
@@ -102,35 +173,44 @@ fn is_direct_program(item: &ItemImpl) -> bool {
     })
 }
 
-/// Reifies one borrowed extension method as an operation and its application meaning.
-fn defunctionalize(method: &ImplItemFn, visibility: &Visibility, generics: &Generics) -> syn::Result<TokenStream> {
-    let operation = operation_ident(&method.sig.ident);
-    // A method that writes no return type returns nothing, which is a result like any other: it is
-    // what an endpoint stating no body answers with.
-    let mut output = match &method.sig.output {
-        ReturnType::Type(_, output) => output.as_ref().clone(),
-        ReturnType::Default => parse_quote!(()),
-    };
-    let context = format_ident!("__context");
-    RenameThis.visit_type_mut(&mut output);
-    // The parameters the block names besides its receiver are fixed by the context through its
-    // bounds, so the operation keeps them on its implementations and not on its type.
-    let named = generics
-        .params
-        .iter()
-        .filter(|param| !matches!(param, GenericParam::Type(param) if param.ident == "This"))
-        .cloned()
-        .map(|mut param| {
-            RenameThis.visit_generic_param_mut(&mut param);
-            param
-        })
-        .collect::<Vec<_>>();
-    let mut predicates = generics.where_clause.as_ref().map(|clause| clause.predicates.clone()).unwrap_or_default();
-    for predicate in &mut predicates {
-        RenameThis.visit_where_predicate_mut(predicate);
+/// Reads the type parameters a method selects, and the bounds it states on them.
+///
+/// They are selected where the operation is named, so they are parameters of the operation type,
+/// and their bounds belong to both of its implementations.
+fn selected_parameters(method: &ImplItemFn) -> syn::Result<(Vec<Ident>, Punctuated<WherePredicate, Token![,]>)> {
+    let mut selected = Vec::new();
+    let mut method_predicates = Punctuated::<WherePredicate, Token![,]>::new();
+    for param in &method.sig.generics.params {
+        let GenericParam::Type(param) = param else {
+            return Err(syn::Error::new_spanned(
+                param,
+                "a defunctionalized method selects type parameters only; a lifetime or const parameter has \
+                 no first-order operation to select",
+            ));
+        };
+        let ident = &param.ident;
+        selected.push(ident.clone());
+        if !param.bounds.is_empty() {
+            let mut bounds = param.bounds.clone();
+            for bound in &mut bounds {
+                RenameThis.visit_type_param_bound_mut(bound);
+            }
+            method_predicates.push(parse_quote!(#ident: #bounds));
+        }
     }
-    // A signature without named parameters keeps stating itself for every context.
-    let signature_predicates = if named.is_empty() { None } else { Some(&predicates) };
+    if let Some(clause) = &method.sig.generics.where_clause {
+        for predicate in &clause.predicates {
+            let mut predicate = predicate.clone();
+            RenameThis.visit_where_predicate_mut(&mut predicate);
+            method_predicates.push(predicate);
+        }
+    }
+    Ok((selected, method_predicates))
+}
+
+/// Reads a method's arguments, their types with `This` as the context and every elided lifetime
+/// named as the operation's borrow, and whether its receiver is mutable.
+fn signature_arguments(method: &ImplItemFn, borrow: &mut NameBorrow) -> syn::Result<(Vec<Ident>, Vec<Type>, bool)> {
     let mut arguments = Vec::new();
     let mut argument_types = Vec::<Type>::new();
     let mut mutable_receiver = false;
@@ -149,41 +229,264 @@ fn defunctionalize(method: &ImplItemFn, visibility: &Visibility, generics: &Gene
                 arguments.push(pattern.ident.clone());
                 let mut argument_type = input.ty.as_ref().clone();
                 RenameThis.visit_type_mut(&mut argument_type);
+                borrow.visit_type_mut(&mut argument_type);
                 argument_types.push(argument_type);
             }
         }
     }
+    Ok((arguments, argument_types, mutable_receiver))
+}
+
+/// Chooses the handle an application takes, how it reaches the receiver, and what it requires.
+///
+/// An owned output is answered to any handle that lends the context; a borrowed output only to a
+/// borrow of the context for the output's lifetime.
+fn handle(
+    context: &Ident,
+    lifetime_ref: &syn::Lifetime,
+    lends_output: bool,
+    mutable_receiver: bool,
+) -> (TokenStream, TokenStream, Option<TokenStream>, TokenStream, TokenStream) {
+    // `Borrow` reaches the context through `&`, `&mut`, `Arc`, `Box`, or the context itself, sized or not.
+    let context_bound =
+        if mutable_receiver { quote!(core::borrow::BorrowMut<Context>) } else { quote!(core::borrow::Borrow<Context>) };
+    let context_parameter = if mutable_receiver && !lends_output { quote!(mut #context) } else { quote!(#context) };
+    let receiver = match (lends_output, mutable_receiver) {
+        (true, _) => quote!(#context),
+        (false, true) => quote!(<Handle as core::borrow::BorrowMut<Context>>::borrow_mut(&mut #context)),
+        (false, false) => quote!(<Handle as core::borrow::Borrow<Context>>::borrow(&#context)),
+    };
+    let (handle_param, handle, handle_bounds) = match (lends_output, mutable_receiver) {
+        (true, false) => (None, quote!(&#lifetime_ref Context), quote!(Context: Sync,)),
+        (true, true) => (None, quote!(&#lifetime_ref mut Context), quote!(Context: Send,)),
+        (false, _) => (Some(quote!(Handle,)), quote!(Handle), quote!(Handle: #context_bound + Send, Context: Sync,)),
+    };
+    (context_parameter, receiver, handle_param, handle, handle_bounds)
+}
+
+/// Reads the parameters a block names besides `This`, its bounds with `This` as the context, and
+/// whether it admits an unsized context.
+fn block_parameters(generics: &Generics) -> (Vec<GenericParam>, Vec<WherePredicate>, bool) {
+    // The parameters the block names besides its receiver are fixed by the context through its
+    // bounds, so the operation keeps them on its implementations and not on its type.
+    let named = generics
+        .params
+        .iter()
+        .filter(|param| !matches!(param, GenericParam::Type(param) if param.ident == "This"))
+        .cloned()
+        .map(|mut param| {
+            RenameThis.visit_generic_param_mut(&mut param);
+            param
+        })
+        .collect::<Vec<_>>();
+    let mut predicates = generics.where_clause.as_ref().map(|clause| clause.predicates.clone()).unwrap_or_default();
+    for predicate in &mut predicates {
+        RenameThis.visit_where_predicate_mut(predicate);
+    }
+    // A block that admits an unsized receiver admits an unsized context, on every item generated.
+    let unsized_context = predicates.iter().any(|predicate| {
+        let predicate = quote!(#predicate).to_string();
+        predicate.starts_with("Context :") && predicate.contains("? Sized")
+    });
+    // The relaxation is stated once, on the parameter, so the bounds keep only what they require.
+    let predicates = predicates
+        .into_iter()
+        .filter_map(|mut predicate| {
+            if let WherePredicate::Type(bound) = &mut predicate {
+                bound.bounds =
+                    bound.bounds.iter().filter(|bound| quote!(#bound).to_string() != "? Sized").cloned().collect();
+                if bound.bounds.is_empty() {
+                    return None;
+                }
+            }
+            Some(predicate)
+        })
+        .collect::<Vec<_>>();
+    (named, predicates, unsized_context)
+}
+
+/// States a method's argument names and stated types on an item no context changes, so a program
+/// can check the sources it binds where it is declared.
+fn arg_names_item(
+    method: &ImplItemFn,
+    visibility: &Visibility,
+    generics: &Generics,
+    arguments: &[Ident],
+) -> TokenStream {
+    let arg_names = arg_names_ident(&method.sig.ident);
+    let stated_args = stated_arg_types(method, generics);
+    quote! {
+        /// Carries the method's argument names, which no context or selected type changes, so a
+        /// program can check names it binds where it is declared.
+        #[doc(hidden)]
+        #visibility struct #arg_names;
+
+        #[doc(hidden)]
+        impl #arg_names {
+            /// The method's argument names, in order.
+            pub const ARG_NAMES: &'static [&'static str] = &[#(stringify!(#arguments)),*];
+            #(#stated_args)*
+        }
+
+    }
+}
+
+/// States each argument's type on a constant `ARG_<index>`, or that the context decides it.
+///
+/// A type naming the carrier, a type parameter, or a lifetime depends on what the operation is
+/// applied to, so only an interpretation can check a source against it.
+fn stated_arg_types(method: &ImplItemFn, generics: &Generics) -> Vec<TokenStream> {
+    let parameters = generics
+        .params
+        .iter()
+        .chain(&method.sig.generics.params)
+        .filter_map(|param| match param {
+            GenericParam::Type(param) => Some(param.ident.clone()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    method
+        .sig
+        .inputs
+        .iter()
+        .filter_map(|input| match input {
+            FnArg::Typed(input) => Some(input.ty.as_ref()),
+            FnArg::Receiver(_) => None,
+        })
+        .enumerate()
+        .map(|(index, argument_type)| {
+            let constant = format_ident!("ARG_{index}");
+            let mut dependence = ContextDependence { parameters: &parameters, dependent: false };
+            dependence.visit_type(argument_type);
+            if dependence.dependent {
+                quote!(pub const #constant: ::alux_ext::ContextArg = ::alux_ext::ContextArg;)
+            } else {
+                quote!(pub const #constant: ::alux_ext::StatedArg<#argument_type> = ::alux_ext::StatedArg::new();)
+            }
+        })
+        .collect()
+}
+
+/// Finds whether a type names the carrier, a type parameter, a lifetime, or an opaque type.
+struct ContextDependence<'a> {
+    parameters: &'a [Ident],
+    dependent: bool,
+}
+
+impl<'ast> Visit<'ast> for ContextDependence<'_> {
+    fn visit_ident(&mut self, ident: &'ast Ident) {
+        self.dependent |= ident == "This" || ident == "Self" || self.parameters.contains(ident);
+    }
+
+    fn visit_lifetime(&mut self, _: &'ast syn::Lifetime) {
+        self.dependent = true;
+    }
+
+    fn visit_type_reference(&mut self, _: &'ast syn::TypeReference) {
+        self.dependent = true;
+    }
+
+    fn visit_type_impl_trait(&mut self, _: &'ast syn::TypeImplTrait) {
+        self.dependent = true;
+    }
+
+    fn visit_type_infer(&mut self, _: &'ast syn::TypeInfer) {
+        self.dependent = true;
+    }
+}
+
+/// Reifies one borrowed extension method as an operation and its application meaning.
+fn defunctionalize(method: &ImplItemFn, visibility: &Visibility, generics: &Generics) -> syn::Result<TokenStream> {
+    let operation = operation_ident(&method.sig.ident);
+    // A method that writes no return type returns nothing, which is a result like any other: it is
+    // what an endpoint stating no body answers with.
+    let mut output = match &method.sig.output {
+        ReturnType::Type(_, output) => output.as_ref().clone(),
+        ReturnType::Default => parse_quote!(()),
+    };
+    let context = format_ident!("__context");
+    RenameThis.visit_type_mut(&mut output);
+    let (named, predicates, unsized_context) = block_parameters(generics);
+    let context_param = if unsized_context { quote!(Context: ?Sized) } else { quote!(Context) };
+    let (selected, method_predicates) = selected_parameters(method)?;
+    // Borrowed arguments share one lifetime, a parameter of the operation: an application lends
+    // them for as long as its future runs.
+    let mut borrow = NameBorrow {
+        lifetime: syn::Lifetime::new("'__alux_borrow", proc_macro2::Span::call_site()),
+        named: false,
+        referents: Vec::new(),
+    };
+    // An output that borrows borrows the context, so it is answered only to a handle that is itself
+    // a borrow of the context for the same lifetime, never to an owned handle the application drops.
+    let lends_output = borrows(&output);
+    borrow.visit_type_mut(&mut output);
+    let (arguments, argument_types, mutable_receiver) = signature_arguments(method, &mut borrow)?;
     let args = if argument_types.is_empty() { quote!(()) } else { quote!((#(#argument_types,)*)) };
+    // The borrow lifetime belongs to the application, which is stated for every lifetime the
+    // arguments are lent for; the operation type names no lifetime, so every program names it alike.
+    let lifetimes = borrow.named.then(|| {
+        let lifetime = &borrow.lifetime;
+        quote!(#lifetime,)
+    });
+    // The signature states each borrow at `'static`: its shape, independent of any one loan.
+    let mut signature_types = argument_types.clone();
+    for argument_type in &mut signature_types {
+        StaticBorrow(&borrow.lifetime).visit_type_mut(argument_type);
+    }
+    let signature_args = if signature_types.is_empty() { quote!(()) } else { quote!((#(#signature_types,)*)) };
+    // The context is named only behind a reference, which keeps the operation `Send` and `Sync`
+    // and admits an unsized context.
+    let phantom = quote!(core::marker::PhantomData<(fn(&Context), fn() -> (#(#selected),*))>);
+    let lifetime_ref = &borrow.lifetime;
+    let outlives = borrow.referents.iter().map(|referent| quote!(#referent: #lifetime_ref)).collect::<Vec<_>>();
+    let static_referents = borrow
+        .referents
+        .iter()
+        .map(|referent| {
+            let mut referent = referent.clone();
+            StaticBorrow(&borrow.lifetime).visit_type_mut(&mut referent);
+            quote!(#referent: 'static)
+        })
+        .collect::<Vec<_>>();
+    // A signature names the context's sorts only through the block's bounds, so it keeps them
+    // wherever it mentions the context; one that does not states itself for every context.
+    let signature = quote!(#args #output #method_predicates);
+    let kept = !named.is_empty() || mentions_context(signature);
+    let signature_predicates = predicates.iter().filter(|_| kept).chain(&method_predicates).collect::<Vec<_>>();
+    let application_predicates = predicates.iter().chain(&method_predicates).collect::<Vec<_>>();
     let destructure =
         if arguments.is_empty() { quote!(let () = __args;) } else { quote!(let (#(#arguments,)*) = __args;) };
     let method_name = &method.sig.ident;
-    let context_bound = if mutable_receiver { quote!(AsMut<Context>) } else { quote!(AsRef<Context>) };
-    let context_parameter = if mutable_receiver { quote!(mut #context) } else { quote!(#context) };
-    let receiver = if mutable_receiver { quote!(#context.as_mut()) } else { quote!(#context.as_ref()) };
+    let (context_parameter, receiver, handle_param, handle, handle_bounds) =
+        handle(&context, lifetime_ref, lends_output, mutable_receiver);
     let call = quote!(#receiver.#method_name(#(#arguments),*));
     let application = if method.sig.asyncness.is_some() { quote!(#call.await) } else { call };
     let documentation = documentation(&method.attrs);
     let doc = doc_text(&method.attrs);
+    let arg_names_item = arg_names_item(method, visibility, generics, &arguments);
 
     Ok(quote! {
         #(#documentation)*
         #[doc(hidden)]
-        #visibility struct #operation<Context>(core::marker::PhantomData<fn() -> Context>);
+        #visibility struct #operation<Context: ?Sized #(, #selected)*>(#phantom);
+
+        #arg_names_item
 
         #[doc(hidden)]
-        impl<Context> core::default::Default for #operation<Context> {
+        impl<Context: ?Sized #(, #selected)*> core::default::Default for #operation<Context #(, #selected)*> {
             fn default() -> Self {
                 Self(core::marker::PhantomData)
             }
         }
 
         #[doc(hidden)]
-        impl<Context, #(#named),*> ::alux_ext::OperationAlg for #operation<Context>
+        impl<#context_param, #(#selected,)* #(#named),*> ::alux_ext::OperationAlg for #operation<Context #(, #selected)*>
         where
-            #signature_predicates
+            #(#signature_predicates,)*
+            #(#static_referents,)*
         {
             type Context = Context;
-            type Args = #args;
+            type Args = #signature_args;
 
             const DOC: &'static str = #doc;
             const NAME: &'static str = stringify!(#method_name);
@@ -191,15 +494,17 @@ fn defunctionalize(method: &ImplItemFn, visibility: &Visibility, generics: &Gene
         }
 
         #[doc(hidden)]
-        impl<Context, Handle, #(#named),*> ::alux_ext::ApplyAlg<Handle, #args> for #operation<Context>
+        impl<#lifetimes #context_param, #handle_param #(#selected,)* #(#named),*> ::alux_ext::ApplyAlg<#handle, #args> for #operation<Context #(, #selected)*>
         where
-            Handle: #context_bound + Send,
-            Context: Sync,
-            #predicates
+            #handle_bounds
+            // The application's future owns each argument until it runs, so it is `Send` where they are.
+            #(#argument_types: Send,)*
+            #(#application_predicates,)*
+            #(#outlives,)*
         {
             type Output = #output;
 
-            fn apply(&self, #context_parameter: Handle, __args: #args) -> impl core::future::Future<Output = Self::Output> + Send {
+            fn apply(&self, #context_parameter: #handle, __args: #args) -> impl core::future::Future<Output = Self::Output> + Send {
                 async move {
                     #destructure
                     #application
@@ -215,9 +520,18 @@ pub(crate) fn ext_internal(attr: TokenStream, item: TokenStream) -> syn::Result<
     if let Defunc::Via(via) = &arguments.defunc {
         // The backend lowers the methods first and then generates the trait and the impl the same way.
         let forwarded = &arguments.forwarded;
-        return Ok(quote! {
-            #[#via(#(#forwarded),*)]
-            #item
+        // One backend lowers the whole block. Several are cumulative: each lowers the declarations
+        // written in its own vocabulary, and the last one states the extension.
+        return Ok(match via.as_slice() {
+            [only] => quote! {
+                #[#only(#(#forwarded),*)]
+                #item
+            },
+            [first, rest @ ..] => quote! {
+                #[#first(#(#forwarded,)* __alux_then(#(#rest),*))]
+                #item
+            },
+            [] => unreachable!("`defunc(...)` states at least one backend"),
         });
     }
     let original = item.clone();
@@ -507,7 +821,7 @@ mod tests {
         assert!(output.contains("const ARG_NAMES"));
         assert!(output.contains("stringify ! (value)"));
         assert!(output.contains("alux_ext :: ApplyAlg"));
-        assert!(output.contains("AsRef < Context >"));
+        assert!(output.contains("Handle : core :: borrow :: Borrow < Context > + Send"), "{output}");
     }
 
     #[test]
@@ -527,13 +841,169 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct EchoOperation < Context >"), "{output}");
+        assert!(output.contains("struct EchoOperation < Context : ? Sized >"), "{output}");
         assert!(output.contains("impl < Context , Item > :: alux_ext :: OperationAlg"), "{output}");
         assert!(output.contains("impl < Context , Handle , Item > :: alux_ext :: ApplyAlg"), "{output}");
         assert!(output.contains("type Args = (Item , Context :: Key ,)"), "{output}");
         assert!(output.contains("type Output = Item"), "{output}");
         assert_eq!(output.matches("Context : ReadAlg < Item = Item >").count(), 2, "{output}");
         assert!(output.matches("Item : Send").count() >= 2, "{output}");
+    }
+
+    #[test]
+    fn states_argument_names_on_an_item_no_context_changes() {
+        let output = ext_internal(
+            quote!(name = NodeExt, defunc),
+            quote! {
+                impl<This> This
+                where
+                    This: Node,
+                {
+                    fn start_node(&self, name: String, base_path: This::Path) {}
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("struct StartNodeArgNames ;"), "{output}");
+        assert!(
+            output.contains(
+                "pub const ARG_NAMES : & 'static [& 'static str] = & [stringify ! (name) , stringify ! (base_path)]"
+            ),
+            "{output}"
+        );
+        // A type the method states is known without a context; one naming the carrier is not.
+        assert!(
+            output.contains(
+                "pub const ARG_0 : :: alux_ext :: StatedArg < String > = :: alux_ext :: StatedArg :: new () ;"
+            ),
+            "{output}"
+        );
+        assert!(
+            output.contains("pub const ARG_1 : :: alux_ext :: ContextArg = :: alux_ext :: ContextArg ;"),
+            "{output}"
+        );
+    }
+
+    #[test]
+    fn keeps_the_capability_a_signature_names_a_sort_of() {
+        let output = ext_internal(
+            quote!(name = LeavesExt, defunc),
+            quote! {
+                impl<This> This
+                where
+                    This: Naming,
+                {
+                    fn leaves(&self, names: Vec<This::Name>) -> Vec<This::Name> { names }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // Description and application both name `Context::Name`, so both keep `Context: Naming`.
+        assert_eq!(output.matches("Context : Naming").count(), 2, "{output}");
+        // Only the application owns the arguments in a `Send` future.
+        assert_eq!(output.matches("Vec < Context :: Name > : Send").count(), 1, "{output}");
+    }
+
+    #[test]
+    fn selects_a_methods_type_parameters_on_the_operation() {
+        let output = ext_internal(
+            quote!(name = SelectExt, defunc),
+            quote! {
+                impl<This> This
+                where
+                    This: AsRef<[u8]>,
+                {
+                    fn select<Predicate: Copy>(&self, predicate: Predicate) -> Vec<u8>
+                    where
+                        Predicate: Fn(u8) -> bool,
+                    {
+                        Vec::new()
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("struct SelectOperation < Context : ? Sized , Predicate >"), "{output}");
+        assert!(output.contains(":: alux_ext :: OperationAlg for SelectOperation < Context , Predicate >"), "{output}");
+        // Description and application both state the method's bounds on what it selects.
+        assert!(output.contains("where Predicate : Copy , Predicate : Fn (u8) -> bool , { type Context"), "{output}");
+        assert!(output.contains("Predicate : Copy , Predicate : Fn (u8) -> bool , { type Output"), "{output}");
+    }
+
+    #[test]
+    fn lends_borrowed_arguments_for_one_named_lifetime() {
+        let output = ext_internal(
+            quote!(name = BytesExt, defunc),
+            quote! {
+                impl<This> This
+                where
+                    This: Naming,
+                {
+                    fn append(&mut self, bytes: &[u8], names: &[This::Name]) {}
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        // The type names no lifetime; the application is stated for every loan, the signature at `'static`.
+        assert!(output.contains("struct AppendOperation < Context : ? Sized >"), "{output}");
+        assert!(output.contains("type Args = (& 'static [u8] , & 'static [Context :: Name] ,)"), "{output}");
+        assert!(
+            output.contains("ApplyAlg < Handle , (& '__alux_borrow [u8] , & '__alux_borrow [Context :: Name] ,) >"),
+            "{output}"
+        );
+        assert!(output.contains("[Context :: Name] : '__alux_borrow"), "{output}");
+        assert!(output.contains("[Context :: Name] : 'static"), "{output}");
+    }
+
+    #[test]
+    fn admits_an_unsized_context_where_the_block_admits_an_unsized_receiver() {
+        let output = ext_internal(
+            quote!(name = PrefixExt, defunc),
+            quote! {
+                impl<This> This
+                where
+                    This: AsRef<[u8]> + ?Sized,
+                {
+                    fn length(&self) -> usize { self.as_ref().len() }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("struct LengthOperation < Context : ? Sized >"), "{output}");
+        assert!(output.contains("PhantomData < (fn (& Context) , fn () -> ()) >"), "{output}");
+        assert_eq!(output.matches("impl < Context : ? Sized").count(), 3, "{output}");
+        assert!(output.contains("Context : AsRef < [u8] > ,"), "{output}");
+    }
+
+    #[test]
+    fn answers_a_borrowed_output_only_to_a_borrowed_handle() {
+        let output = ext_internal(
+            quote!(name = PrefixExt, defunc),
+            quote! {
+                impl<This> This
+                where
+                    This: AsRef<[u8]>,
+                {
+                    fn prefix(&self, count: usize) -> &[u8] { &self.as_ref()[..count] }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("ApplyAlg < & '__alux_borrow Context , (usize ,) >"), "{output}");
+        assert!(output.contains("type Output = & '__alux_borrow [u8]"), "{output}");
+        assert!(!output.contains("Handle"), "{output}");
     }
 
     #[test]
@@ -599,6 +1069,21 @@ mod tests {
         .unwrap_err();
 
         assert!(error.to_string().contains("use `defunc` or `defunc(via = path)`"));
+    }
+
+    #[test]
+    fn chains_several_backends_in_authored_order() {
+        let output = ext_internal(
+            quote!(name = SurfacesExt, defunc(via = cli, via = jsonrpc, via = http)),
+            quote!(
+                impl<This> This {}
+            ),
+        )
+        .unwrap()
+        .to_string();
+
+        // The first backend runs now and hands the rest on; each one adds its own declarations.
+        assert!(output.contains("# [cli (name = SurfacesExt , __alux_then (jsonrpc , http))]"), "{output}");
     }
 
     #[test]
