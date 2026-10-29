@@ -90,10 +90,10 @@ impl ProgramBackendAlg for JsonRpcBackend {
     /// A JSON-RPC program states whether its methods' errors answer as protocol errors.
     type Defaults = MethodDefaults;
 
-    const NESTED_SUFFIX: &'static str = "_rpc";
+    const ROOT: &'static str = "methods";
     const REJECTED_PARAM: &'static str = "JSON-RPC programs currently support type parameters only";
 
-    fn prepare_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults) {
+    fn prepare_declarations(method: &mut ImplItemFn, defaults: &Self::Defaults) -> TokenStream {
         let mut operations = Vec::new();
         Methods { requirements: &mut operations, defaults: *defaults }.visit_block_mut(&mut method.block);
         let where_clause = method.sig.generics.make_where_clause();
@@ -108,7 +108,7 @@ impl ProgramBackendAlg for JsonRpcBackend {
         for carrier in carriers {
             where_clause.predicates.push(parse_quote!(This: ::alux_ext::HandlerContextAlg<#carrier>));
         }
-        for MethodRequirement { reified: Reified { operation, carrier }, fallible } in operations {
+        for MethodRequirement { reified: Reified { operation, carrier, .. }, fallible } in operations {
             where_clause.predicates.push(parse_quote! {
                 #operation: ::alux_ext::OperationAlg<Context = #carrier>
                     + ::alux_ext::ApplyAlg<
@@ -135,6 +135,8 @@ impl ProgramBackendAlg for JsonRpcBackend {
                 >
             });
         }
+        // This transport states its evidence in the where clause alone.
+        TokenStream::new()
     }
 
     fn require_subprogram(program: &TokenStream) -> TokenStream {

@@ -23,6 +23,7 @@ procedural macro has to be, and those live under [`macros/`](macros).
 | [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](macros/alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
 | [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros] | Transformations kept as expressions<br>The macros it exports |
 | [`alux-traversable`](alux-traversable) | [![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | `traverse` over `Option` and iterators |
+| [`alux-cli`](alux-cli) | [![crates.io][v-cli]][c-cli] [![docs.rs][d-cli]][r-cli] | Command-line programs, no parser framework |
 | [`alux-bench`](alux-bench) | [![crates.io][v-bench]][c-bench] [![docs.rs][d-bench]][r-bench] | What a benchmark measures, no harness |
 
 ## Interpretations
@@ -74,6 +75,14 @@ Shared HTTP support:
 | [`alux-jsonrpc-typescript`](crates/alux-jsonrpc-typescript) | [![crates.io][v-rpc-ts]][c-rpc-ts] [![docs.rs][d-rpc-ts]][r-rpc-ts] | a TypeScript client module |
 | [`alux-jsonrpc-jsonrpsee`](crates/alux-jsonrpc-jsonrpsee) | [![crates.io][v-rpsee]][c-rpsee] [![docs.rs][d-rpsee]][r-rpsee] | [jsonrpsee](https://docs.rs/jsonrpsee) `Methods` |
 | [`alux-jsonrpc-direct`](crates/alux-jsonrpc-direct) | [![crates.io][v-rpc-direct]][c-rpc-direct] [![docs.rs][d-rpc-direct]][r-rpc-direct] | a message handler, no framework |
+
+### Of a command-line program
+
+| Crate | | Interprets a program as |
+| --- | --- | --- |
+| [`alux-cli-direct`](crates/alux-cli-direct) | [![crates.io][v-cli-direct]][c-cli-direct] [![docs.rs][d-cli-direct]][r-cli-direct] | a command line, parsed with no framework |
+| [`alux-cli-clap`](crates/alux-cli-clap) | [![crates.io][v-cli-clap]][c-cli-clap] [![docs.rs][d-cli-clap]][r-cli-clap] | a [clap](https://docs.rs/clap) command |
+| [`alux-cli-multicall`](crates/alux-cli-multicall) | [![crates.io][v-cli-multicall]][c-cli-multicall] [![docs.rs][d-cli-multicall]][r-cli-multicall] | one executable answering to each command's name |
 
 ### Of a data shape
 
@@ -132,27 +141,12 @@ just ci
 ```
 
 That runs, in order, `just fmt`, `just build`, `just clippy`, `just doc`, `just test`, and
-`just package`. Each is also runnable on its own during development. The [`Justfile`](Justfile) holds
+`just package`. Each is also runnable on its own during development. The [`justfile`](justfile) holds
 the full command every recipe stands for.
 
 ## Publication
 
-Packages are licensed under MIT. Publish and verify them in this order, allowing the crates.io index
-to update between dependent packages:
-
-1. `alux-ext-macros`, `alux-sdk-macros`, and `alux-shape-macros` in any order
-2. `alux-ext`
-3. `alux-bench`, `alux-http`, `alux-jsonrpc`, `alux-shape`, and `alux-traversable` in any order
-4. `alux-sdk`, `alux-shape-json`, `alux-shape-text`, and `alux-shape-typescript` in any order
-5. `alux-shape-jsonschema`, `alux-http-parts`, `alux-http-text`, `alux-http-direct`,
-   `alux-http-conformance`, `alux-http-poem`, `alux-http-actix`, `alux-http-axum`,
-   `alux-http-hyper`, `alux-http-openapi`, `alux-http-rocket`, `alux-http-salvo`,
-   `alux-http-typescript`, `alux-http-warp`, `alux-jsonrpc-jsonrpsee`, `alux-jsonrpc-direct`,
-   `alux-jsonrpc-typescript`, `alux-shape-rust`, `alux-shape-term`, `alux-shape-morph`,
-   `alux-bench-direct`, `alux-bench-criterion`, and `alux-tokio` in dependency order where needed
-
-Cargo cannot fully package later steps against crates.io until the preceding package version is
-available there.
+Packages are licensed under MIT. `just release <crate>:<level>...` bumps, publishes in dependency order, tags, and pushes them in one `chore: release` commit; without `--execute` it is a dry run.
 
 [ga-badge]: https://github.com/alux-network/alux-rust/actions/workflows/rust.yml/badge.svg?branch=master
 [ga-url]: https://github.com/alux-network/alux-rust/actions?query=branch:master
@@ -306,6 +300,22 @@ available there.
 [c-rpc-direct]: https://crates.io/crates/alux-jsonrpc-direct
 [d-rpc-direct]: https://docs.rs/alux-jsonrpc-direct/badge.svg
 [r-rpc-direct]: https://docs.rs/alux-jsonrpc-direct
+[v-cli]: https://img.shields.io/crates/v/alux-cli
+[c-cli]: https://crates.io/crates/alux-cli
+[d-cli]: https://docs.rs/alux-cli/badge.svg
+[r-cli]: https://docs.rs/alux-cli
+[v-cli-direct]: https://img.shields.io/crates/v/alux-cli-direct
+[c-cli-direct]: https://crates.io/crates/alux-cli-direct
+[d-cli-direct]: https://docs.rs/alux-cli-direct/badge.svg
+[r-cli-direct]: https://docs.rs/alux-cli-direct
+[v-cli-clap]: https://img.shields.io/crates/v/alux-cli-clap
+[c-cli-clap]: https://crates.io/crates/alux-cli-clap
+[d-cli-clap]: https://docs.rs/alux-cli-clap/badge.svg
+[r-cli-clap]: https://docs.rs/alux-cli-clap
+[v-cli-multicall]: https://img.shields.io/crates/v/alux-cli-multicall
+[c-cli-multicall]: https://crates.io/crates/alux-cli-multicall
+[d-cli-multicall]: https://docs.rs/alux-cli-multicall/badge.svg
+[r-cli-multicall]: https://docs.rs/alux-cli-multicall
 [v-shape-jsonschema]: https://img.shields.io/crates/v/alux-shape-jsonschema
 [c-shape-jsonschema]: https://crates.io/crates/alux-shape-jsonschema
 [d-shape-jsonschema]: https://docs.rs/alux-shape-jsonschema/badge.svg

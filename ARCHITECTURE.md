@@ -445,6 +445,31 @@ its transport library uses.
 context sharing, application, serialization, and boundary error conversion. These are jsonrpsee
 mechanics, not JSON-RPC program meaning.
 
+## CLI program algebra
+
+A command-line program preserves:
+
+```text
+empty command collection
+    + named command, an operation with one source per argument
+    + program merge
+    + nested subprogram
+    + context: global arguments opening the handle a subtree runs on
+```
+
+`Empty`, `Merge`, `Named`, `Nest`, `Command`, and `Within` are neutral syntax nodes, folded through
+`CliCommandsAlg`, `CliOperationAlg`, `CliNestAlg`, and `CliContextAlg`. A source states where an
+argument's words come from (by position, by option spelling, or as a `name=value` operand), how many
+it takes, its fallbacks, and, for a product or sum from `alux-shape`, its parts. Each command states
+the conventions its words are read under. The specification names no value type: decoding a word is
+`CliWordAlg`, answered by each interpreter, so a domain type is read by the interpreter that runs it.
+
+`defunc(via = cli)` lowers the fluent declaration to that syntax, checking each source against the
+argument at its position, and `.arg_for(..)` against the argument's name, where the source is written.
+
+`alux-cli-direct` parses words with no framework, `alux-cli-clap` lets clap parse and render help,
+and `alux-cli-multicall` reads one executable invoked under each first-layer command's name.
+
 ## Program composition
 
 Programs compose before interpretation:
@@ -494,6 +519,9 @@ A specification crate contains only neutral meaning:
 - `alux-http-openapi` adds `alux-shape` and its JSON Schema interpretation, and no framework.
 - `alux-http-typescript` adds `alux-shape` and its TypeScript interpretation, and no framework.
 - `alux-jsonrpc-jsonrpsee` adds jsonrpsee, Serde, and boundary helper types.
+- `alux-cli` declares `alux-ext` and `alux-shape`, the specification it reads products and sums from.
+- `alux-cli-direct` and `alux-cli-multicall` add no framework.
+- `alux-cli-clap` adds clap.
 
 The dependency list of a specification crate is the architectural test: `alux-http` and `alux-jsonrpc`
 declare `alux-ext` and nothing else. Compiling proves less here than it appears to, because a crate can

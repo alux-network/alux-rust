@@ -72,18 +72,24 @@ impl ProgramBackendAlg for ShapeBackend {
     /// A shape program states nothing once for all of its declarations.
     type Defaults = ();
 
-    const NESTED_SUFFIX: &'static str = "_shape";
+    const ROOT: &'static str = "record";
     const REJECTED_PARAM: &'static str = "shape programs currently support type parameters only";
+    /// A shape names another shape wherever a member's shape is written, `field(name, shape)`
+    /// included, so a call on `self` ending in `_shape` is a nested shape anywhere in the body.
+    const NESTED_SUFFIX: Option<&'static str> = Some("_shape");
 
-    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
+    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) -> TokenStream {
         // The method is the shape's name, and this is the only stage that reads it: the lowering
-        // carries the derived program type from here on, not the name it came from.
+        // carries the derived program type from here on, not the name it came from. A trailing
+        // `shape` names the vocabulary, not the shape, so it is not one of its words.
         let mut named = words(&method.sig.ident);
-        if named.last().is_some_and(|word| word == Self::NESTED_SUFFIX.trim_start_matches('_')) {
+        if named.last().is_some_and(|word| word == "shape") {
             named.pop();
         }
         Names.visit_block_mut(&mut method.block);
         name_record(&mut method.block, &named);
+        // This transport states its evidence in the where clause alone.
+        TokenStream::new()
     }
 
     fn require_subprogram(program: &TokenStream) -> TokenStream {
@@ -225,7 +231,32 @@ mod tests {
 
         assert!(output.contains("ProfileShapeProgram : :: alux_shape :: ShapeProgramAlg < This"));
         assert!(output.contains("TimestampsShapeProgram : :: alux_shape :: ShapeProgramAlg < This"));
-        assert!(output.contains("builder . program (builder . profile_shape"));
+        // In A-normal form, the nested shape is bound once and then named.
+        assert!(output.contains("let part0 = builder . profile_shape () ;"), "{output}");
+        assert!(output.contains("builder . program (part0)"), "{output}");
+    }
+
+    #[test]
+    fn reads_a_suffixed_call_as_a_nested_shape_in_a_member() {
+        let output = shape_program_defunc_internal(
+            quote!(name = AccountShapeExt),
+            quote! {
+                pub impl<This> This
+                where
+                    This: ShapeAlg + FieldAlg,
+                {
+                    /// An account, its profile a shape of its own.
+                    fn account_shape(&self) {
+                        self.record().field(profile, self.profile_shape())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("ProfileShapeProgram : :: alux_shape :: ShapeProgramAlg < This"), "{output}");
+        assert!(output.contains("builder . program (part0)"), "{output}");
     }
 
     #[test]

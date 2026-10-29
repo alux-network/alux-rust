@@ -72,9 +72,12 @@ changes, keeping a run of capitals whole, so `HTTPServer` gives `[http, server]`
 be spelled any way, so its words are read back out of it. Where either would get it wrong, state the
 shape as a declaration and give the words directly.
 
-Four layouts are refused, each with a compile error rather than a shape that is quietly wrong:
+Three layouts are refused, each with a compile error rather than a shape that is quietly wrong:
 
-- a type with type parameters, since a generic shape is written as a declaration instead
 - a `union`, which describes no values
 - a newtype or tuple struct, since a product is read from named members
 - a tuple or struct variant, which is not read yet
+
+A type with type parameters is read like any other; its shape holds where each member's type states one.
+
+Beside the shape, the derive states how a value is made from its members: `Product` for a struct, one field per member, a skipped member made with `Default` and a flattened one a single field; and `Sum` for an enum of two to sixteen alternatives, each carrying one value or none. An enum of one alternative or more than sixteen has a shape and no `Sum`, and a use that needs one says so.

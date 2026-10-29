@@ -16,7 +16,7 @@ just clippy
 just doc
 ```
 
-`just ci` runs the whole gate, and the [`Justfile`](Justfile) holds the full command every recipe
+`just ci` runs the whole gate, and the [`justfile`](justfile) holds the full command every recipe
 stands for.
 
 Dependencies belong in the root workspace manifest. Member crates inherit them with

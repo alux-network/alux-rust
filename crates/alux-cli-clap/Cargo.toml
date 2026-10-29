@@ -1,0 +1,24 @@
+[package]
+name = "alux-cli-clap"
+version = "0.1.0"
+description = "clap interpretation of ALUX CLI programs: clap parses and renders help, the program applies operations"
+documentation = "https://docs.rs/alux-cli-clap"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-cli.workspace = true
+alux-cli-direct.workspace = true
+alux-ext.workspace = true
+clap.workspace = true
+
+[dev-dependencies]
+alux-shape.workspace = true

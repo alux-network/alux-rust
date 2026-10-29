@@ -1,3 +1,7 @@
+# List the recipes.
+default:
+    @just --list
+
 # Check formatting without rewriting any file.
 fmt:
     cargo fmt --all -- --check
@@ -6,10 +10,12 @@ fmt:
 build:
     cargo build --workspace --all-features --all-targets
 
-# Run every test; doc tests run separately because Nextest does not support them.
-test:
-    cargo nextest run --workspace --all-features --no-fail-fast
-    cargo test --workspace --all-features --doc
+# Run every test; doc tests run separately because Nextest does not support them. Arguments go to
+# both runs, as to `cargo test`: `just test -p alux-cli` or `just test product`. `--workspace` is
+# dropped when a package is selected, since it would select every package again.
+test *args:
+    cargo nextest run {{ if args =~ '(^|\s)(-p|--package)(\s|=|$)' { "" } else { "--workspace" } }} --all-features --no-fail-fast {{ args }}
+    cargo test {{ if args =~ '(^|\s)(-p|--package)(\s|=|$)' { "" } else { "--workspace" } }} --all-features --doc {{ args }}
 
 # Lint every target, treating warnings as errors.
 clippy:

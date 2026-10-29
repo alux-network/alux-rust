@@ -15,6 +15,10 @@ rust-version = "1.97"
 alux-bench = { version = "0.2.0", path = "alux-bench" }
 alux-bench-criterion = { version = "0.2.0", path = "crates/alux-bench-criterion" }
 alux-bench-direct = { version = "0.2.0", path = "crates/alux-bench-direct" }
+alux-cli = { version = "0.1.0", path = "alux-cli" }
+alux-cli-clap = { version = "0.1.0", path = "crates/alux-cli-clap" }
+alux-cli-direct = { version = "0.1.0", path = "crates/alux-cli-direct" }
+alux-cli-multicall = { version = "0.1.0", path = "crates/alux-cli-multicall" }
 alux-ext = { version = "0.2.1", path = "alux-ext" }
 alux-ext-macros = { version = "0.2.1", path = "macros/alux-ext-macros" }
 alux-http = { version = "0.4.0", path = "alux-http" }
@@ -53,6 +57,7 @@ actix-web = "4"
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }
 bytes = "1"
+clap = { version = "4.6", default-features = false, features = ["std", "help", "usage", "error-context", "suggestions", "string"] }
 criterion = "0.8"
 http-body-util = "0.1"
 hyper = "1"

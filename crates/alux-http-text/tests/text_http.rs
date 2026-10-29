@@ -165,6 +165,22 @@ where
     }
 }
 
+#[ext(name = AuthoredApiExt, defunc(via = http))]
+impl<This> This
+where
+    This: HttpApiAlg,
+{
+    /// Declares a route whose path the author binds under a name the lowering also uses.
+    fn authored_api<Alg>(&self)
+    where
+        Alg: StatusAlg,
+    {
+        let part0 = "/status";
+        // Merging the empty program is the identity, not a declared program.
+        self.routes().get(part0, self.op(Alg::status_current).json()).merge(self.routes())
+    }
+}
+
 #[derive(Debug, Default, PartialEq)]
 struct TestStatus {
     temp: f32,
@@ -226,6 +242,14 @@ fn describes_example_http_surface() {
     assert!(api_lines[3].contains("- `args`: `(f32,)`"));
     assert!(api_lines[4].starts_with("### GET /download"));
     assert!(api_lines[4].contains("TextFileOutput"));
+}
+
+#[test]
+fn keeps_authored_names_and_merges_the_empty_program() {
+    let api = TextHandlerImpl;
+    let routes = api.compile_http(api.authored_api::<TestStatus>());
+
+    assert_eq!(routes.labels(), ["GET /status"]);
 }
 
 #[test]

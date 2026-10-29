@@ -9,12 +9,13 @@
 //! A spelling is not read, because a term carries no spelling: `rename_all` says how names are
 //! written, which is the interpretation's statement and not the type's.
 
+use crate::construct;
 use crate::words;
 use crate::written::written_of;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields, LitStr, Result, Variant};
+use syn::{Data, DeriveInput, Error, Fields, LitStr, Result, Variant, parse_quote};
 
 /// How a choice states which alternative a value carries.
 enum Tagging {
@@ -26,34 +27,42 @@ enum Tagging {
 
 /// States `ShapeOf` for the type this derive was written on.
 pub(crate) fn expand(input: DeriveInput) -> Result<TokenStream> {
-    if !input.generics.params.is_empty() {
-        return Err(Error::new(
-            input.generics.span(),
-            "a shape is read from a layout without type parameters; state a generic shape as a \
-             declaration instead",
-        ));
-    }
-
     let name = &input.ident;
     let words = renamed(&input.attrs)?.unwrap_or_else(|| words::of_camel(&name.to_string()));
     let words = literal(&words);
 
-    let body = match &input.data {
-        Data::Struct(data) => product(&data.fields)?,
-        Data::Enum(data) => choice(&input.attrs, &data.variants)?,
+    let mut members = Vec::new();
+    let (body, construction) = match &input.data {
+        Data::Struct(data) => {
+            let body = product(&data.fields, &mut members)?;
+            let Fields::Named(named) = &data.fields else { unreachable!("a product is read from named members") };
+            (body, construct::product(&input, named)?)
+        }
+        Data::Enum(data) => (choice(&input.attrs, &data.variants, &mut members)?, construct::sum(&input, data)?),
         Data::Union(_) => {
             return Err(Error::new(input.span(), "a union states no shape"));
         }
     };
 
-    Ok(quote! {
-        impl<Alg> ::alux_shape::ShapeOf<Alg> for #name
-        where
-            Alg: ::alux_shape::ShapeAlg + ::alux_shape::FieldAlg,
-        {
-            type Shape = <Alg as ::alux_shape::Sorts>::Ty;
+    // Each member's type states its own shape, which a type parameter does only where it is bound to.
+    let mut generics = input.generics.clone();
+    let alg = algebra(&input.generics);
+    generics.params.push(parse_quote!(#alg));
+    let predicates = &mut generics.make_where_clause().predicates;
+    predicates.push(parse_quote!(#alg: ::alux_shape::ShapeAlg + ::alux_shape::FieldAlg));
+    for member in members {
+        predicates.push(parse_quote!(#member: ::alux_shape::ShapeOf<#alg, Shape = <#alg as ::alux_shape::Sorts>::Ty>));
+    }
+    let (impl_generics, _, where_clause) = generics.split_for_impl();
+    let (_, ty_generics, _) = input.generics.split_for_impl();
 
-            fn shape_of(alg: &Alg) -> Self::Shape {
+    Ok(quote! {
+        impl #impl_generics ::alux_shape::ShapeOf<#alg> for #name #ty_generics
+        #where_clause
+        {
+            type Shape = <#alg as ::alux_shape::Sorts>::Ty;
+
+            fn shape_of(alg: &#alg) -> Self::Shape {
                 use ::alux_shape::{FieldAlg as _, ShapeAlg as _, ShapeExt as _, ShapeTaggedExt as _};
 
                 let body = #body;
@@ -61,7 +70,18 @@ pub(crate) fn expand(input: DeriveInput) -> Result<TokenStream> {
                 alg.named(#words, body)
             }
         }
+
+        #construction
     })
+}
+
+/// Names the algebra parameter with an identifier none of the layout's own parameters is.
+fn algebra(generics: &syn::Generics) -> syn::Ident {
+    let mut name = String::from("Alg");
+    while generics.type_params().any(|param| param.ident == name) {
+        name.push('_');
+    }
+    syn::Ident::new(&name, proc_macro2::Span::call_site())
 }
 
 /// A name, as the words it is made of.
@@ -71,13 +91,15 @@ fn literal(words: &[String]) -> TokenStream {
     quote!(&[#(#words),*])
 }
 
-/// The shape of one field's type.
-fn shape_of_type(ty: &syn::Type) -> TokenStream {
-    quote!(<#ty as ::alux_shape::ShapeOf<Alg>>::shape_of(alg))
+/// The shape of one member's type, which the member then requires of it.
+fn shape_of_type(ty: &syn::Type, members: &mut Vec<syn::Type>) -> TokenStream {
+    members.push(ty.clone());
+    // The algebra is the one `alg` is, so its parameter is never named here.
+    quote!(<#ty as ::alux_shape::ShapeOf<_>>::shape_of(alg))
 }
 
 /// The product a struct's members state.
-fn product(fields: &Fields) -> Result<TokenStream> {
+fn product(fields: &Fields, types: &mut Vec<syn::Type>) -> Result<TokenStream> {
     let Fields::Named(named) = fields else {
         return Err(Error::new(
             fields.span(),
@@ -96,7 +118,7 @@ fn product(fields: &Fields) -> Result<TokenStream> {
         // meaning is narrower than the type it names.
         let shape = match written_of(&field.attrs)? {
             Some(written) => written.shape(),
-            None => shape_of_type(&field.ty),
+            None => shape_of_type(&field.ty, types),
         };
 
         if merged(&field.attrs)? {
@@ -129,6 +151,7 @@ fn product(fields: &Fields) -> Result<TokenStream> {
 fn choice(
     attrs: &[syn::Attribute],
     variants: &syn::punctuated::Punctuated<Variant, syn::Token![,]>,
+    types: &mut Vec<syn::Type>,
 ) -> Result<TokenStream> {
     let tagging = tagging(attrs)?;
     let named_only = variants.iter().all(|variant| matches!(variant.fields, Fields::Unit));
@@ -146,7 +169,7 @@ fn choice(
 
         let shape = match &variant.fields {
             Fields::Unit => quote!(alg.unit()),
-            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => shape_of_type(&fields.unnamed[0].ty),
+            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => shape_of_type(&fields.unnamed[0].ty, types),
             _ => {
                 return Err(Error::new(
                     variant.fields.span(),
@@ -210,7 +233,7 @@ fn tagging(attrs: &[syn::Attribute]) -> Result<Tagging> {
 }
 
 /// The words a `rename` states, if one does.
-fn renamed(attrs: &[syn::Attribute]) -> Result<Option<Vec<String>>> {
+pub(crate) fn renamed(attrs: &[syn::Attribute]) -> Result<Option<Vec<String>>> {
     let mut renamed = None;
 
     for attr in serde_attrs(attrs) {
@@ -230,12 +253,12 @@ fn renamed(attrs: &[syn::Attribute]) -> Result<Option<Vec<String>>> {
 }
 
 /// Whether a member states a merge rather than a member of its own.
-fn merged(attrs: &[syn::Attribute]) -> Result<bool> {
+pub(crate) fn merged(attrs: &[syn::Attribute]) -> Result<bool> {
     flag(attrs, "flatten")
 }
 
 /// Whether a member is written at all.
-fn skipped(attrs: &[syn::Attribute]) -> Result<bool> {
+pub(crate) fn skipped(attrs: &[syn::Attribute]) -> Result<bool> {
     Ok(flag(attrs, "skip")? || flag(attrs, "skip_serializing")?)
 }
 

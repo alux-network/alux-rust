@@ -163,10 +163,10 @@ fn lift_route(declaration: &mut Expr) -> Option<(Reified, Vec<InputDeclaration>,
 impl ProgramBackendAlg for HttpBackend {
     type Defaults = ();
 
-    const NESTED_SUFFIX: &'static str = "_api";
+    const ROOT: &'static str = "routes";
     const REJECTED_PARAM: &'static str = "HTTP programs currently support type parameters only";
 
-    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) {
+    fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) -> TokenStream {
         let mut requirements = Vec::new();
         Routes(&mut requirements).visit_block_mut(&mut method.block);
         let clause = method.sig.generics.make_where_clause();
@@ -195,6 +195,8 @@ impl ProgramBackendAlg for HttpBackend {
                     Endpoint = <This as ::alux_http::RouteAlg>::Endpoint>
             });
         }
+        // This transport states its evidence in the where clause alone.
+        TokenStream::new()
     }
 
     fn require_subprogram(program: &TokenStream) -> TokenStream {
