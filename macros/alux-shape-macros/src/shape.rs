@@ -46,22 +46,23 @@ pub(crate) fn expand(input: DeriveInput) -> Result<TokenStream> {
 
     // Each member's type states its own shape, which a type parameter does only where it is bound to.
     let mut generics = input.generics.clone();
-    generics.params.push(parse_quote!(Alg));
+    let alg = algebra(&input.generics);
+    generics.params.push(parse_quote!(#alg));
     let predicates = &mut generics.make_where_clause().predicates;
-    predicates.push(parse_quote!(Alg: ::alux_shape::ShapeAlg + ::alux_shape::FieldAlg));
+    predicates.push(parse_quote!(#alg: ::alux_shape::ShapeAlg + ::alux_shape::FieldAlg));
     for member in members {
-        predicates.push(parse_quote!(#member: ::alux_shape::ShapeOf<Alg, Shape = <Alg as ::alux_shape::Sorts>::Ty>));
+        predicates.push(parse_quote!(#member: ::alux_shape::ShapeOf<#alg, Shape = <#alg as ::alux_shape::Sorts>::Ty>));
     }
     let (impl_generics, _, where_clause) = generics.split_for_impl();
     let (_, ty_generics, _) = input.generics.split_for_impl();
 
     Ok(quote! {
-        impl #impl_generics ::alux_shape::ShapeOf<Alg> for #name #ty_generics
+        impl #impl_generics ::alux_shape::ShapeOf<#alg> for #name #ty_generics
         #where_clause
         {
-            type Shape = <Alg as ::alux_shape::Sorts>::Ty;
+            type Shape = <#alg as ::alux_shape::Sorts>::Ty;
 
-            fn shape_of(alg: &Alg) -> Self::Shape {
+            fn shape_of(alg: &#alg) -> Self::Shape {
                 use ::alux_shape::{FieldAlg as _, ShapeAlg as _, ShapeExt as _, ShapeTaggedExt as _};
 
                 let body = #body;
@@ -74,6 +75,15 @@ pub(crate) fn expand(input: DeriveInput) -> Result<TokenStream> {
     })
 }
 
+/// Names the algebra parameter with an identifier none of the layout's own parameters is.
+fn algebra(generics: &syn::Generics) -> syn::Ident {
+    let mut name = String::from("Alg");
+    while generics.type_params().any(|param| param.ident == name) {
+        name.push('_');
+    }
+    syn::Ident::new(&name, proc_macro2::Span::call_site())
+}
+
 /// A name, as the words it is made of.
 fn literal(words: &[String]) -> TokenStream {
     let words = words.iter().map(|word| LitStr::new(word, proc_macro2::Span::call_site()));
@@ -84,7 +94,8 @@ fn literal(words: &[String]) -> TokenStream {
 /// The shape of one member's type, which the member then requires of it.
 fn shape_of_type(ty: &syn::Type, members: &mut Vec<syn::Type>) -> TokenStream {
     members.push(ty.clone());
-    quote!(<#ty as ::alux_shape::ShapeOf<Alg>>::shape_of(alg))
+    // The algebra is the one `alg` is, so its parameter is never named here.
+    quote!(<#ty as ::alux_shape::ShapeOf<_>>::shape_of(alg))
 }
 
 /// The product a struct's members state.

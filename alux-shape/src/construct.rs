@@ -2,8 +2,9 @@
 //!
 //! A shape describes a value; it never builds one. An interpretation that reads a value member by
 //! member, from command-line words, named parameters, or a form, needs the other direction too: a
-//! product is its fields taken together, and a sum is the one alternative it carries. Each is an
-//! isomorphism with a tuple or a `SumN`, and its members are named as identifiers, the way an
+//! product is its fields taken together, and a sum is the one alternative it carries. A sum is an
+//! isomorphism with a `SumN`. A product is one with a tuple unless a member is skipped: that member is
+//! no field and is made with `Default`, so a product made from its fields answers those fields, and its members are named as identifiers, the way an
 //! operation's argument names are, so `words_of` reads them as the words a shape names them by.
 
 use alux_ext::ext;
@@ -395,15 +396,19 @@ pub enum Sum16<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P> {
     P(P),
 }
 
-/// States that taking a product apart and making it again changes nothing.
+/// States that a product made from its fields answers those fields.
+///
+/// A skipped member is no field, so the product made again holds its `Default`, not its value.
 #[ext(name = ProductLawsExt)]
-pub impl<This> This
+pub impl<This, Fields> This
 where
-    This: Product + Clone + PartialEq,
+    This: Product<Fields = Fields> + Clone,
+    Fields: Clone + PartialEq,
 {
-    /// Making a product from the fields it is taken apart into answers the same product.
+    /// Taking apart a product made from this one's fields answers the same fields.
     fn law_product_round_trip(&self) -> bool {
-        This::from_fields(self.clone().into_fields()) == *self
+        let fields = self.clone().into_fields();
+        This::from_fields(fields.clone()).into_fields() == fields
     }
 }
 

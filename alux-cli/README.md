@@ -145,7 +145,7 @@ where
 }
 ```
 
-A source that cannot supply its argument does not compile once the program is: a missing or extra source, a positional `bool`, and a switch with a fallback, because a switch that defaults or reads the environment is no longer something the command line turns on.
+A source that cannot supply its argument does not compile once the program is: a missing or extra source, a source of the wrong shape for its argument (`.many()` for a `String`), and a switch with a `.default(..)`. A switch is turned on by its spelling and may fall back to `.env(..)` only.
 
 `.arg_for("name", source)` declares the same source for the argument it names. The names are checked against the operation's own, in order, when the program compiles, so two arguments of one type cannot be swapped unnoticed:
 

@@ -2,7 +2,7 @@ use crate::{
     ClapWords,
     command::{assigned_long, command},
 };
-use alux_cli::{CliArgumentError, CliProgramAlg, CommandDescription, SourceInfo, USAGE_STATUS};
+use alux_cli::{Arity, CliArgumentError, CliProgramAlg, CommandDescription, Conventions, SourceInfo, USAGE_STATUS};
 use alux_cli_direct::{DirectCompiler, Entry, Exit, Running};
 use clap::{ArgMatches, Command, error::ErrorKind};
 use core::future::Future;
@@ -13,6 +13,10 @@ use std::{
     task::{Context, Poll, Wake, Waker},
     thread::{self, Thread},
 };
+
+/// The status a run exits with when the program declares conventions `clap` does not read, as
+/// `EX_SOFTWARE`: no command line could run it as declared.
+pub const UNSUPPORTED_STATUS: u8 = 70;
 
 /// Interprets a CLI program through `clap`, applying its operations to `Handle`.
 ///
@@ -117,6 +121,9 @@ where
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default();
         let name = self.name.clone().unwrap_or(invoked);
+        if let Some(exit) = self.unsupported() {
+            return Box::pin(async move { exit });
+        }
         let command = self.command_named(name);
         let words = self.assigned(words);
         let exit = match command.clone().try_get_matches_from(words) {
@@ -138,32 +145,78 @@ where
         Box::pin(async move { exit })
     }
 
-    /// Rewrites each operand `name=value` assigning an argument of the program into the option
-    /// `clap` reads it as. A word naming no assigned argument is left as it is.
+    /// Refuses a program declaring command-line conventions, which `clap` reads by its own.
+    ///
+    /// A command that is `verbatim`, reads options first, or gives a numeric option its digits would
+    /// otherwise run with a different meaning than it declares; `alux-cli-direct` reads all of them.
+    fn unsupported(&self) -> Option<Exit> {
+        let declared =
+            self.descriptions().into_iter().find(|description| description.conventions != Conventions::default())?;
+        let command = declared.path.join(" ");
+        let stderr = format!(
+            "error: `{command}` declares command-line conventions alux-cli-clap does not read; alux-cli-direct reads them\n"
+        );
+        Some(Exit { status: UNSUPPORTED_STATUS, stdout: String::new(), stderr })
+    }
+
+    /// Rewrites each operand `name=value` assigning an argument of the selected command into the
+    /// option `clap` reads it as.
+    ///
+    /// The command is selected by its path's words as they come. Only an operand is rewritten: a
+    /// word another command's arguments name and a value an option takes are left as they are. An
+    /// operand after `--` assigns too, so its option is moved before the `--`.
     fn assigned(&self, words: Vec<OsString>) -> Vec<OsString> {
-        let names = self
-            .entries
-            .iter()
-            .flat_map(|entry| entry.description().arguments.iter())
-            .filter_map(|argument| match &argument.source {
-                SourceInfo::Assigned { name } => Some(name.as_str()),
-                _ => None,
-            })
-            .collect::<Vec<_>>();
-        if names.is_empty() {
+        let descriptions = self.descriptions();
+        if !descriptions.iter().flat_map(|description| &description.arguments).any(is_assigned) {
             return words;
         }
-        words
-            .into_iter()
-            .map(|word| {
-                let assigned =
-                    word.to_str().and_then(|text| text.split_once('=')).filter(|(name, _)| names.contains(name));
-                match assigned {
-                    Some((name, value)) => OsString::from(format!("--{}={value}", assigned_long(name))),
-                    None => word,
+        let mut path: Vec<&str> = Vec::new();
+        let mut takes_value = false;
+        let mut ended = None;
+        let mut rewritten = Vec::with_capacity(words.len());
+        for (index, word) in words.into_iter().enumerate() {
+            let text = word.to_str();
+            if index == 0 || std::mem::take(&mut takes_value) {
+                rewritten.push(word);
+                continue;
+            }
+            let beneath = descriptions.iter().filter(|description| description.path.starts_with(&path));
+            let segment = beneath.clone().find_map(|description| {
+                description.path.get(path.len()).copied().filter(|segment| Some(*segment) == text)
+            });
+            let own = descriptions.iter().find(|description| description.path == path);
+            // An argument the command line reaches here: the command's own, or a context's.
+            let mut reachable = own
+                .into_iter()
+                .flat_map(|description| &description.arguments)
+                .chain(beneath.flat_map(|description| &description.context));
+            match text {
+                Some("--") if ended.is_none() => ended = Some(rewritten.len()),
+                Some(_) if ended.is_none() && segment.is_some() => path.extend(segment),
+                Some(text) if ended.is_none() && text.starts_with('-') && !text.contains('=') => {
+                    takes_value = reachable.any(|argument| takes_separate_value(argument, text));
                 }
-            })
-            .collect()
+                Some(text) => {
+                    let assigned = text.split_once('=').filter(|(name, _)| {
+                        own.is_some_and(|own| own.arguments.iter().any(|argument| matches!(&argument.source, SourceInfo::Assigned { name: assigned } if assigned == name)))
+                    });
+                    if let Some((name, value)) = assigned {
+                        let option = OsString::from(format!("--{}={value}", assigned_long(name)));
+                        match ended {
+                            Some(at) => {
+                                rewritten.insert(at, option);
+                                ended = Some(at + 1);
+                            }
+                            None => rewritten.push(option),
+                        }
+                        continue;
+                    }
+                }
+                None => {}
+            }
+            rewritten.push(word);
+        }
+        rewritten
     }
 
     /// Runs `program` on a full command line and waits for its exit, on the calling thread.
@@ -173,6 +226,26 @@ where
         Words::Item: Into<OsString>,
     {
         block_on(self.run(words))
+    }
+}
+
+/// Whether an argument is read from an operand `name=value`.
+fn is_assigned(argument: &alux_cli::ArgumentInfo) -> bool {
+    matches!(argument.source, SourceInfo::Assigned { .. })
+}
+
+/// Whether `word` spells `argument` as an option whose value is the next word.
+fn takes_separate_value(argument: &alux_cli::ArgumentInfo, word: &str) -> bool {
+    let SourceInfo::Named { long, short, short_aliases } = &argument.source else { return false };
+    if matches!(argument.arity, Arity::Presence | Arity::OptionalValue) {
+        return false;
+    }
+    match word.strip_prefix("--") {
+        Some(spelled) => spelled == long,
+        // A short option takes the next word when it ends its cluster.
+        None => {
+            word.chars().last().is_some_and(|last| short.iter().chain(short_aliases.iter()).any(|short| *short == last))
+        }
     }
 }
 

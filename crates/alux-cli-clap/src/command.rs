@@ -35,6 +35,9 @@ pub(crate) fn command(name: String, descriptions: &[&CommandDescription], prefix
     }
     if own.is_none() {
         command = command.subcommand_required(true).arg_required_else_help(true);
+    } else if !children.is_empty() {
+        // Selecting a command selects only it, so the program's own arguments are not required.
+        command = command.subcommand_negates_reqs(true);
     }
 
     command
@@ -118,6 +121,10 @@ fn arg(argument: &ArgumentInfo, global: bool) -> Arg {
             .default_missing_value("")
             .value_name(value_name(argument)),
     };
+    // A value is read as its raw word, whatever its bytes, and decoded by the argument's own type.
+    if argument.arity != Arity::Presence {
+        arg = arg.value_parser(clap::builder::OsStringValueParser::new());
+    }
     // A list one word can give is split by `clap` as it reads the command line.
     if let Some(delimiter) = argument.delimiter {
         arg = arg.value_delimiter(delimiter);

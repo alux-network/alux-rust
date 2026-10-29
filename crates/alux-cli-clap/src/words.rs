@@ -8,13 +8,13 @@ use std::ffi::{OsStr, OsString};
 #[derive(Clone, Debug)]
 pub struct ClapWords(pub(crate) ArgMatches);
 
-/// Names the `clap` argument an argument is declared as: its long spelling, or its name.
+/// Keys the `clap` argument an argument is declared as by its source's kind and its spelling or
+/// position, so an option `--path` and an operand `path` are two arguments.
 pub(crate) fn id(argument: &ArgumentInfo) -> String {
     match &argument.source {
-        SourceInfo::Named { long, .. } => long.clone(),
-        // An assigned name keeps its `=`, so `if=` is never the option `--if`.
-        SourceInfo::Assigned { name } => format!("{name}="),
-        SourceInfo::Positional { .. } => argument.name.to_owned(),
+        SourceInfo::Named { long, .. } => format!("named:{long}"),
+        SourceInfo::Assigned { name } => format!("assigned:{name}"),
+        SourceInfo::Positional { index } => format!("positional:{index}"),
     }
 }
 
@@ -41,7 +41,38 @@ impl CliWordsAlg for ClapWords {
 
     fn cli_split(&self, word: OsString, delimiter: char) -> Vec<OsString> {
         // `clap` splits the command line's words itself; this splits the environment's and the default.
-        word.to_string_lossy().split(delimiter).map(OsString::from).collect()
+        split(&word, delimiter)
+    }
+}
+
+/// Splits a word on a delimiter, keeping each part's bytes.
+#[cfg(unix)]
+fn split(word: &OsStr, delimiter: char) -> Vec<OsString> {
+    use std::os::unix::ffi::OsStrExt;
+    let mut encoded = [0; 4];
+    let delimiter = delimiter.encode_utf8(&mut encoded).as_bytes();
+    let bytes = word.as_bytes();
+    let mut parts = Vec::new();
+    let (mut start, mut at) = (0, 0);
+    while at + delimiter.len() <= bytes.len() {
+        if &bytes[at..at + delimiter.len()] == delimiter {
+            parts.push(OsStr::from_bytes(&bytes[start..at]).to_os_string());
+            at += delimiter.len();
+            start = at;
+        } else {
+            at += 1;
+        }
+    }
+    parts.push(OsStr::from_bytes(&bytes[start..]).to_os_string());
+    parts
+}
+
+/// Splits a word on a delimiter; off Unix a word that is not text is kept whole.
+#[cfg(not(unix))]
+fn split(word: &OsStr, delimiter: char) -> Vec<OsString> {
+    match word.to_str() {
+        Some(text) => text.split(delimiter).map(OsString::from).collect(),
+        None => vec![word.to_os_string()],
     }
 }
 

@@ -9,7 +9,7 @@ use crate::extension::{extension, stated};
 use crate::syntax::{
     ExtensionImpl, ReplaceSelf, Subprograms, documentation, predicates, program_ident, program_type_params, unbind,
 };
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
@@ -84,6 +84,10 @@ pub(crate) trait ProgramBackendAlg {
 
     /// Explains a rejected generic parameter in this transport's vocabulary.
     const REJECTED_PARAM: &'static str;
+
+    /// The suffix naming a declaration call that denotes a nested program wherever it is written,
+    /// beyond the composing positions every backend reads.
+    const NESTED_SUFFIX: Option<&'static str> = None;
 
     /// Whether this backend derives nested-program obligations from the body.
     const INFER_SUBPROGRAM_BOUNDS: bool = true;
@@ -251,7 +255,8 @@ fn hoist_arguments(expression: &mut Expr, bindings: &mut Vec<Stmt>) {
     for argument in &mut call.args {
         if matches!(argument, Expr::MethodCall(_)) {
             hoist_arguments(argument, bindings);
-            let name = format_ident!("part{}", bindings.len());
+            // A name the author cannot write, so no binding of theirs is captured or shadowed.
+            let name = format_ident!("part{}", bindings.len(), span = Span::mixed_site());
             let value = std::mem::replace(argument, parse_quote!(#name));
             bindings.push(parse_quote!(let #name = #value;));
         }
@@ -323,7 +328,7 @@ where
     if Backend::READS_BINDINGS {
         inline_bindings(&mut compiler.block);
     }
-    let mut subprograms = Subprograms::new();
+    let mut subprograms = Subprograms::new(Backend::ROOT, Backend::NESTED_SUFFIX);
     subprograms.visit_block_mut(&mut compiler.block);
     let declared = Backend::prepare_declarations(&mut compiler, defaults);
     ReplaceSelf.visit_block_mut(&mut compiler.block);

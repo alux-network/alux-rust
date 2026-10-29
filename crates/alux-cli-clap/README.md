@@ -8,6 +8,8 @@ Runs an [`alux-cli`](https://docs.rs/alux-cli) program through [`clap`](https://
 
 An argument is declared once, in the program, and `clap` never sees a second declaration of it. A value is read as `clap` reads it, with `value_parser!`: the standard types are, and a domain type states that it is with `clap_words!(Level)`, whether it reads through `FromStr`, a `ValueEnum`, or its own `ValueParserFactory`.
 
+`clap` reads the command line by its own conventions, so a program declaring any (`verbatim`, `options_first`, `numeric_option`, …) is refused with `UNSUPPORTED_STATUS` rather than run with a different meaning. `alux-cli-direct` reads all of them.
+
 ```rust
 use alux_cli::{CliCommandsAlg, CliProgramBuilder, cli};
 use alux_cli_clap::CliClap;

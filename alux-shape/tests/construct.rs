@@ -24,6 +24,10 @@ fn a_product_names_its_fields_by_the_words_its_shape_reads() {
     assert_eq!(credentials, Credentials { user: 7, secret: "open".to_owned(), attempts: 0 });
     assert_eq!(credentials.clone().into_fields(), (7, "open".to_owned()));
     assert!(credentials.law_product_round_trip());
+    // A skipped member is no field: made again, it holds its `Default`, and the fields are the same.
+    let attempted = Credentials { attempts: 1, ..credentials };
+    assert!(attempted.law_product_round_trip());
+    assert_eq!(Credentials::from_fields(attempted.into_fields()).attempts, 0);
 }
 
 #[test]
@@ -61,4 +65,17 @@ fn a_sum_holds_up_to_sixteen_alternatives() {
     assert_eq!(Hex::ALTERNATIVES.len(), 16);
     assert_eq!(Hex::Df(1).into_alternative(), alux_shape::Sum16::P(1));
     assert!(Hex::De.law_sum_round_trip());
+}
+
+/// A layout whose own parameter is named as the derive's algebra parameter would be.
+#[derive(Shape, Clone, Debug, PartialEq)]
+enum Placed<Alg> {
+    At(Alg),
+    Nowhere,
+}
+
+#[test]
+fn a_layout_may_name_its_parameter_alg() {
+    assert_eq!(Placed::<u8>::ALTERNATIVES, ["at", "nowhere"]);
+    assert!(Placed::At(3).law_sum_round_trip());
 }

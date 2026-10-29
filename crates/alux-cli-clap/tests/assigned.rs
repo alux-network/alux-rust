@@ -17,6 +17,11 @@ where
     fn dd(&self, input: Option<String>, count: Option<u64>, conversions: Vec<String>, extra: Vec<String>) -> String {
         format!("if={input:?} count={count:?} conv={conversions:?} extra={extra:?}")
     }
+
+    /// Writes its words.
+    fn echo(&self, separator: Option<String>, words: Vec<String>) -> String {
+        format!("sep={separator:?} words={words:?}")
+    }
 }
 
 #[ext(name = BlocksCliExt, defunc(via = cli))]
@@ -25,14 +30,21 @@ where
     This: CliCommandsAlg,
 {
     fn blocks_cli<Machine>(&self) {
-        self.commands().command(
-            "dd",
-            self.op(Machine::dd)
-                .arg_for("input", self.named("Input file").assigned("if").optional())
-                .arg_for("count", self.named("Blocks to copy").assigned("count").optional())
-                .arg_for("conversions", self.named("Conversions").assigned("conv").many().delimiter(','))
-                .arg_for("extra", self.positional("Other operands").many()),
-        )
+        self.commands()
+            .command(
+                "dd",
+                self.op(Machine::dd)
+                    .arg_for("input", self.named("Input file").assigned("if").optional())
+                    .arg_for("count", self.named("Blocks to copy").assigned("count").optional())
+                    .arg_for("conversions", self.named("Conversions").assigned("conv").many().delimiter(','))
+                    .arg_for("extra", self.positional("Other operands").many()),
+            )
+            .command(
+                "echo",
+                self.op(Machine::echo)
+                    .arg_for("separator", self.named("Separator").optional())
+                    .arg_for("words", self.positional("Words").many()),
+            )
     }
 }
 
@@ -54,4 +66,13 @@ fn reads_assigned_operands_as_the_direct_interpretation_does() {
         assert_eq!(clap(line).stdout, direct(line).stdout, "{line}");
     }
     assert_eq!(clap("box dd count=x").status, direct("box dd count=x").status);
+}
+
+#[test]
+fn rewrites_only_the_selected_commands_assigned_operands() {
+    // `echo` assigns nothing, so `if=a` is its operand, and a value an option takes is its value.
+    for line in ["box echo if=a", "box echo --separator if=b c", "box dd -- if=a"] {
+        assert_eq!(clap(line), direct(line), "{line}");
+    }
+    assert_eq!(clap("box echo --separator if=b c").stdout, "sep=Some(\"if=b\") words=[\"c\"]\n");
 }

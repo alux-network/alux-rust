@@ -4,7 +4,7 @@ mod command;
 mod interpreter;
 mod words;
 
-pub use interpreter::CliClap;
+pub use interpreter::{CliClap, UNSUPPORTED_STATUS};
 pub use words::{ClapWord, ClapWords};
 
 #[doc(hidden)]

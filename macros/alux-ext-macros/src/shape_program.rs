@@ -74,6 +74,9 @@ impl ProgramBackendAlg for ShapeBackend {
 
     const ROOT: &'static str = "record";
     const REJECTED_PARAM: &'static str = "shape programs currently support type parameters only";
+    /// A shape names another shape wherever a member's shape is written, `field(name, shape)`
+    /// included, so a call on `self` ending in `_shape` is a nested shape anywhere in the body.
+    const NESTED_SUFFIX: Option<&'static str> = Some("_shape");
 
     fn prepare_declarations(method: &mut ImplItemFn, (): &Self::Defaults) -> TokenStream {
         // The method is the shape's name, and this is the only stage that reads it: the lowering
@@ -230,6 +233,29 @@ mod tests {
         assert!(output.contains("TimestampsShapeProgram : :: alux_shape :: ShapeProgramAlg < This"));
         // In A-normal form, the nested shape is bound once and then named.
         assert!(output.contains("let part0 = builder . profile_shape () ;"), "{output}");
+        assert!(output.contains("builder . program (part0)"), "{output}");
+    }
+
+    #[test]
+    fn reads_a_suffixed_call_as_a_nested_shape_in_a_member() {
+        let output = shape_program_defunc_internal(
+            quote!(name = AccountShapeExt),
+            quote! {
+                pub impl<This> This
+                where
+                    This: ShapeAlg + FieldAlg,
+                {
+                    /// An account, its profile a shape of its own.
+                    fn account_shape(&self) {
+                        self.record().field(profile, self.profile_shape())
+                    }
+                }
+            },
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("ProfileShapeProgram : :: alux_shape :: ShapeProgramAlg < This"), "{output}");
         assert!(output.contains("builder . program (part0)"), "{output}");
     }
 

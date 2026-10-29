@@ -253,17 +253,21 @@ pub(crate) fn lift_operation(declaration: &mut Expr) -> Option<Reified> {
 }
 
 /// Finds the programs a declaration composes, by where they are written: the program argument of
-/// `merge(program)`, `nest(name, program)`, and `within(operation, program)`.
+/// `merge(program)`, `nest(name, program)`, and `within(operation, program)`, and, for a backend
+/// with a nested suffix, any call on `self` whose method ends with it.
 ///
-/// A call on `self` in one of those positions denotes a program whatever its method is named, so a
-/// program declared in this block, in another block, or in another crate composes alike.
+/// A call on `self` in a composing position denotes a program whatever its method is named, so a
+/// program declared in this block, in another block, or in another crate composes alike. The
+/// backend's own empty program, `self.routes()` for one, is no declaration and stays as written.
 pub(crate) struct Subprograms {
+    root: &'static str,
+    suffix: Option<&'static str>,
     programs: Vec<TokenStream>,
 }
 
 impl Subprograms {
-    pub(crate) fn new() -> Self {
-        Self { programs: Vec::new() }
+    pub(crate) fn new(root: &'static str, suffix: Option<&'static str>) -> Self {
+        Self { root, suffix, programs: Vec::new() }
     }
 
     /// Returns the nested program types found so far.
@@ -279,23 +283,43 @@ impl Subprograms {
             _ => None,
         }
     }
+
+    /// Whether `call` names a declared program: a call on `self` other than the backend's root and
+    /// the `program` call this rewrite writes.
+    fn declares(&self, call: &syn::ExprMethodCall) -> bool {
+        matches!(call.receiver.as_ref(), Expr::Path(path) if path.path.is_ident("self"))
+            && call.method != self.root
+            && call.method != "program"
+    }
+
+    /// Rewrites a declaration call into the program it denotes, recording that program's type.
+    fn denote(&mut self, expression: &mut Expr) {
+        let Expr::MethodCall(call) = &*expression else { return };
+        let name = program_ident(&call.method);
+        let arguments = call.turbofish.as_ref().map(|arguments| arguments.args.clone()).unwrap_or_default();
+        let program_type = if arguments.is_empty() { quote!(#name) } else { quote!(#name<#arguments>) };
+        self.programs.push(program_type);
+        let call = call.clone();
+        *expression = parse_quote!(self.program(#call));
+    }
 }
 
 impl VisitMut for Subprograms {
-    fn visit_expr_method_call_mut(&mut self, call: &mut syn::ExprMethodCall) {
-        visit_mut::visit_expr_method_call_mut(self, call);
-        let Some(position) = Self::program_position(&call.method) else { return };
-        let Some(argument) = call.args.iter_mut().nth(position) else { return };
-        let Expr::MethodCall(program) = &*argument else { return };
-        if !matches!(program.receiver.as_ref(), Expr::Path(path) if path.path.is_ident("self")) {
+    fn visit_expr_mut(&mut self, expression: &mut Expr) {
+        visit_mut::visit_expr_mut(self, expression);
+        let Expr::MethodCall(call) = expression else { return };
+        if let Some(suffix) = self.suffix
+            && call.method.to_string().ends_with(suffix)
+            && self.declares(call)
+        {
+            self.denote(expression);
             return;
         }
-        let name = program_ident(&program.method);
-        let arguments = program.turbofish.as_ref().map(|arguments| arguments.args.clone()).unwrap_or_default();
-        let program_type = if arguments.is_empty() { quote!(#name) } else { quote!(#name<#arguments>) };
-        self.programs.push(program_type);
-        let program = program.clone();
-        *argument = parse_quote!(self.program(#program));
+        let Some(position) = Self::program_position(&call.method) else { return };
+        let Some(argument) = call.args.iter_mut().nth(position) else { return };
+        if matches!(argument, Expr::MethodCall(program) if self.declares(program)) {
+            self.denote(argument);
+        }
     }
 }
 
