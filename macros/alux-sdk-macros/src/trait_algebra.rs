@@ -26,6 +26,15 @@
 //! It is headed by `Send + Sync` as well, since it reaches the carrier through a reference, and that
 //! is what lets an algebra whose calls may be awaited elsewhere be stated this way.
 //!
+//! An algebra whose carriers are still open is stated for every choice of them at once. Each
+//! associated type becomes a parameter of the impl, bounded by what the trait declares of it, and
+//! the impl defines it as that parameter. The carrier form reads the parameters off the carrier's
+//! own type and is conditioned on the capabilities that carrier witnesses; the capability form and
+//! the proxy read them off `AlgebraCarrier`, which names the one operation and reply type a carrier
+//! carries.
+//! Either way, every associated type must occur in some argument or return, since one that occurs
+//! in neither is fixed by nothing a carrier carries.
+//!
 //! Stream transport is a separate interpretation. `alux-tokio` envelopes the generated operation
 //! and reply types in a bounded channel while keeping the receiver available as a stream.
 
@@ -35,7 +44,7 @@ use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::visit::{self, Visit};
 use syn::visit_mut::{self, VisitMut};
-use syn::{FnArg, Ident, ItemTrait, Meta, Pat, ReturnType, Token, TraitItem, Type, TypePath};
+use syn::{FnArg, Ident, ItemTrait, Meta, Pat, ReturnType, Token, TraitItem, TraitItemType, Type, TypePath};
 
 /// Describes one operation while retaining the trait's original argument and return types.
 struct Method {
@@ -49,7 +58,9 @@ struct Method {
 
 /// Separates all associated carriers from those needed specifically by operations and replies.
 struct Algebra {
+    contract: Ident,
     associated_types: Vec<Ident>,
+    associated_declarations: Vec<TraitItemType>,
     argument_associated_types: Vec<Ident>,
     reply_associated_types: Vec<Ident>,
     methods: Vec<Method>,
@@ -105,14 +116,16 @@ pub(crate) fn trait_algebra_internal(attribute: TokenStream, definition: &ItemTr
 impl Algebra {
     /// Analyzes associated carrier use without choosing their concrete representations.
     fn from_definition(definition: &ItemTrait) -> Self {
-        let associated_types = definition
+        let associated_declarations = definition
             .items
             .iter()
             .filter_map(|item| match item {
-                TraitItem::Type(associated) => Some(associated.ident.clone()),
+                TraitItem::Type(associated) => Some(associated.clone()),
                 _ => None,
             })
             .collect::<Vec<_>>();
+        let associated_types =
+            associated_declarations.iter().map(|associated| associated.ident.clone()).collect::<Vec<_>>();
         let methods = definition
             .items
             .iter()
@@ -124,21 +137,30 @@ impl Algebra {
         let argument_associated_types = associated_types
             .iter()
             .filter(|associated| {
-                methods.iter().any(|method| method.argument_types.iter().any(|item| type_uses_assoc(item, associated)))
+                methods.iter().any(|method| {
+                    method.argument_types.iter().any(|item| type_uses_assoc(item, &definition.ident, associated))
+                })
             })
             .cloned()
             .collect();
         let reply_associated_types = associated_types
             .iter()
             .filter(|associated| {
-                methods
-                    .iter()
-                    .any(|method| method.return_type.as_ref().is_some_and(|item| type_uses_assoc(item, associated)))
+                methods.iter().any(|method| {
+                    method.return_type.as_ref().is_some_and(|item| type_uses_assoc(item, &definition.ident, associated))
+                })
             })
             .cloned()
             .collect();
 
-        Self { associated_types, argument_associated_types, reply_associated_types, methods }
+        Self {
+            contract: definition.ident.clone(),
+            associated_types,
+            associated_declarations,
+            argument_associated_types,
+            reply_associated_types,
+            methods,
+        }
     }
 }
 
@@ -202,7 +224,7 @@ fn render_syntax(definition: &ItemTrait, attributes: &[Meta], algebra: &Algebra,
         let doc = format!("Represents the `{}` operation.", method.ident);
         let fields = method.arguments.iter().zip(method.argument_types.iter()).map(|(argument, item)| {
             let doc = format!("Carries the `{argument}` argument.");
-            let item = rewrite(item, &algebra.associated_types);
+            let item = rewrite(item, algebra, Naming::Bare);
             quote! {
                 #[doc = #doc]
                 #argument: #item
@@ -217,7 +239,7 @@ fn render_syntax(definition: &ItemTrait, attributes: &[Meta], algebra: &Algebra,
         let output = method.return_type.as_ref()?;
         let variant = &method.variant;
         let doc = format!("Contains the reply to `{}`.", method.ident);
-        let output = rewrite(output, &algebra.associated_types);
+        let output = rewrite(output, algebra, Naming::Bare);
         Some(quote! {
             #[doc = #doc]
             #variant(#output)
@@ -256,8 +278,12 @@ fn render_interpreter(definition: &ItemTrait, algebra: &Algebra, names: &Names) 
         let ident = &method.ident;
         let doc = format!("Interprets the `{ident}` operation.");
         let arguments = &method.arguments;
-        let argument_types = &method.argument_types;
-        let output = method.return_type.as_ref().map_or_else(TokenStream::new, |output| quote!(-> #output));
+        let argument_types =
+            method.argument_types.iter().map(|item| rewrite(item, algebra, Naming::Projected)).collect::<Vec<_>>();
+        let output = method.return_type.as_ref().map_or_else(TokenStream::new, |output| {
+            let output = rewrite(output, algebra, Naming::Projected);
+            quote!(-> #output)
+        });
         let asyncness = method.is_async.then(|| quote!(async));
         quote! {
             #[doc = #doc]
@@ -286,7 +312,7 @@ fn render_operation(definition: &ItemTrait, algebra: &Algebra, names: &Names) ->
         let variant = &method.variant;
         let doc = format!("Constructs the `{ident}` operation.");
         let arguments = &method.arguments;
-        let types = method.argument_types.iter().map(|item| rewrite(item, &algebra.associated_types));
+        let types = method.argument_types.iter().map(|item| rewrite(item, algebra, Naming::Bare));
         quote! {
             #[doc = #doc]
             #visibility fn #ident(#(#arguments: #types),*) -> Self {
@@ -378,7 +404,7 @@ fn render_reply(definition: &ItemTrait, algebra: &Algebra, names: &Names) -> Tok
         let accessor = format_ident!("into_{}", method.ident);
         let doc = format!("Extracts the reply to `{}`.", method.ident);
         let panic = format!("`{accessor}` called on a different reply variant");
-        let output = rewrite(output, &algebra.associated_types);
+        let output = rewrite(output, algebra, Naming::Bare);
         Some(quote! {
             #[doc = #doc]
             #visibility fn #accessor(self) -> #output {
@@ -443,15 +469,11 @@ fn split_transport(attributes: Vec<Meta>) -> (Option<Transport>, Vec<Meta>) {
 /// and not the type.
 fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, transport: &Transport) -> TokenStream {
     let contract = &definition.ident;
-    let Names { operation, reply, .. } = names;
-    if !algebra.associated_types.is_empty() {
-        return syn::Error::new_spanned(
-            contract,
-            "a transport states the trait itself, so it cannot be stated while the algebra's \
-             carriers are still open",
-        )
-        .to_compile_error();
-    }
+    let Names { operation, .. } = names;
+    let open = match OpenCarriers::for_impl(definition, algebra, names, "a transport") {
+        Ok(open) => open,
+        Err(error) => return error,
+    };
     if let Some(synchronous) = algebra.methods.iter().find(|method| !method.is_async) {
         return syn::Error::new_spanned(
             &synchronous.ident,
@@ -463,7 +485,8 @@ fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, tr
     let methods = algebra.methods.iter().map(|method| {
         let ident = &method.ident;
         let arguments = &method.arguments;
-        let argument_types = &method.argument_types;
+        let argument_types =
+            method.argument_types.iter().map(|item| rewrite(item, algebra, Naming::Parameter)).collect::<Vec<_>>();
         method.return_type.as_ref().map_or_else(
             || {
                 quote! {
@@ -477,6 +500,7 @@ fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, tr
                 }
             },
             |output| {
+                let output = rewrite(output, algebra, Naming::Parameter);
                 let into = format_ident!("into_{}", ident);
                 let gone = format!("`{contract}::{ident}`: the interpreter answered nothing, so it is gone");
                 quote! {
@@ -491,30 +515,47 @@ fn render_transport(definition: &ItemTrait, algebra: &Algebra, names: &Names, tr
         )
     });
 
+    let OpenCarriers { parameters, bounds, definitions, operation_type, reply_type, carried } = &open;
+    let asking = algebra
+        .methods
+        .iter()
+        .any(|method| method.return_type.is_some())
+        .then(|| quote!(::alux_sdk::AlgebraCall<#operation_type, #reply_type>));
+    let sending = algebra
+        .methods
+        .iter()
+        .any(|method| method.return_type.is_none())
+        .then(|| quote!(::alux_sdk::AlgebraSend<#operation_type>));
     let header = match transport {
-        Transport::Carrier(carrier) => quote!(impl #contract for #carrier<#operation, #reply>),
-        Transport::Capability => {
-            let asking = algebra
-                .methods
-                .iter()
-                .any(|method| method.return_type.is_some())
-                .then(|| quote!(::alux_sdk::AlgebraCall<#operation, #reply>));
-            let sending = algebra
-                .methods
-                .iter()
-                .any(|method| method.return_type.is_none())
-                .then(|| quote!(::alux_sdk::AlgebraSend<#operation>));
-            let stated = asking.into_iter().chain(sending);
+        Transport::Carrier(carrier) if parameters.is_empty() => {
+            quote!(impl #contract for #carrier<#operation_type, #reply_type>)
+        }
+        Transport::Carrier(carrier) => {
+            // The carrier may witness the capabilities only for some carriers, so they are what the
+            // impl is conditioned on, and the algebra's own bounds need not repeat the transport's.
+            let stated = asking.iter().chain(sending.iter());
             quote! {
-                impl<Carrier> #contract for Carrier
+                impl<#(#parameters),*> #contract for #carrier<#operation_type, #reply_type>
                 where
-                    Carrier: #(#stated +)* ::core::marker::Send + ::core::marker::Sync,
+                    #carrier<#operation_type, #reply_type>: #(#stated)+*,
+                    #(#bounds,)*
+            }
+        }
+        Transport::Capability => {
+            let stated = carried.iter().cloned().chain(asking).chain(sending);
+            let carrier = subject("Carrier");
+            quote! {
+                impl<#carrier #(, #parameters)*> #contract for #carrier
+                where
+                    #carrier: #(#stated +)* ::core::marker::Send + ::core::marker::Sync,
+                    #(#bounds,)*
             }
         }
     };
 
     quote! {
         #header {
+            #(#definitions)*
             #(#methods)*
         }
     }
@@ -541,15 +582,11 @@ fn split_proxy(attributes: Vec<Meta>) -> (bool, Vec<Meta>) {
 fn render_proxy(definition: &ItemTrait, algebra: &Algebra, names: &Names) -> TokenStream {
     let visibility = &definition.vis;
     let contract = &definition.ident;
-    let Names { operation, reply, proxy, .. } = names;
-    if !algebra.associated_types.is_empty() {
-        return syn::Error::new_spanned(
-            contract,
-            "a proxy states the trait itself, so it cannot be generated while the algebra's \
-             carriers are still open",
-        )
-        .to_compile_error();
-    }
+    let Names { operation, proxy, .. } = names;
+    let open = match OpenCarriers::for_impl(definition, algebra, names, "a proxy") {
+        Ok(open) => open,
+        Err(error) => return error,
+    };
     if let Some(stated) = algebra.methods.iter().find(|method| !method.is_async) {
         return syn::Error::new_spanned(
             &stated.ident,
@@ -560,7 +597,8 @@ fn render_proxy(definition: &ItemTrait, algebra: &Algebra, names: &Names) -> Tok
     let methods = algebra.methods.iter().map(|method| {
         let ident = &method.ident;
         let arguments = &method.arguments;
-        let argument_types = &method.argument_types;
+        let argument_types =
+            method.argument_types.iter().map(|item| rewrite(item, algebra, Naming::Parameter)).collect::<Vec<_>>();
         method.return_type.as_ref().map_or_else(
             || {
                 quote! {
@@ -570,6 +608,7 @@ fn render_proxy(definition: &ItemTrait, algebra: &Algebra, names: &Names) -> Tok
                 }
             },
             |output| {
+                let output = rewrite(output, algebra, Naming::Parameter);
                 let into = format_ident!("into_{}", ident);
                 quote! {
                     async fn #ident(&self, #(#arguments: #argument_types),*) -> #output {
@@ -583,6 +622,9 @@ fn render_proxy(definition: &ItemTrait, algebra: &Algebra, names: &Names) -> Tok
             },
         )
     });
+    let OpenCarriers { parameters, bounds, definitions, operation_type, reply_type, carried } = &open;
+    let carried = carried.iter();
+    let calling = subject("Calling");
     let proxy_doc = format!("States `{contract}` by sending its operations to an interpreter elsewhere.");
     let new_doc = format!("States one `{contract}` by calling through the given caller.");
     quote! {
@@ -609,12 +651,127 @@ fn render_proxy(definition: &ItemTrait, algebra: &Algebra, names: &Names) -> Tok
             }
         }
 
-        impl<Calling> #contract for #proxy<Calling>
+        impl<#calling #(, #parameters)*> #contract for #proxy<#calling>
         where
-            Calling: ::alux_sdk::AlgebraCall<#operation, #reply>,
+            #calling: #(#carried +)* ::alux_sdk::AlgebraCall<#operation_type, #reply_type>,
+            #(#bounds,)*
         {
+            #(#definitions)*
             #(#methods)*
         }
+    }
+}
+
+/// States what an impl of the trait itself leaves open: the algebra's carriers, as its parameters.
+///
+/// Each associated type becomes a parameter, its declared bounds become the parameter's, and the
+/// impl defines the associated type as the parameter. The parameters, like the type an impl headed
+/// by a parameter is stated for, are named apart from every name the trait states, so a bound such
+/// as `type Error: Error` still names the trait it named where the trait was declared. With no associated type,
+/// every part is empty and the operation and reply types are the bare enums, so an algebra whose
+/// carriers are all chosen states exactly what it stated before carriers could be open.
+struct OpenCarriers {
+    /// The impl's parameters standing for the algebra's carriers.
+    parameters: Vec<Ident>,
+    /// The declared bounds of each carrier, as where-clause predicates on its parameter.
+    bounds: Vec<TokenStream>,
+    /// `type Carrier = <its parameter>;` for each carrier.
+    definitions: Vec<TokenStream>,
+    /// The operation type, applied to the carriers its arguments use.
+    operation_type: TokenStream,
+    /// The reply type, applied to the carriers its returns use.
+    reply_type: TokenStream,
+    /// `AlgebraCarrier` bound to the operation and reply types, which is what fixes the parameters of
+    /// an impl headed by a type parameter; absent when there is no parameter to fix.
+    carried: Option<TokenStream>,
+}
+
+impl OpenCarriers {
+    /// Reads the open carriers off the algebra, refusing any no impl could fix.
+    ///
+    /// An impl's parameter is fixed only by what it is stated for, so a carrier occurring in no
+    /// argument and no return is fixed by nothing a carrier carries. A generic associated type has
+    /// parameters of its own, which no single carrier could state for all of them. A where clause of the
+    /// associated type's own has no parameter to be stated on, so its bounds go where it is declared
+    /// or in the trait's where clause, whose predicates on carriers the impl restates.
+    fn for_impl(definition: &ItemTrait, algebra: &Algebra, names: &Names, stating: &str) -> Result<Self, TokenStream> {
+        for declaration in &algebra.associated_declarations {
+            let ident = &declaration.ident;
+            let refused = if !declaration.generics.params.is_empty() {
+                Some(format!(
+                    "{stating} states the trait for one carrier of each kind, so `{ident}` cannot have \
+                     parameters of its own"
+                ))
+            } else if declaration.generics.where_clause.is_some() {
+                Some(format!(
+                    "{stating} states each carrier as a parameter, so `{ident}` cannot have a where clause \
+                     of its own: bound it where it is declared, or in the trait's where clause"
+                ))
+            } else if !algebra.argument_associated_types.contains(ident)
+                && !algebra.reply_associated_types.contains(ident)
+            {
+                Some(format!(
+                    "{stating} reads each carrier off what it carries, so `{ident}` must occur in some \
+                     argument or return"
+                ))
+            } else {
+                None
+            };
+            if let Some(refused) = refused {
+                return Err(syn::Error::new_spanned(ident, refused).to_compile_error());
+            }
+        }
+        let Names { operation, reply, .. } = names;
+        let operation_generics = generics(&algebra.argument_associated_types.iter().map(parameter).collect::<Vec<_>>());
+        let reply_generics = generics(&algebra.reply_associated_types.iter().map(parameter).collect::<Vec<_>>());
+        let operation_type = quote!(#operation #operation_generics);
+        let reply_type = quote!(#reply #reply_generics);
+        let declared = algebra.associated_declarations.iter().filter(|declaration| !declaration.bounds.is_empty()).map(
+            |declaration| {
+                let ident = parameter(&declaration.ident);
+                let bounds = declaration.bounds.iter().map(|bound| rewrite_bound(bound, algebra));
+                quote!(#ident: #(#bounds)+*)
+            },
+        );
+        // The trait's own predicates are obligations of every impl. Those naming a carrier are
+        // restated on the parameters, since only this impl can name them. Those naming none (such as
+        // `Self: Clone`) and supertraits are not restated yet, as before carriers could be open, so
+        // an impl over a carrier that does not witness them fails to compile.
+        let stated = definition
+            .generics
+            .where_clause
+            .iter()
+            .flat_map(|clause| clause.predicates.iter())
+            .filter(|predicate| {
+                algebra
+                    .associated_types
+                    .iter()
+                    .any(|associated| predicate_uses_assoc(predicate, &algebra.contract, associated))
+            })
+            .map(|predicate| {
+                let predicate = rewrite_predicate(predicate, algebra);
+                quote!(#predicate)
+            });
+        let bounds = declared.chain(stated).collect();
+        let definitions = algebra
+            .associated_types
+            .iter()
+            .map(|ident| {
+                let parameter = parameter(ident);
+                quote!(type #ident = #parameter;)
+            })
+            .collect();
+        let carried = (!algebra.associated_types.is_empty())
+            .then(|| quote!(::alux_sdk::AlgebraCarrier<Operation = #operation_type, Reply = #reply_type>));
+
+        Ok(Self {
+            parameters: algebra.associated_types.iter().map(parameter).collect(),
+            bounds,
+            definitions,
+            operation_type,
+            reply_type,
+            carried,
+        })
     }
 }
 
@@ -622,54 +779,121 @@ fn generics(identifiers: &[Ident]) -> TokenStream {
     if identifiers.is_empty() { TokenStream::new() } else { quote!(<#(#identifiers),*>) }
 }
 
-fn type_uses_assoc(item: &Type, associated: &Ident) -> bool {
-    struct Finder<'a> {
-        associated: &'a Ident,
-        found: bool,
-    }
+/// Names the impl's parameter standing for one carrier apart from every name the trait states.
+fn parameter(associated: &Ident) -> Ident {
+    format_ident!("__Open{}", associated)
+}
 
-    impl<'syntax> Visit<'syntax> for Finder<'_> {
-        fn visit_type_path(&mut self, path: &'syntax TypePath) {
-            if is_self_assoc(path, self.associated) {
-                self.found = true;
-            }
-            visit::visit_type_path(self, path);
+/// Names the type an impl headed by a parameter is stated for apart from every name the trait states.
+fn subject(name: &str) -> Ident {
+    format_ident!("__{}", name)
+}
+
+/// Finds `Self::Associated`, or `<Self as Trait>::Associated`, anywhere in what it visits.
+struct Finder<'a> {
+    contract: &'a Ident,
+    associated: &'a Ident,
+    found: bool,
+}
+
+impl<'syntax> Visit<'syntax> for Finder<'_> {
+    fn visit_type_path(&mut self, path: &'syntax TypePath) {
+        if projected(path, self.contract).is_some_and(|(associated, _)| associated == self.associated) {
+            self.found = true;
         }
+        visit::visit_type_path(self, path);
     }
+}
 
-    let mut finder = Finder { associated, found: false };
+fn type_uses_assoc(item: &Type, contract: &Ident, associated: &Ident) -> bool {
+    let mut finder = Finder { contract, associated, found: false };
     finder.visit_type(item);
     finder.found
 }
 
-fn rewrite(item: &Type, associated_types: &[Ident]) -> Type {
-    struct Rewriter<'a> {
-        associated_types: &'a [Ident],
-    }
+fn predicate_uses_assoc(predicate: &syn::WherePredicate, contract: &Ident, associated: &Ident) -> bool {
+    let mut finder = Finder { contract, associated, found: false };
+    finder.visit_where_predicate(predicate);
+    finder.found
+}
 
-    impl VisitMut for Rewriter<'_> {
-        fn visit_type_path_mut(&mut self, path: &mut TypePath) {
-            visit_mut::visit_type_path_mut(self, path);
-            if path.qself.is_none()
-                && path.path.segments.len() >= 2
-                && path.path.segments[0].ident == "Self"
-                && self.associated_types.iter().any(|associated| path.path.segments[1].ident == *associated)
-            {
-                path.path.segments = path.path.segments.iter().skip(1).cloned().collect();
-            }
-        }
-    }
+/// Says what a generated item calls a carrier the trait projects off itself.
+#[derive(Clone, Copy)]
+enum Naming {
+    /// The bare carrier, which the generated enums are generic over.
+    Bare,
+    /// The parameter an impl of the trait stands for it with.
+    Parameter,
+    /// `Self::Carrier`, which the interpreter declares.
+    Projected,
+}
 
+/// Names each carrier the trait projects off itself as one generated item calls it.
+struct Rewriter<'a> {
+    algebra: &'a Algebra,
+    naming: Naming,
+}
+
+fn rewrite(item: &Type, algebra: &Algebra, naming: Naming) -> Type {
     let mut item = item.clone();
-    Rewriter { associated_types }.visit_type_mut(&mut item);
+    Rewriter { algebra, naming }.visit_type_mut(&mut item);
     item
 }
 
-fn is_self_assoc(path: &TypePath, associated: &Ident) -> bool {
-    path.qself.is_none()
-        && path.path.segments.len() >= 2
-        && path.path.segments[0].ident == "Self"
-        && path.path.segments[1].ident == *associated
+fn rewrite_predicate(predicate: &syn::WherePredicate, algebra: &Algebra) -> syn::WherePredicate {
+    let mut predicate = predicate.clone();
+    Rewriter { algebra, naming: Naming::Parameter }.visit_where_predicate_mut(&mut predicate);
+    predicate
+}
+
+fn rewrite_bound(bound: &syn::TypeParamBound, algebra: &Algebra) -> syn::TypeParamBound {
+    let mut bound = bound.clone();
+    Rewriter { algebra, naming: Naming::Parameter }.visit_type_param_bound_mut(&mut bound);
+    bound
+}
+
+impl VisitMut for Rewriter<'_> {
+    fn visit_type_path_mut(&mut self, path: &mut TypePath) {
+        visit_mut::visit_type_path_mut(self, path);
+        let Some((associated, at)) = projected(path, &self.algebra.contract) else {
+            return;
+        };
+        if !self.algebra.associated_types.contains(associated) {
+            return;
+        }
+        let mut carrier = path.path.segments[at].clone();
+        let mut segments = Punctuated::new();
+        match self.naming {
+            Naming::Bare => {}
+            Naming::Parameter => carrier.ident = parameter(&carrier.ident),
+            Naming::Projected => segments.push(syn::PathSegment::from(Ident::new("Self", carrier.ident.span()))),
+        }
+        segments.push(carrier);
+        segments.extend(path.path.segments.iter().skip(at + 1).cloned());
+        path.qself = None;
+        path.path.leading_colon = None;
+        path.path.segments = segments;
+    }
+}
+
+/// Reads the carrier a path projects off the trait itself, as `Self::Carrier` or
+/// `<Self as Trait>::Carrier`, and where in the path it stands.
+fn projected<'path>(path: &'path TypePath, contract: &Ident) -> Option<(&'path Ident, usize)> {
+    let segments = &path.path.segments;
+    let at = match &path.qself {
+        None => {
+            let first = segments.first()?;
+            (path.path.leading_colon.is_none() && first.ident == "Self" && first.arguments.is_none()).then_some(1)?
+        }
+        Some(qself) => {
+            let Type::Path(own) = qself.ty.as_ref() else {
+                return None;
+            };
+            let named = qself.position.checked_sub(1).and_then(|last| segments.get(last))?;
+            (own.qself.is_none() && own.path.is_ident("Self") && named.ident == *contract).then_some(qself.position)?
+        }
+    };
+    segments.get(at).map(|carrier| (&carrier.ident, at))
 }
 
 fn pascal(identifier: &Ident) -> Ident {
@@ -687,4 +911,304 @@ fn pascal(identifier: &Ident) -> Ident {
 
 fn is_unit(item: &Type) -> bool {
     matches!(item, Type::Tuple(tuple) if tuple.elems.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::trait_algebra_internal;
+    use proc_macro2::TokenStream;
+    use quote::quote;
+
+    fn expand(attribute: TokenStream, definition: TokenStream) -> String {
+        trait_algebra_internal(attribute, &syn::parse2(definition).unwrap()).to_string()
+    }
+
+    #[test]
+    fn an_algebra_whose_carriers_are_chosen_states_the_capability_impl_unchanged() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Counter {
+                    async fn increment(&self, by: u32) -> u32;
+                    async fn note(&self, text: String);
+                }
+            },
+        );
+
+        assert!(output.contains(
+            "impl < __Carrier > Counter for __Carrier where __Carrier : :: alux_sdk :: AlgebraCall < CounterOp , \
+             CounterReply > + :: alux_sdk :: AlgebraSend < CounterOp > + :: core :: marker :: Send + :: core :: \
+             marker :: Sync ,"
+        ));
+        assert!(!output.contains("AlgebraCarrier"));
+    }
+
+    #[test]
+    fn the_capability_impl_reads_open_carriers_off_what_the_carrier_carries() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Registry {
+                    type Peer: Clone + Send;
+                    type Record;
+                    async fn admit(&self, peer: Self::Peer) -> Option<Self::Record>;
+                    async fn forget(&self, peer: Self::Peer);
+                }
+            },
+        );
+
+        assert!(output.contains(
+            "impl < __Carrier , __OpenPeer , __OpenRecord > Registry for __Carrier where __Carrier : :: alux_sdk \
+             :: AlgebraCarrier < Operation = RegistryOp < __OpenPeer > , Reply = RegistryReply < __OpenRecord > > + \
+             :: alux_sdk :: AlgebraCall < RegistryOp < __OpenPeer > , RegistryReply < __OpenRecord > > + :: \
+             alux_sdk :: AlgebraSend < RegistryOp < __OpenPeer > > + :: core :: marker :: Send + :: core :: marker \
+             :: Sync , __OpenPeer : Clone + Send ,"
+        ));
+        assert!(output.contains("type Peer = __OpenPeer ; type Record = __OpenRecord ;"));
+        assert!(output.contains("async fn admit (& self , peer : __OpenPeer) -> Option < __OpenRecord >"));
+        assert!(output.contains("enum RegistryOp < Peer >"));
+    }
+
+    #[test]
+    fn the_carrier_impl_reads_open_carriers_off_the_carrier_type() {
+        let output = expand(
+            quote!(transport = Kept),
+            quote! {
+                trait Ledger {
+                    type Entry: From<Self::Note>;
+                    type Note;
+                    async fn enter(&self, entry: Self::Entry, note: Self::Note) -> Self::Entry;
+                }
+            },
+        );
+
+        assert!(output.contains(
+            "impl < __OpenEntry , __OpenNote > Ledger for Kept < LedgerOp < __OpenEntry , __OpenNote > , \
+             LedgerReply < __OpenEntry > > where Kept < LedgerOp < __OpenEntry , __OpenNote > , LedgerReply < \
+             __OpenEntry > > : :: alux_sdk :: AlgebraCall < LedgerOp < __OpenEntry , __OpenNote > , LedgerReply < \
+             __OpenEntry > > , __OpenEntry : From < __OpenNote > ,"
+        ));
+        assert!(!output.contains("AlgebraCarrier"));
+    }
+
+    #[test]
+    fn the_proxy_reads_open_carriers_off_what_its_caller_carries() {
+        let output = expand(
+            quote!(proxy),
+            quote! {
+                trait Directory {
+                    type Name;
+                    async fn look_up(&self, name: Self::Name) -> usize;
+                }
+            },
+        );
+
+        assert!(output.contains(
+            "impl < __Calling , __OpenName > Directory for DirectoryProxy < __Calling > where __Calling : :: \
+             alux_sdk :: AlgebraCarrier < Operation = DirectoryOp < __OpenName > , Reply = DirectoryReply > + :: \
+             alux_sdk :: AlgebraCall < DirectoryOp < __OpenName > , DirectoryReply > ,"
+        ));
+        assert!(output.contains("type Name = __OpenName ;"));
+    }
+
+    #[test]
+    fn a_carrier_nothing_carries_is_refused() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Registry {
+                    type Peer;
+                    type Unused;
+                    async fn admit(&self, peer: Self::Peer);
+                }
+            },
+        );
+
+        assert!(output.contains("compile_error"));
+        assert!(output.contains("so `Unused` must occur in some argument or return"));
+    }
+
+    #[test]
+    fn a_carrier_with_parameters_of_its_own_is_refused() {
+        let output = expand(
+            quote!(proxy),
+            quote! {
+                trait Registry {
+                    type Peer<Tag>;
+                    async fn admit(&self, peer: Self::Peer<u8>);
+                }
+            },
+        );
+
+        assert!(output.contains("compile_error"));
+        assert!(output.contains("so `Peer` cannot have parameters of its own"));
+    }
+
+    #[test]
+    fn an_algebra_whose_carriers_are_chosen_states_the_carrier_impl_unchanged() {
+        let output = expand(
+            quote!(transport = Kept),
+            quote! {
+                trait Counter {
+                    async fn increment(&self, by: u32) -> u32;
+                }
+            },
+        );
+
+        assert!(output.contains("impl Counter for Kept < CounterOp , CounterReply > {"));
+    }
+
+    #[test]
+    fn the_carrier_impl_is_conditioned_on_the_capabilities_the_carrier_witnesses() {
+        let output = expand(
+            quote!(transport = Kept),
+            quote! {
+                trait Registry {
+                    type Peer;
+                    async fn admit(&self, peer: Self::Peer) -> usize;
+                    async fn forget(&self, peer: Self::Peer);
+                }
+            },
+        );
+
+        assert!(output.contains(
+            "impl < __OpenPeer > Registry for Kept < RegistryOp < __OpenPeer > , RegistryReply > where Kept < \
+             RegistryOp < __OpenPeer > , RegistryReply > : :: alux_sdk :: AlgebraCall < RegistryOp < __OpenPeer > \
+             , RegistryReply > + :: alux_sdk :: AlgebraSend < RegistryOp < __OpenPeer > > ,"
+        ));
+    }
+
+    #[test]
+    fn the_traits_own_predicates_on_carriers_are_restated() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Registry
+                where
+                    Self::Peer: Clone,
+                    Self: Sized,
+                {
+                    type Peer;
+                    async fn admit(&self, peer: Self::Peer) -> usize;
+                }
+            },
+        );
+
+        assert!(output.contains(":: core :: marker :: Sync , __OpenPeer : Clone , {"), "{output}");
+    }
+
+    #[test]
+    fn the_traits_own_predicates_on_qualified_carriers_are_restated() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Registry
+                where
+                    <Self as Registry>::Peer: Clone,
+                {
+                    type Peer;
+                    async fn admit(&self, peer: Self::Peer) -> usize;
+                }
+            },
+        );
+
+        assert!(output.contains(":: core :: marker :: Sync , __OpenPeer : Clone , {"), "{output}");
+    }
+
+    #[test]
+    fn a_qualified_carrier_is_lifted_like_an_unqualified_one() {
+        let output = expand(
+            quote!(proxy),
+            quote! {
+                trait Directory {
+                    type Name;
+                    async fn look_up(&self, name: <Self as Directory>::Name) -> usize;
+                }
+            },
+        );
+
+        assert!(output.contains("enum DirectoryOp < Name > {"), "{output}");
+        assert!(output.contains("async fn look_up (& mut self , name : Self :: Name) -> usize ;"), "{output}");
+        assert!(output.contains("async fn look_up (& self , name : __OpenName) -> usize"), "{output}");
+    }
+
+    #[test]
+    fn a_bound_naming_a_trait_called_like_its_carrier_still_names_that_trait() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Fallible {
+                    type Error: Error;
+                    async fn fail(&self) -> Self::Error;
+                }
+            },
+        );
+
+        assert!(output.contains("__OpenError : Error ,"), "{output}");
+        assert!(output.contains("type Error = __OpenError ;"), "{output}");
+    }
+
+    #[test]
+    fn a_carrier_with_a_where_clause_of_its_own_is_refused() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Registry {
+                    type Peer where Self: Sized;
+                    async fn admit(&self, peer: Self::Peer);
+                }
+            },
+        );
+
+        assert!(output.contains("compile_error"));
+        assert!(output.contains("so `Peer` cannot have a where clause of its own"));
+    }
+
+    #[test]
+    fn a_carrier_named_like_the_named_carrier_is_free() {
+        let output = expand(
+            quote!(transport = Kept),
+            quote! {
+                trait Ledger {
+                    type Kept;
+                    async fn enter(&self, entry: Self::Kept);
+                }
+            },
+        );
+
+        assert!(!output.contains("compile_error"));
+        assert!(output.contains("impl < __OpenKept > Ledger for Kept < LedgerOp < __OpenKept > , LedgerReply >"));
+    }
+
+    #[test]
+    fn a_carrier_named_carrier_is_free_where_a_carrier_is_named() {
+        let output = expand(
+            quote!(transport = Kept),
+            quote! {
+                trait Ledger {
+                    type Carrier;
+                    async fn enter(&self, entry: Self::Carrier);
+                }
+            },
+        );
+
+        assert!(!output.contains("compile_error"));
+        assert!(output.contains("impl < __OpenCarrier > Ledger for Kept < LedgerOp < __OpenCarrier > , LedgerReply >"));
+    }
+
+    #[test]
+    fn a_carrier_named_like_what_the_impl_is_stated_for_is_free() {
+        let output = expand(
+            quote!(transport),
+            quote! {
+                trait Registry {
+                    type Carrier;
+                    async fn admit(&self, peer: Self::Carrier);
+                }
+            },
+        );
+
+        assert!(!output.contains("compile_error"));
+        assert!(output.contains("impl < __Carrier , __OpenCarrier > Registry for __Carrier"));
+    }
 }

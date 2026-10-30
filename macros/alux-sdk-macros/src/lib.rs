@@ -100,9 +100,44 @@ use syn::{ItemTrait, parse_macro_input};
 /// algebra too, so the trait needs no `auto_impl` of its own, and carrying one would conflict with
 /// the blanket impl.
 ///
-/// Either way, transport is stated only for an algebra whose carriers are all chosen and whose
-/// methods are all asynchronous. `alux-tokio` carries the generated operation and reply types over
-/// a bounded channel while leaving stream consumption to the application.
+/// An algebra whose carriers are still open is stated for every choice of them at once: each
+/// associated type becomes a parameter of the impl, bounded as the trait declares it (on the
+/// associated type, or in the trait's where clause), and the impl defines the associated type as
+/// that parameter. `transport = <Carrier>` reads the parameters off the carrier's own type, as
+/// `impl<Peer> Registry for Carrier<RegistryOp<Peer>, RegistryReply>`, and is conditioned on the
+/// capabilities that carrier witnesses, so one witnessing them only for some choices (as
+/// `alux-tokio`'s sender does only for `Send` ones) restricts the impl rather than the algebra's
+/// bounds.
+/// Bare `transport` is headed by a type parameter, which fixes nothing, so it reads them off
+/// `AlgebraCarrier`, which names the one operation and reply type a carrier carries:
+///
+/// ```ignore
+/// impl<Carrier, Peer> Registry for Carrier
+/// where
+///     Carrier: AlgebraCarrier<Operation = RegistryOp<Peer>, Reply = RegistryReply>
+///         + AlgebraCall<RegistryOp<Peer>, RegistryReply>
+///         + Send
+///         + Sync,
+///     Peer: Send,
+/// {
+///     type Peer = Peer;
+///     // …
+/// }
+/// ```
+///
+/// The expansions show each parameter by its carrier's name. The macro names the parameters, and
+/// the type parameter heading the capability form and the proxy, apart from every name the trait
+/// states, so a bound such as `type Error: Error` still names the imported trait. A carrier may be
+/// reached as `Self::Peer` or as `<Self as Registry>::Peer`, in a signature or in the trait's where
+/// clause.
+///
+/// An algebra whose carriers are all chosen asks for no `AlgebraCarrier`, so its impl is unchanged.
+/// A carrier is refused where no impl could state it: one occurring in no argument and no return,
+/// and one with parameters or a where clause of its own.
+///
+/// Either way, transport is stated only for an algebra whose methods are all asynchronous.
+/// `alux-tokio` carries the generated operation and reply types over a bounded channel while leaving
+/// stream consumption to the application.
 #[proc_macro_attribute]
 pub fn trait_algebra(attribute: TokenStream, item: TokenStream) -> TokenStream {
     let definition = parse_macro_input!(item as ItemTrait);

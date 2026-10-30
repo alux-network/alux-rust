@@ -17,7 +17,7 @@ pub trait AlgebraCall<Operation, Reply> {
 }
 ```
 
-Both halves travel to another task, so this crate states either capability for an operation and a reply that are `Send`.
+Both halves travel to another task, so this crate states either capability for an operation and a reply that are `Send`. One channel carries one algebra, so the sender also states `AlgebraCarrier`, naming that operation and reply, which is what lets an algebra with open carriers read them off the sender.
 
 A reply is the interpreter's own value, and only interpreting the operation produces one, so holding a reply is **evidence the operation ran** — including the unit reply of a method that states no value. Nothing is stated once the interpreter is gone, which is an ordinary ending and not a failure.
 
@@ -120,9 +120,108 @@ The loop that repeatedly receives and folds operations is intentionally absent. 
 
 **Every call waits for the interpreter to run it**, which is what awaiting these signatures means where the interpreter is at hand — `add` is handed the total, and `reset` the evidence that clearing happened, which is why `tally` can read its result from the last call. An interpreter with work to leave running answers first and carries on, so how long a call waits is its to state.
 
-The proxy is cloneable when its sender is, and `BoundedAlgebraSender` is, so many callers can state one vocabulary against one interpreter. It is generated only for an algebra whose carriers are all chosen, since a value stating the trait cannot leave a carrier open.
+The proxy is cloneable when its sender is, and `BoundedAlgebraSender` is, so many callers can state one vocabulary against one interpreter. For an algebra whose carriers are still open, the proxy reads them off what its sender carries: `BoundedAlgebraSender<Operation, Reply>` states `AlgebraCarrier` for exactly that operation and reply, so a sender of `RegistryOp<u32>` is the registry of `u32` peers, and so is a proxy over it.
 
 A proxy never carries an operation nobody stays for. A caller wanting one gone and forgotten holds `BoundedAlgebraSender` itself and calls `send`.
+
+## Open carriers
+
+A contract layer often cannot choose every type its vocabulary speaks of: who a peer is, say, belongs to the node that runs it. The algebra leaves such a type open as an associated type, and the sender still *is* the algebra, for whichever choice its channel carries. Using it takes four steps:
+
+1. **Declare** the algebra with `transport` and the open type as an associated type. Bound it with what any carrier needs: `Send` here, because the calls travel to another task. Nothing in this step names a channel or a choice of peer.
+2. **Program** against the algebra, generic over the peer (`R::Peer`) or naming the one it reads in (`impl Registry<Peer = u16>`).
+3. **Interpret** it with an interpreter that chooses the peer, `type Peer = u16`.
+4. **Carry** it on a channel of the operations for that choice, `RegistryOp<u16>`. The sender states `AlgebraCarrier` for what it carries, so it is `Registry<Peer = u16>`, and so is a borrow or a share of it.
+
+```rust
+use alux_sdk::trait_algebra;
+use alux_tokio::bounded_algebra_channel;
+use futures::StreamExt;
+use std::collections::BTreeSet;
+use std::num::NonZeroUsize;
+
+// 1. Declare: the contract layer leaves the peer open.
+#[trait_algebra(derive(Debug), transport)]
+trait Registry {
+    /// Who is admitted, chosen by whoever runs the registry.
+    type Peer: Send;
+    /// States a value, so a caller asks and waits for it.
+    async fn admit(&self, peer: Self::Peer) -> usize;
+    /// States none, so a caller sends and does not stay.
+    async fn greet(&self, peer: Self::Peer);
+}
+
+// 2. Program: generic over the peer, knowing nothing of what carries it.
+async fn welcome<R: Registry>(registry: &R, peer: R::Peer) -> usize
+where
+    R::Peer: Clone,
+{
+    registry.greet(peer.clone()).await;
+    registry.admit(peer).await
+}
+
+// 3. Interpret: the node chooses its peers to be `u16` indexes.
+#[derive(Default)]
+struct Admitted {
+    peers: BTreeSet<u16>,
+    greeted: Vec<u16>,
+}
+
+impl RegistryInterpreter for Admitted {
+    type Peer = u16;
+
+    async fn admit(&mut self, peer: u16) -> usize {
+        self.peers.insert(peer);
+        self.peers.len()
+    }
+
+    async fn greet(&mut self, peer: u16) {
+        self.greeted.push(peer);
+    }
+}
+
+#[tokio::main(flavor = "current_thread")]
+async fn main() {
+    // 4. Carry: a channel of the operations for that choice; its sender is `Registry<Peer = u16>`.
+    let (sender, mut operations) =
+        bounded_algebra_channel::<RegistryOp<u16>, RegistryReply>(NonZeroUsize::new(8).unwrap());
+
+    let interpreting = tokio::spawn(async move {
+        let mut admitted = Admitted::default();
+        while let Some(message) = operations.next().await {
+            let (operation, responder) = message.into_parts();
+            responder.respond(operation.interpret(&mut admitted).await);
+        }
+        admitted
+    });
+
+    assert_eq!(welcome(&sender, 7).await, 1);
+    assert_eq!(welcome(&sender, 9).await, 2);
+
+    sender.stop();
+    let admitted = interpreting.await.unwrap();
+    assert_eq!(admitted.greeted, [7, 9]);
+}
+```
+
+What `transport` states for `Registry` names the carrier by what it carries, not by its type, which is why the contract layer can state it without knowing the channel (shown with each parameter named after its carrier; the macro names them apart from the trait's own names):
+
+```rust,ignore
+impl<Carrier, Peer> Registry for Carrier
+where
+    Carrier: AlgebraCarrier<Operation = RegistryOp<Peer>, Reply = RegistryReply>
+        + AlgebraCall<RegistryOp<Peer>, RegistryReply>
+        + AlgebraSend<RegistryOp<Peer>>
+        + Send
+        + Sync,
+    Peer: Send,
+{
+    type Peer = Peer;
+    // …
+}
+```
+
+A `proxy` over the sender reads the peer the same way, and `transport = BoundedAlgebraSender` names the sender instead, `impl<Peer> Registry for BoundedAlgebraSender<RegistryOp<Peer>, RegistryReply>`. That form is conditioned on the sender's own capabilities, so it holds for `Send` peers without the algebra having to say so. The [`alux-sdk` README](https://docs.rs/alux-sdk#open-carriers) states the rules, and the diagnostics for an open type no impl could state.
 
 ## Laws
 
