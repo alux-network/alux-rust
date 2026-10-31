@@ -17,7 +17,7 @@ alux-bench-criterion = { version = "0.2.0", path = "crates/alux-bench-criterion"
 alux-bench-direct = { version = "0.2.0", path = "crates/alux-bench-direct" }
 alux-cli = { version = "0.2.1", path = "alux-cli" }
 alux-cli-clap = { version = "0.2.1", path = "crates/alux-cli-clap" }
-alux-cli-direct = { version = "0.2.1", path = "crates/alux-cli-direct" }
+alux-cli-direct = { version = "0.2.2", path = "crates/alux-cli-direct" }
 alux-cli-multicall = { version = "0.2.0", path = "crates/alux-cli-multicall" }
 alux-ext = { version = "0.2.7", path = "alux-ext" }
 alux-ext-macros = { version = "0.5.1", path = "macros/alux-ext-macros" }
