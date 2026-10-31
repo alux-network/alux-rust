@@ -9,20 +9,27 @@ ALUX expects many independently published specification crates. This workspace p
 operation and interface-program vocabulary without centralizing their domain algebras. Each crate has
 one role: it either defines a meaning, or interprets that meaning for a particular purpose.
 
-## Specifications
+A program is written with specifications alone; an interpreter is chosen only where the program runs, so one program can be served, documented, and tested by different interpreters without changing it.
 
-What a surface means, with no interpreter in it. These depend only on `alux-ext` and sit at the top
-level of the repository. The attribute or derive that goes with one is a separate crate, because a
-procedural macro has to be, and those live under [`macros/`](macros).
+Specifications here are ordinary Rust: traits, extension methods over them, and plain values. A program you write is the same kind of thing, so a program and a specification compose as any Rust code does, flatly, with new capabilities and new interpreters added beside the existing ones rather than into them.
+
+`alux-ext` is not needed for any of that; it removes boilerplate. `#[ext]` turns an extension method into an operation value an interpreter can read, carrying its context, its named arguments, and its output, a value you could also write by hand. Specifications use it for that, and it depends on none of them.
 
 | Crate | | Responsibility |
 | --- | --- | --- |
+| [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](macros/alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
+
+## Specifications
+
+What a surface means, with no interpreter in it. Each depends on `alux-ext` and, when it is stated over another specification, on that one, which is listed before it: `alux-cli` reads its products and sums from `alux-shape`, and `alux-sdk` traverses with `alux-traversable`. They sit at the top level of the repository. The attribute or derive that goes with one is a separate crate, because a procedural macro has to be, and those live under [`macros/`](macros).
+
+| Crate | | Responsibility |
+| --- | --- | --- |
+| [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](macros/alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, no encoder<br>The derive reading one out of a layout |
+| [`alux-traversable`](alux-traversable) | [![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | `traverse` over `Option` and iterators |
+| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros] | Transformations kept as expressions<br>The macros it exports |
 | [`alux-http`](alux-http) | [![crates.io][v-http]][c-http] [![docs.rs][d-http]][r-http] | HTTP programs and server, no web framework |
 | [`alux-jsonrpc`](alux-jsonrpc) | [![crates.io][v-rpc]][c-rpc] [![docs.rs][d-rpc]][r-rpc] | JSON-RPC programs, no RPC framework |
-| [`alux-shape`](alux-shape)<br>[`alux-shape-macros`](macros/alux-shape-macros) | [![crates.io][v-shape]][c-shape] [![docs.rs][d-shape]][r-shape]<br>[![crates.io][v-shape-macros]][c-shape-macros] [![docs.rs][d-shape-macros]][r-shape-macros] | Data shapes, no encoder<br>The derive reading one out of a layout |
-| [`alux-ext`](alux-ext)<br>[`alux-ext-macros`](macros/alux-ext-macros) | [![crates.io][v-ext]][c-ext] [![docs.rs][d-ext]][r-ext]<br>[![crates.io][v-macros]][c-macros] [![docs.rs][d-macros]][r-macros] | First-order operations and context handles<br>The `ext` attribute and its macros |
-| [`alux-sdk`](alux-sdk)<br>[`alux-sdk-macros`](macros/alux-sdk-macros) | [![crates.io][v-sdk]][c-sdk] [![docs.rs][d-sdk]][r-sdk]<br>[![crates.io][v-sdk-macros]][c-sdk-macros] [![docs.rs][d-sdk-macros]][r-sdk-macros] | Transformations kept as expressions<br>The macros it exports |
-| [`alux-traversable`](alux-traversable) | [![crates.io][v-trav]][c-trav] [![docs.rs][d-trav]][r-trav] | `traverse` over `Option` and iterators |
 | [`alux-cli`](alux-cli) | [![crates.io][v-cli]][c-cli] [![docs.rs][d-cli]][r-cli] | Command-line programs, no parser framework |
 | [`alux-bench`](alux-bench) | [![crates.io][v-bench]][c-bench] [![docs.rs][d-bench]][r-bench] | What a benchmark measures, no harness |
 
