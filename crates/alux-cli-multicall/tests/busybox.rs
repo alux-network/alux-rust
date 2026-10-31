@@ -94,7 +94,7 @@ where
     /// Declares the applets.
     fn applets<Machine>(&self) {
         self.commands()
-            .cmd("cat", self.op(Machine::cat).arg("files", self.positional("Files").many()).fallible())
+            .cmd("cat", self.op(Machine::cat).arg("files", self.positional("Files").many()).fallible_by_error())
             .cmd(
                 "echo",
                 self.op(Machine::echo)
@@ -109,7 +109,10 @@ where
             .cmd("true", self.op(Machine::truth).arg("ignored", self.positional("Ignored").many()).verbatim())
             .cmd(
                 "false",
-                self.op(Machine::falsity).arg("ignored", self.positional("Ignored").many()).verbatim().fallible(),
+                self.op(Machine::falsity)
+                    .arg("ignored", self.positional("Ignored").many())
+                    .verbatim()
+                    .fallible_by_error(),
             )
     }
 

@@ -8,7 +8,7 @@ Runs an [`alux-cli`](https://docs.rs/alux-cli) program as a command line, with n
 - decodes each argument through its source, from the command line, then its environment variable, then its default, with the value's `DirectWord`;
 - applies the operation to the handle it was given, or, beneath a `within`, to the context the context operation opens from it, and renders the outcome.
 
-A success writes its value to standard output and exits with zero. A `.fallible()` command's failure writes its error to standard error and exits with the error's status. Words that do not make the command write the problem and the command's usage, and exit with `USAGE_STATUS`. `--help` or `-h` prints help built from the same program: command lists from the first line of each operation's documentation, and per-command usage, arguments, options, global options, environment variables, and defaults.
+A success writes its value to standard output and exits with zero. A fallible command's failure writes its error to standard error, in its alternate form so a chain of causes such as `anyhow`'s shows in full, and exits with the status the declaration states. Words that do not make the command write the problem and the command's usage, and exit with `USAGE_STATUS`. `--help` or `-h` prints help built from the same program: command lists from the first line of each operation's documentation, and per-command usage, arguments, options, global options, environment variables, and defaults.
 
 ```rust
 use alux_cli::{CliCommandsAlg, CliProgramBuilder, cli};

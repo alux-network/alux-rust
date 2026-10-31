@@ -500,7 +500,8 @@ where
         CliOutcome::Success(value) => Ok(value),
         // A failure already reported as it happened leaves only its status to the exit.
         CliOutcome::Failure(error) if error.cli_reported() => Err(Exit::err(status, String::new())),
-        CliOutcome::Failure(error) => Err(Exit::err(status, format!("{prefix}: {error}\n"))),
+        // The alternate form, so an error with a chain of causes, as `anyhow`'s, writes all of it.
+        CliOutcome::Failure(error) => Err(Exit::err(status, format!("{prefix}: {error:#}\n"))),
     }
 }
 

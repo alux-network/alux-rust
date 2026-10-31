@@ -259,12 +259,16 @@ fn argument_sources(declaration: &Expr) -> Vec<ArgumentSource> {
     }
 }
 
-/// Reads how a command's output is read as its outcome: `Fallible` when it says `.fallible()`.
+/// Reads how a command's output is read as its outcome: `Fallible` when it says `.fallible()` or
+/// `.fallible_as(..)`, and `FallibleByError` when it says `.fallible()`.
 fn mode_type(declaration: &Expr) -> Type {
     let mut current = declaration;
     while let Expr::MethodCall(call) = current {
-        if call.method == "fallible" {
+        if call.method == "fallible" || call.method == "fallible_as" {
             return parse_quote!(::alux_cli::Fallible);
+        }
+        if call.method == "fallible_by_error" {
+            return parse_quote!(::alux_cli::FallibleByError);
         }
         current = &call.receiver;
     }

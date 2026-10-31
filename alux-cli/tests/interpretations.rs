@@ -4,8 +4,8 @@ use alux_cli::{
     ArgumentInfo, Arity, CliArgumentError, CliCommandsAlg, CliCommandsObserved, CliCompositionLawsExt, CliContextAlg,
     CliContextLawsExt, CliDeclarationLawsExt, CliDecodeSources, CliFailureAlg, CliNestAlg, CliNestLawsExt,
     CliOperationAlg, CliOutcome, CliOutcomeLawsExt, CliOutcomeOf, CliProgramBuilder, CliProgramExt, CliSources,
-    CliWordAlg, CliWordsAlg, CommandDescription, CompileCliProgram, Conventions, Fallback, Fallible, SourceInfo, Total,
-    USAGE_STATUS, cli,
+    CliWordAlg, CliWordsAlg, CommandDescription, CompileCliProgram, Conventions, Fallback, Fallible, FallibleByError,
+    SourceInfo, Total, USAGE_STATUS, cli,
 };
 use alux_ext::{ApplyAlg, OperationAlg, ext};
 use core::{
@@ -79,7 +79,10 @@ where
     fn reading_cli<Machine, Name>(&self) {
         self.commands()
             .cmd("lookup", self.op(Machine::lookup).arg("name", self.positional("Requested name")))
-            .cmd("find", self.op(Machine::find_value).arg("name", self.positional("Requested name")).fallible())
+            .cmd(
+                "find",
+                self.op(Machine::find_value).arg("name", self.positional("Requested name")).fallible_by_error(),
+            )
             .cmd("sum", self.op(Machine::sum))
             .cmd(
                 "page",
@@ -452,7 +455,7 @@ fn direct_construction_folds_like_the_lowered_declaration() {
             builder
                 .op(FindValueOperation::<Memory>::default())
                 .arg("name", builder.positional("Requested name"))
-                .fallible(),
+                .fallible_by_error(),
         )
         .cmd("sum", builder.op(SumOperation::<Memory>::default()))
         .cmd(
@@ -486,8 +489,11 @@ fn description_satisfies_the_laws() {
         )
         .unwrap();
     Total.law_cli_outcome(7_u16).unwrap();
-    Fallible.law_cli_outcome(Ok::<u16, Unknown>(7)).unwrap();
-    Fallible.law_cli_outcome(Err::<u16, Unknown>(Unknown)).unwrap();
+    Fallible::default().law_cli_outcome(Ok::<u16, Unknown>(7)).unwrap();
+    Fallible::default().law_cli_outcome(Err::<u16, Unknown>(Unknown)).unwrap();
+    Fallible::new(122).law_cli_outcome(Err::<u16, Unknown>(Unknown)).unwrap();
+    FallibleByError.law_cli_outcome(Ok::<u16, Unknown>(7)).unwrap();
+    FallibleByError.law_cli_outcome(Err::<u16, Unknown>(Unknown)).unwrap();
     // Two arguments read from one spelling cannot be told apart.
     assert_eq!(
         Describe.law_cli_declaration(

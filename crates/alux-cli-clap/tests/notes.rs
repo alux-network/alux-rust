@@ -105,7 +105,10 @@ where
                     .arg("limit", self.named("Maximum number of notes to show").optional().short('n'))
                     .arg("verbose", self.named("Number the notes").switch().short('v')),
             )
-            .cmd("remove", self.op(Store::remove_note).arg("number", self.positional("The note's number")).fallible())
+            .cmd(
+                "remove",
+                self.op(Store::remove_note).arg("number", self.positional("The note's number")).fallible_by_error(),
+            )
             .nest(
                 "owner",
                 self.commands().cmd(
@@ -119,7 +122,9 @@ where
     /// Declares the notes commands, applied to the store `--store` opens from a library.
     fn library_cli<Shelf, Store>(&self) {
         self.commands().within(
-            self.op(Shelf::open).arg("store", self.named("The store to use").short('s').default("main")).fallible(),
+            self.op(Shelf::open)
+                .arg("store", self.named("The store to use").short('s').default("main"))
+                .fallible_by_error(),
             self.notes_cli::<Store>(),
         )
     }
@@ -157,7 +162,9 @@ where
     /// Declares the scoped notes commands within the store `--store` opens: two contexts, nested.
     fn nested_cli<Shelf, Store>(&self) {
         self.commands().within(
-            self.op(Shelf::open).arg("store", self.named("The store to use").short('s').default("main")).fallible(),
+            self.op(Shelf::open)
+                .arg("store", self.named("The store to use").short('s').default("main"))
+                .fallible_by_error(),
             self.scoped_cli::<Store>(),
         )
     }

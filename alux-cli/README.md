@@ -289,7 +289,7 @@ impl<This> This where This: CliCommandsAlg {
 
 ## Contexts
 
-`within(operation, program)` applies every command of `program` to the value `operation` answers: a store it opens, a configuration it reads. The operation's arguments are the subtree's global arguments, which every command beneath it takes besides its own, and `.fallible()` lets opening the context fail with its error's status. The subtree compiles with the interpreter `CliContextAlg` hands over for that value, so a context can be another type than the one around it. Global arguments are named, because positions belong to each command:
+`within(operation, program)` applies every command of `program` to the value `operation` answers: a store it opens, a configuration it reads. The operation's arguments are the subtree's global arguments, which every command beneath it takes besides its own, and `.fallible()` lets opening the context fail. The subtree compiles with the interpreter `CliContextAlg` hands over for that value, so a context can be another type than the one around it. Global arguments are named, because positions belong to each command:
 
 ```rust compile_fail
 # use alux_cli::{CliCommandsAlg, cli};
@@ -339,7 +339,9 @@ impl<This> This where This: CliCommandsAlg {
 
 ## Outcome
 
-A command succeeds with its operation's output and exits with status zero. `.fallible()` reads an output that is a `Result` instead: `Ok` succeeds, and `Err` fails with the status its error states through `CliFailureAlg`, nonzero by its type. `CliOutcomeOf` reads an output under the declared mode, `Total` or `Fallible`, as a `CliOutcome`, so an interpreter that applies a `.fallible()` command whose operation does not answer a `Result` fails to compile. Words that do not make the command exit with `USAGE_STATUS` before anything applies.
+A command succeeds with its operation's output and exits with status zero. `.fallible()` reads an output that is a `Result` instead: `Ok` succeeds, and `Err` fails with status `1`. The error can be any error that displays, `anyhow::Error` among them, so an operation can use `?`, `bail!`, and `ensure!` directly. `.fallible_as(status)` fails with another status. `.fallible_by_error()` fails with the status its error states through `CliFailureAlg`, nonzero by its type, which can differ from one error to another and can say the failure was already reported, as `cat` reports each missing file as it reads on. `CliOutcomeOf` reads an output under the declared mode, `Total`, `Fallible`, or `FallibleByError`, as a `CliOutcome`, so an interpreter that applies a fallible command whose operation does not answer a `Result` fails to compile. Words that do not make the command exit with `USAGE_STATUS` before anything applies.
+
+From 0.2: `.fallible()` now fails with status `1` whatever its error states. A command whose error implements `CliFailureAlg` keeps its own statuses with `.fallible_by_error()`.
 
 How a value or a failure is rendered, and on which stream, belongs to the interpreter, as do splitting words, diagnostics, and help. [`alux-cli-direct`](https://docs.rs/alux-cli-direct) is the interpretation that runs a program as a command line with no parser framework.
 

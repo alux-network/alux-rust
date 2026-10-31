@@ -176,8 +176,10 @@ The command line first, then the variable, then the default.
 // clap, in the handler
 eprintln!("{e}"); std::process::exit(3)
 
-// alux-cli
-.fallible()  // on a method returning Result
+// alux-cli, on a method returning Result: exits with 1, any error that displays, anyhow's too
+.fallible()
+// or with a status of its own
+.fallible_as(3)
 ```
 
 ### 📖 Help
@@ -229,7 +231,7 @@ A global argument is written the same way in both: before the command path, betw
 |---|---|---|
 | Declaring it | `Arg::global(true)` on the parent | `.arg("name", self.named(..))` on the context operation |
 | Using it | code in `main` | the context operation's body |
-| Its failure | code in `main` | `.fallible()` and `CliFailureAlg`, with the error's own status |
+| Its failure | code in `main` | `.fallible()`, `.fallible_as(status)`, or `.fallible_by_error()` with the error's own status |
 | The commands' handle | one, whatever `main` passes | `CliContextAlg::Inner`, which can be another type for the subtree |
 | Required | rejected: "Global arguments cannot be required" | allowed; `.default(..)` or `.env(..)` can supply it |
 | Positional | accepted | rejected at compile time |

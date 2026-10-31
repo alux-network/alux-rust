@@ -20,3 +20,4 @@ alux-ext.workspace = true
 
 [dev-dependencies]
 alux-shape.workspace = true
+anyhow.workspace = true

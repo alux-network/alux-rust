@@ -1,6 +1,6 @@
 use crate::{
     CliCommandsAlg, CliContextAlg, CliNamedSources, CliNestAlg, CliOperationAlg, CliProgramAlg, CliSources,
-    Conventions, Fallible, NamedSource, PositionalSource, ProductSource, SumSource, Total,
+    Conventions, Fallible, FallibleByError, NamedSource, PositionalSource, ProductSource, SumSource, Total,
 };
 use alux_ext::OperationAlg;
 
@@ -184,9 +184,30 @@ impl<Handler, Inputs, Mode> Operation<Handler, Inputs, Mode> {
 }
 
 impl<Handler, Inputs> Operation<Handler, Inputs, Total> {
-    /// Reads the operation's `Result` output as success or a failure with the error's own status.
+    /// Reads the operation's `Result` output as success or a failure exiting with status `1`. The
+    /// error can be any error that displays, `anyhow::Error` among them.
     pub fn fallible(self) -> Operation<Handler, Inputs, Fallible> {
-        Operation { handler: self.handler, inputs: self.inputs, mode: Fallible, conventions: self.conventions }
+        self.with_mode(Fallible::default())
+    }
+
+    /// Reads the operation's `Result` output as success or a failure exiting with `status`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `status` is zero, which is success.
+    #[track_caller]
+    pub fn fallible_as(self, status: u8) -> Operation<Handler, Inputs, Fallible> {
+        self.with_mode(Fallible::new(status))
+    }
+
+    /// Reads the operation's `Result` output as success or a failure with the status its error
+    /// states through `CliFailureAlg`, which may also say it was reported as it happened.
+    pub fn fallible_by_error(self) -> Operation<Handler, Inputs, FallibleByError> {
+        self.with_mode(FallibleByError)
+    }
+
+    fn with_mode<Mode>(self, mode: Mode) -> Operation<Handler, Inputs, Mode> {
+        Operation { handler: self.handler, inputs: self.inputs, mode, conventions: self.conventions }
     }
 }
 
