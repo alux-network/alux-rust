@@ -428,8 +428,8 @@ fn renders_help_from_the_program() {
          Usage: notes list [options]\n\
          \n\
          Options:\n  \
-           -n, --limit <limit>  Maximum number of notes to show\n  \
-           -v, --verbose        Number the notes\n"
+           -n, --limit <limit>     Maximum number of notes to show\n  \
+           -v, --verbose[=<BOOL>]  Number the notes\n"
     );
     assert_eq!(
         notes(&store, "notes owner greet --help").stdout,
@@ -484,8 +484,8 @@ fn applies_every_command_to_the_context_its_global_arguments_open() {
          Usage: notes list [options]\n\
          \n\
          Options:\n  \
-           -n, --limit <limit>  Maximum number of notes to show\n  \
-           -v, --verbose        Number the notes\n\
+           -n, --limit <limit>     Maximum number of notes to show\n  \
+           -v, --verbose[=<BOOL>]  Number the notes\n\
          \n\
          Global options:\n  \
            -s, --store <store>  The store to use [default: main]\n"

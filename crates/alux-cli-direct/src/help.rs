@@ -154,7 +154,10 @@ fn spelling(argument: &ArgumentInfo) -> String {
     }
     let _ = write!(out, "--{long}");
     match argument.arity {
-        Arity::Presence => {}
+        // An alternative of a sum is chosen by its spelling alone.
+        Arity::Presence if matches!(argument.part_of, Some(Part::Sum(_))) => {}
+        // Any other switch may state a truth in its own word, as `clap` shows it.
+        Arity::Presence => out.push_str("[=<BOOL>]"),
         // A list one word can give shows its delimiter.
         Arity::Many => match argument.delimiter {
             Some(delimiter) => {
