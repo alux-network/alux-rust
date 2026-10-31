@@ -1,6 +1,6 @@
 [package]
 name = "alux-cli-multicall"
-version = "0.2.0"
+version = "0.3.0"
 description = "Multicall interpretation of ALUX CLI programs: one executable reached by each first-layer command's name"
 documentation = "https://docs.rs/alux-cli-multicall"
 authors.workspace = true
