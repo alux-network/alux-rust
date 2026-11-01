@@ -27,8 +27,8 @@ use shape_program::shape_program_defunc_internal;
 
 /// Declares extension methods and optionally gives each method a first-order operation type.
 ///
-/// Plain `defunc` produces a hidden `*Operation<Context>` type implementing
-/// `OperationAlg` and `ApplyAlg`. When every method already builds first-order
+/// Plain `defunc` produces a hidden `Op_<method><Context>` type, named by the method exactly as
+/// written, implementing `OperationAlg` and `ApplyAlg`. When every method already builds first-order
 /// route syntax from `routes()`, plain `defunc` names those inferred programs
 /// directly. A backend such as `defunc(via = http)` or `defunc(via = jsonrpc)`
 /// additionally lifts convenient method references while producing named programs
@@ -55,7 +55,7 @@ use shape_program::shape_program_defunc_internal;
 ///     }
 /// }
 ///
-/// // The expansion also defines `IncrementedOperation<This>`.
+/// // The expansion also defines `Op_incremented<This>`.
 /// ```
 ///
 /// ```ignore
@@ -73,7 +73,7 @@ use shape_program::shape_program_defunc_internal;
 ///     }
 /// }
 ///
-/// // The expansion also defines `StatusRoutesProgram<Alg>`.
+/// // The expansion also defines `Program_status_routes<Alg>`.
 /// ```
 #[proc_macro_attribute]
 pub fn ext(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -106,7 +106,7 @@ pub fn ext(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 /// }
 ///
-/// // The expansion also defines `StatusApiProgram<Alg>`.
+/// // The expansion also defines `Program_status_api<Alg>`.
 /// ```
 #[proc_macro_attribute]
 pub fn http(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -144,7 +144,7 @@ pub fn http(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 /// }
 ///
-/// // The expansion also defines `StatusRpcProgram<Alg>`.
+/// // The expansion also defines `Program_status_rpc<Alg>`.
 /// ```
 #[proc_macro_attribute]
 pub fn jsonrpc(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -189,7 +189,7 @@ pub fn jsonrpc(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 /// }
 ///
-/// // The expansion also defines `UserShapeProgram`.
+/// // The expansion also defines `Program_user_shape`.
 /// ```
 #[proc_macro_attribute]
 pub fn shape(attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -224,7 +224,7 @@ pub fn shape(attr: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 /// }
 ///
-/// // The expansion also defines `ReadingCliProgram<Machine, Name>`.
+/// // The expansion also defines `Program_reading_cli<Machine, Name>`.
 /// ```
 #[proc_macro_attribute]
 pub fn cli(attr: TokenStream, item: TokenStream) -> TokenStream {

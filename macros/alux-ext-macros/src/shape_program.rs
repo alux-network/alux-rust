@@ -205,7 +205,7 @@ mod tests {
         .to_string();
 
         assert!(output.contains(r#"record (& ["stored" , "user"])"#));
-        assert!(output.contains("struct StoredUserShapeProgram"));
+        assert!(output.contains("struct Program_stored_user_shape"));
         // The closing call is the backend's, so no declaration writes one.
         assert!(output.contains("record . into_shape ()"));
     }
@@ -229,8 +229,8 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("ProfileShapeProgram : :: alux_shape :: ShapeProgramAlg < This"));
-        assert!(output.contains("TimestampsShapeProgram : :: alux_shape :: ShapeProgramAlg < This"));
+        assert!(output.contains("Program_profile_shape : :: alux_shape :: ShapeProgramAlg < This"));
+        assert!(output.contains("Program_timestamps_shape : :: alux_shape :: ShapeProgramAlg < This"));
         // In A-normal form, the nested shape is bound once and then named.
         assert!(output.contains("let part0 = builder . profile_shape () ;"), "{output}");
         assert!(output.contains("builder . program (part0)"), "{output}");
@@ -255,7 +255,7 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("ProfileShapeProgram : :: alux_shape :: ShapeProgramAlg < This"), "{output}");
+        assert!(output.contains("Program_profile_shape : :: alux_shape :: ShapeProgramAlg < This"), "{output}");
         assert!(output.contains("builder . program (part0)"), "{output}");
     }
 

@@ -71,12 +71,12 @@ let builder = JsonRpcProgramBuilder;
 let program = builder
     .methods()
     // The same method, declared without the convenience macro.
-    .method("status_current", builder.op(StatusCurrentOperation::<App>::default()))
+    .method("status_current", builder.op(Op_status_current::<App>::default()))
     .into_program();
 let _merged = builder.methods().merge(builder.program(program)).into_program();
 
 // Named decoding means these argument names, carried from the authored method.
-assert_eq!(<StatusAdjustedOperation<App> as OperationAlg>::ARG_NAMES, ["temp"]);
+assert_eq!(<Op_status_adjusted<App> as OperationAlg>::ARG_NAMES, ["temp"]);
 ```
 
 ## Composing surfaces
@@ -224,8 +224,8 @@ where
 Two things there are worth pausing on, because the authored text is not what runs:
 
 - **The declarations look like they return nothing.** They do return something. The macro replaces the
-  written signature with `-> ServiceRpcProgram<Alg>` and the written body with
-  `ServiceRpcProgram::default()`, so calling `service_rpc` hands back a zero-sized program value.
+  written signature with `-> Program_service_rpc<Alg>` and the written body with
+  `Program_service_rpc::default()`, so calling `service_rpc` hands back a zero-sized program value.
   Writing no return type is the convention: the type is generated, and naming it by hand would only
   repeat the macro.
 - **`merge` is not receiving a method collection.** The authored body is read as a description rather

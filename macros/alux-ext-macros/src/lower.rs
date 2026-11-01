@@ -389,6 +389,7 @@ where
     let generated = quote! {
         #(#documentation)*
         #[doc(hidden)]
+        #[allow(non_camel_case_types)]
         #visibility struct #program #parameters (core::marker::PhantomData<#marker>);
 
         impl #parameters core::default::Default for #program_type {

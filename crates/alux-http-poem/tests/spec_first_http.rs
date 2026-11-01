@@ -11,8 +11,8 @@ use alux_http::{HttpApiAlg, HttpProgramExt, http};
 use alux_http_poem::PoemHandlerImpl;
 use alux_http_text::TextHandlerImpl;
 use common::{
-    App, DownloadAlg, DownloadCurrentOperation, StatusAdjustedOperation, StatusAlg, StatusClearedOperation,
-    StatusCurrentOperation, StatusForIdOperation, StatusMovedOperation, StatusReplacedOperation,
+    App, DownloadAlg, Op_download_current, Op_status_adjusted, Op_status_cleared, Op_status_current, Op_status_for_id,
+    Op_status_moved, Op_status_replaced, StatusAlg,
 };
 use expect::expect_example_api;
 

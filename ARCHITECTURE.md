@@ -115,7 +115,7 @@ where
 }
 ```
 
-The downstream capability is authoritative for status meaning. `StatusCurrentOperation` preserves
+The downstream capability is authoritative for status meaning. `Op_status_current` preserves
 application of the derived operation. HTTP and JSON-RPC programs can refer to that value without
 learning what a status contains or how it is computed.
 
@@ -152,7 +152,7 @@ handler parameters.
 `#[ext(name = ..., defunc)]` has two simultaneous results:
 
 1. The normal extension trait preserves ergonomic Rust method calls.
-2. A generated `*Operation<Context>` makes each eligible borrowed method first-order.
+2. A generated `Op_<method><Context>`, named by the method exactly as written, makes each eligible borrowed method first-order.
 
 The operation implementation invokes the same extension method. It is not a copied second
 implementation. Context, argument types, argument names, and output are inferred from authored Rust.

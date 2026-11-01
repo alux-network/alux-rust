@@ -120,32 +120,30 @@ pub(crate) fn doc_text(attrs: &[Attribute]) -> String {
     lines.join("\n").trim().to_owned()
 }
 
-/// Derives a generated type name from an authored method name.
-pub(crate) fn pascal_ident(name: &Ident, suffix: &str) -> Ident {
-    let mut pascal = String::new();
-    for part in name.to_string().split('_') {
-        let mut chars = part.chars();
-        if let Some(first) = chars.next() {
-            pascal.extend(first.to_uppercase());
-            pascal.extend(chars);
-        }
-    }
-    format_ident!("{pascal}{suffix}", span = name.span())
+/// Derives a generated type name from an authored method name: the role, an underscore, and the
+/// method name exactly as written, `status_for` naming `Op_status_for`.
+///
+/// Keeping the spelling makes the name injective, so a reference to a method spelled otherwise
+/// than it was declared names a type that does not exist.
+pub(crate) fn role_ident(role: &str, method: &Ident) -> Ident {
+    let name = method.to_string();
+    let name = name.strip_prefix("r#").unwrap_or(&name);
+    format_ident!("{role}_{name}", span = method.span())
 }
 
 /// Names the first-order operation reifying one method's application.
 pub(crate) fn operation_ident(method: &Ident) -> Ident {
-    pascal_ident(method, "Operation")
+    role_ident("Op", method)
 }
 
 /// Names the item carrying one method's argument names, which no context changes.
 pub(crate) fn arg_names_ident(method: &Ident) -> Ident {
-    pascal_ident(method, "ArgNames")
+    role_ident("ArgNames", method)
 }
 
 /// Names the first-order program produced by one declaration method.
 pub(crate) fn program_ident(method: &Ident) -> Ident {
-    pascal_ident(method, "Program")
+    role_ident("Program", method)
 }
 
 /// Returns the program's type parameters, rejecting parameters a program cannot carry.

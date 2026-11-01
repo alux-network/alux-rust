@@ -11,8 +11,8 @@ use alux_ext::ext;
 use alux_jsonrpc::{JsonRpcApiAlg, JsonRpcProgramExt, jsonrpc};
 use alux_jsonrpc_jsonrpsee::JsonrpseeImpl;
 use common::{
-    App, ItemsAlg, JsonrpcItemsCurrentOperation, JsonrpcStatusAdjustedOperation, JsonrpcStatusCurrentOperation,
-    JsonrpcStatusHistoryOperation, JsonrpcStatusOffsetOperation, StatusAlg,
+    App, ItemsAlg, Op_jsonrpc_items_current, Op_jsonrpc_status_adjusted, Op_jsonrpc_status_current,
+    Op_jsonrpc_status_history, Op_jsonrpc_status_offset, StatusAlg,
 };
 use expect::expect_example_rpc;
 

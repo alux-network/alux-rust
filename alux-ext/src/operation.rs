@@ -139,13 +139,13 @@ mod tests {
     #[tokio::test]
     async fn preserves_named_parameters_bound_through_the_context() {
         let reader = Arc::new(Reader);
-        let operation = ReadSuffixedOperation::<Reader>::default();
+        let operation = Op_read_suffixed::<Reader>::default();
 
         assert_eq!(
             reader.read_suffixed(4, "!".to_owned()).await,
             operation.apply(reader.clone(), (4, "!".to_owned())).await,
         );
-        assert_eq!(<ReadSuffixedOperation<Reader> as OperationAlg>::ARG_NAMES, &["key", "suffix"]);
+        assert_eq!(<Op_read_suffixed<Reader> as OperationAlg>::ARG_NAMES, &["key", "suffix"]);
     }
 
     #[tokio::test]
@@ -153,10 +153,10 @@ mod tests {
         let value = Arc::new(Value(40));
 
         assert_eq!(value.value_plus(2).await, 42);
-        assert_eq!(ValuePlusOperation::<Value>::default().apply(value, (2,)).await, 42);
-        assert_eq!(<ValuePlusOperation<Value> as OperationAlg>::NAME, "value_plus");
-        assert_eq!(<ValuePlusOperation<Value> as OperationAlg>::DOC, "Adds `increment` to the value.");
-        assert_eq!(<ValuePlusOperation<Value> as OperationAlg>::ARG_NAMES, &["increment"]);
+        assert_eq!(Op_value_plus::<Value>::default().apply(value, (2,)).await, 42);
+        assert_eq!(<Op_value_plus<Value> as OperationAlg>::NAME, "value_plus");
+        assert_eq!(<Op_value_plus<Value> as OperationAlg>::DOC, "Adds `increment` to the value.");
+        assert_eq!(<Op_value_plus<Value> as OperationAlg>::ARG_NAMES, &["increment"]);
     }
 
     trait BytesAlg {
@@ -232,12 +232,12 @@ mod tests {
     async fn applies_operations_to_borrowed_arguments() {
         let bytes = [1, 2, 3];
         let mut buffer = Buffer::default();
-        AppendOperation::<Buffer>::default().apply(&mut buffer, (&bytes[..],)).await.unwrap();
+        Op_append::<Buffer>::default().apply(&mut buffer, (&bytes[..],)).await.unwrap();
         assert_eq!(buffer.0, [1, 2, 3]);
-        assert_eq!(<AppendOperation<Buffer> as OperationAlg>::ARG_NAMES, &["bytes"]);
+        assert_eq!(<Op_append<Buffer> as OperationAlg>::ARG_NAMES, &["bytes"]);
 
         let names = ["a/b".to_owned(), "c".to_owned()];
-        let leaves = LeavesOperation::<Buffer>::default().apply(Arc::new(Buffer::default()), (&names[..],)).await;
+        let leaves = Op_leaves::<Buffer>::default().apply(Arc::new(Buffer::default()), (&names[..],)).await;
         assert_eq!(leaves, ["b", "c"]);
     }
 
@@ -273,7 +273,7 @@ mod tests {
             running
         }
 
-        let operation = BumpTwiceOperation::<Tally>::default();
+        let operation = Op_bump_twice::<Tally>::default();
         let running = operation.apply(Box::new(Tally::default()), ());
         assert_eq!(sent(running).await, 2);
     }
@@ -281,7 +281,7 @@ mod tests {
     #[tokio::test]
     async fn answers_a_borrowed_output_to_a_borrowed_handle() {
         let buffer = Buffer(vec![1, 2, 3]);
-        let head = HeadOperation::<Buffer>::default().apply(&buffer, (2,)).await;
+        let head = Op_head::<Buffer>::default().apply(&buffer, (2,)).await;
         assert_eq!(head, [1, 2]);
         assert_eq!(head, buffer.head(2));
     }
@@ -300,8 +300,8 @@ mod tests {
     #[tokio::test]
     async fn applies_an_operation_over_an_unsized_carrier() {
         let bytes: &[u8] = &[1, 2, 3];
-        assert_eq!(PrefixOperation::<[u8]>::default().apply(bytes, (5,)).await, [1, 2, 3]);
-        assert_eq!(PrefixOperation::<[u8]>::default().apply(bytes, (1,)).await, bytes.prefix(1));
+        assert_eq!(Op_prefix::<[u8]>::default().apply(bytes, (5,)).await, [1, 2, 3]);
+        assert_eq!(Op_prefix::<[u8]>::default().apply(bytes, (1,)).await, bytes.prefix(1));
     }
 
     trait Counter {
@@ -338,13 +338,13 @@ mod tests {
 
     #[tokio::test]
     async fn applies_an_operation_to_an_unsized_context_through_any_borrow() {
-        let counted = CountedOperation::<dyn Counter + Send + Sync>::default();
+        let counted = Op_counted::<dyn Counter + Send + Sync>::default();
         let shared: Arc<dyn Counter + Send + Sync> = Arc::new(Buffer(vec![1, 2]));
         assert_eq!(counted.apply(Arc::clone(&shared), (1,)).await, 3);
         assert_eq!(counted.apply(&*shared, (2,)).await, 4);
 
         let mut owned: Box<dyn Counter + Send + Sync> = Box::new(Buffer(vec![1]));
-        let bumped = BumpedOperation::<dyn Counter + Send + Sync>::default();
+        let bumped = Op_bumped::<dyn Counter + Send + Sync>::default();
         assert_eq!(bumped.apply(&mut *owned, ()).await, 2);
         assert_eq!(bumped.apply(owned, ()).await, 3);
     }
@@ -354,10 +354,10 @@ mod tests {
         fn odd(byte: u8) -> bool {
             byte % 2 == 1
         }
-        let operation = SelectOperation::<Buffer, fn(u8) -> bool>::default();
+        let operation = Op_select::<Buffer, fn(u8) -> bool>::default();
         let selected = operation.apply(Arc::new(Buffer::default()), (vec![1, 2, 3], odd as fn(u8) -> bool)).await;
         assert_eq!(selected, [1, 3]);
-        assert_eq!(<SelectOperation<Buffer, fn(u8) -> bool> as OperationAlg>::ARG_NAMES, &["bytes", "predicate"]);
+        assert_eq!(<Op_select<Buffer, fn(u8) -> bool> as OperationAlg>::ARG_NAMES, &["bytes", "predicate"]);
     }
 
     #[test]

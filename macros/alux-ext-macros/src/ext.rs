@@ -324,6 +324,7 @@ fn arg_names_item(
         /// Carries the method's argument names, which no context or selected type changes, so a
         /// program can check names it binds where it is declared.
         #[doc(hidden)]
+        #[allow(non_camel_case_types)]
         #visibility struct #arg_names;
 
         #[doc(hidden)]
@@ -473,6 +474,7 @@ fn defunctionalize(method: &ImplItemFn, visibility: &Visibility, generics: &Gene
     Ok(quote! {
         #(#documentation)*
         #[doc(hidden)]
+        #[allow(non_camel_case_types)]
         #visibility struct #operation<Context: ?Sized #(, #selected)*>(#phantom);
 
         #arg_names_item
@@ -801,7 +803,7 @@ mod tests {
 
         assert!(output.contains("trait ValueExt < This >"), "{output}");
         assert!(output.contains("impl < This > ValueExt < This > for This"), "{output}");
-        assert!(!output.contains("ValueOperation"), "{output}");
+        assert!(!output.contains("Op_value"), "{output}");
     }
 
     #[test]
@@ -820,7 +822,7 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("pub struct DoubledOperation"));
+        assert!(output.contains("pub struct Op_doubled"));
         assert!(output.contains("alux_ext :: OperationAlg"));
         assert!(output.contains("type Args = (u32 ,)"));
         assert!(output.contains("const ARG_NAMES"));
@@ -870,7 +872,7 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct EchoOperation < Context : ? Sized >"), "{output}");
+        assert!(output.contains("struct Op_echo < Context : ? Sized >"), "{output}");
         assert!(output.contains("impl < Context , Item > :: alux_ext :: OperationAlg"), "{output}");
         assert!(output.contains("impl < Context , Handle , Item > :: alux_ext :: ApplyAlg"), "{output}");
         assert!(output.contains("type Args = (Item , Context :: Key ,)"), "{output}");
@@ -895,7 +897,7 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct StartNodeArgNames ;"), "{output}");
+        assert!(output.contains("struct ArgNames_start_node ;"), "{output}");
         assert!(
             output.contains(
                 "pub const ARG_NAMES : & 'static [& 'static str] = & [stringify ! (name) , stringify ! (base_path)]"
@@ -958,8 +960,8 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct SelectOperation < Context : ? Sized , Predicate >"), "{output}");
-        assert!(output.contains(":: alux_ext :: OperationAlg for SelectOperation < Context , Predicate >"), "{output}");
+        assert!(output.contains("struct Op_select < Context : ? Sized , Predicate >"), "{output}");
+        assert!(output.contains(":: alux_ext :: OperationAlg for Op_select < Context , Predicate >"), "{output}");
         // Description and application both state the method's bounds on what it selects.
         assert!(output.contains("where Predicate : Copy , Predicate : Fn (u8) -> bool , { type Context"), "{output}");
         assert!(output.contains("Predicate : Copy , Predicate : Fn (u8) -> bool , { type Output"), "{output}");
@@ -982,7 +984,7 @@ mod tests {
         .to_string();
 
         // The type names no lifetime; the application is stated for every loan, the signature at `'static`.
-        assert!(output.contains("struct AppendOperation < Context : ? Sized >"), "{output}");
+        assert!(output.contains("struct Op_append < Context : ? Sized >"), "{output}");
         assert!(output.contains("type Args = (& 'static [u8] , & 'static [Context :: Name] ,)"), "{output}");
         assert!(
             output.contains("ApplyAlg < Handle , (& '__alux_borrow [u8] , & '__alux_borrow [Context :: Name] ,) >"),
@@ -1008,7 +1010,7 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct LengthOperation < Context : ? Sized >"), "{output}");
+        assert!(output.contains("struct Op_length < Context : ? Sized >"), "{output}");
         assert!(output.contains("PhantomData < (fn (& Context) , fn () -> ()) >"), "{output}");
         assert_eq!(output.matches("impl < Context : ? Sized").count(), 3, "{output}");
         assert!(output.contains("Context : AsRef < [u8] > ,"), "{output}");
@@ -1059,10 +1061,10 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct DirectApiProgram"));
+        assert!(output.contains("struct Program_direct_api"));
         assert!(output.contains("alux_http :: HttpProgramAlg"));
         assert!(output.contains("ExampleSummaryOperation :: < Alg > :: default"));
-        assert!(!output.contains("struct DirectApiOperation"));
+        assert!(!output.contains("struct Op_direct_api"));
     }
 
     #[test]
@@ -1083,7 +1085,7 @@ mod tests {
 
         // A reader landing on the generated type sees what the method says.
         assert!(
-            output.contains(r#"# [doc = r" Returns the value as it stands."] # [doc (hidden)] struct ValueOperation"#)
+            output.contains(r#"# [doc = r" Returns the value as it stands."] # [doc (hidden)] # [allow (non_camel_case_types)] struct Op_value"#)
         );
     }
 
@@ -1098,6 +1100,24 @@ mod tests {
         .unwrap_err();
 
         assert!(error.to_string().contains("use `defunc` or `defunc(via = path)`"));
+    }
+
+    #[test]
+    fn names_each_spelling_of_a_method_apart() {
+        let output = ext_internal(
+            quote!(defunc),
+            quote!(
+                impl<This> This {
+                    fn chat(&self) {}
+                    fn chat_(&self) {}
+                }
+            ),
+        )
+        .unwrap()
+        .to_string();
+
+        assert!(output.contains("struct Op_chat <"));
+        assert!(output.contains("struct Op_chat_ <"));
     }
 
     #[test]

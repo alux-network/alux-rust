@@ -446,22 +446,19 @@ fn direct_construction_folds_like_the_lowered_declaration() {
     let builder = CliProgramBuilder;
     let direct = builder
         .commands()
-        .cmd(
-            "lookup",
-            builder.op(LookupOperation::<Memory>::default()).arg("name", builder.positional("Requested name")),
-        )
+        .cmd("lookup", builder.op(Op_lookup::<Memory>::default()).arg("name", builder.positional("Requested name")))
         .cmd(
             "find",
             builder
-                .op(FindValueOperation::<Memory>::default())
+                .op(Op_find_value::<Memory>::default())
                 .arg("name", builder.positional("Requested name"))
                 .fallible_by_error(),
         )
-        .cmd("sum", builder.op(SumOperation::<Memory>::default()))
+        .cmd("sum", builder.op(Op_sum::<Memory>::default()))
         .cmd(
             "page",
             builder
-                .op(PageOperation::<Memory>::default())
+                .op(Op_page::<Memory>::default())
                 .arg("from", builder.positional("First name"))
                 .arg("limit", builder.named("Most names").optional().short('n'))
                 .arg("tags", builder.named("Tag to match").many().long("tag"))
@@ -482,7 +479,7 @@ fn description_satisfies_the_laws() {
     Describe
         .law_cli_declaration(
             "lookup",
-            LookupOperation::<Memory>::default(),
+            Op_lookup::<Memory>::default(),
             ((), CliProgramBuilder.positional("Requested name")),
             Total,
             Conventions::default(),
@@ -498,7 +495,7 @@ fn description_satisfies_the_laws() {
     assert_eq!(
         Describe.law_cli_declaration(
             "page",
-            PageOperation::<Memory>::default(),
+            Op_page::<Memory>::default(),
             (
                 (
                     (((), CliProgramBuilder.positional("First")), CliProgramBuilder.named("Most").long("x")),
@@ -528,10 +525,10 @@ fn falls_back_to_the_environment_then_the_default() {
 #[test]
 fn a_context_adds_its_global_arguments_to_every_command() {
     let app = Describe.compile_cli(CliProgramBuilder.app_cli::<Memory, u8>());
-    Describe.law_cli_within(SumOperation::<Memory>::default(), (), Total, &app).unwrap();
+    Describe.law_cli_within(Op_sum::<Memory>::default(), (), Total, &app).unwrap();
     Describe
         .law_cli_within(
-            LookupOperation::<Memory>::default(),
+            Op_lookup::<Memory>::default(),
             ((), CliProgramBuilder.named("Default name").short('d')),
             Total,
             &app,
@@ -544,9 +541,9 @@ fn a_lowered_context_describes_like_the_context_built_directly() {
     let reading = Describe.compile_cli(CliProgramBuilder.reading_cli::<Memory, u8>());
     let lowered = Describe.compile_cli(CliProgramBuilder.context_cli::<Memory, u8>());
     let sources = ((), CliProgramBuilder.named("Default name").short('d'));
-    assert_eq!(lowered, Describe.cli_within(LookupOperation::<Memory>::default(), sources, Total, reading.clone()));
+    assert_eq!(lowered, Describe.cli_within(Op_lookup::<Memory>::default(), sources, Total, reading.clone()));
     assert!(lowered.iter().all(|command| command.context.len() == 1 && command.context[0].name == "name"));
-    Describe.law_cli_within(LookupOperation::<Memory>::default(), sources, Total, &reading).unwrap();
+    Describe.law_cli_within(Op_lookup::<Memory>::default(), sources, Total, &reading).unwrap();
 }
 
 #[test]
@@ -578,7 +575,7 @@ fn a_compound_argument_is_one_operation_argument() {
     Describe
         .law_cli_declaration(
             "pair",
-            TakePairOperation::<Memory>::default(),
+            Op_take_pair::<Memory>::default(),
             (
                 ((), cli.product().field("first", cli.named("First")).field("second", cli.named("Second"))),
                 cli.named("Verbose").switch(),

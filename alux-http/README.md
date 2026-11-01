@@ -74,12 +74,12 @@ let builder = HttpProgramBuilder;
 let program = builder
     .routes()
     // The same endpoint, declared without the convenience macro.
-    .get("/status", builder.op(StatusCurrentOperation::<App>::default()).json())
+    .get("/status", builder.op(Op_status_current::<App>::default()).json())
     .into_program();
 let _nested = builder.routes().nest("/api", builder.program(program)).into_program();
 
 // Argument names and order survive from the authored method into the program.
-assert_eq!(<StatusForIdOperation<App> as OperationAlg>::ARG_NAMES, ["id"]);
+assert_eq!(<Op_status_for_id<App> as OperationAlg>::ARG_NAMES, ["id"]);
 ```
 
 ## Interpretation capabilities

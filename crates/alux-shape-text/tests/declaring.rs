@@ -15,9 +15,10 @@ use std::marker::PhantomData;
 
 /// What `fn user_shape(&self)` lowers to.
 #[derive(Default)]
-struct UserShapeProgram(PhantomData<()>);
+#[allow(non_camel_case_types)]
+struct Program_user_shape(PhantomData<()>);
 
-impl<This> ShapeProgramAlg<This> for UserShapeProgram
+impl<This> ShapeProgramAlg<This> for Program_user_shape
 where
     This: ShapeAlg + FieldAlg,
 {
@@ -39,9 +40,10 @@ where
 
 /// What `fn timestamps_shape(&self)` lowers to.
 #[derive(Default)]
-struct TimestampsShapeProgram(PhantomData<()>);
+#[allow(non_camel_case_types)]
+struct Program_timestamps_shape(PhantomData<()>);
 
-impl<This> ShapeProgramAlg<This> for TimestampsShapeProgram
+impl<This> ShapeProgramAlg<This> for Program_timestamps_shape
 where
     This: ShapeAlg + FieldAlg,
 {
@@ -58,13 +60,14 @@ where
 
 /// What `fn stored_user_shape(&self)` lowers to, nesting the two above.
 #[derive(Default)]
-struct StoredUserShapeProgram(PhantomData<()>);
+#[allow(non_camel_case_types)]
+struct Program_stored_user_shape(PhantomData<()>);
 
-impl<This> ShapeProgramAlg<This> for StoredUserShapeProgram
+impl<This> ShapeProgramAlg<This> for Program_stored_user_shape
 where
     This: ShapeAlg + FieldAlg,
-    UserShapeProgram: ShapeProgramAlg<This, Ty = <This as Sorts>::Ty>,
-    TimestampsShapeProgram: ShapeProgramAlg<This, Ty = <This as Sorts>::Ty>,
+    Program_user_shape: ShapeProgramAlg<This, Ty = <This as Sorts>::Ty>,
+    Program_timestamps_shape: ShapeProgramAlg<This, Ty = <This as Sorts>::Ty>,
 {
     type Ty = <This as Sorts>::Ty;
 
@@ -78,8 +81,8 @@ where
         let record = {
             builder
                 .record(&["stored", "user"])
-                .merge(builder.program(UserShapeProgram::default()))
-                .merge(builder.program(TimestampsShapeProgram::default()))
+                .merge(builder.program(Program_user_shape::default()))
+                .merge(builder.program(Program_timestamps_shape::default()))
         };
 
         record.into_shape()
@@ -126,22 +129,22 @@ where
 fn every_authoring_form_folds_to_one_shape() {
     // The law, and the only assertion the law needs: what a declaration states and what a function
     // states are the same shape. Whatever text produced either is below this.
-    assert_eq!(TextShape.compile_shape(UserShapeProgram::default()), user(&TextShape));
-    assert_eq!(TextShape.compile_shape(TimestampsShapeProgram::default()), timestamps(&TextShape));
-    assert_eq!(TextShape.compile_shape(StoredUserShapeProgram::default()), stored_user(&TextShape));
+    assert_eq!(TextShape.compile_shape(Program_user_shape::default()), user(&TextShape));
+    assert_eq!(TextShape.compile_shape(Program_timestamps_shape::default()), timestamps(&TextShape));
+    assert_eq!(TextShape.compile_shape(Program_stored_user_shape::default()), stored_user(&TextShape));
 }
 
 #[test]
 fn a_declaration_takes_its_name_from_the_declaration() {
     // The name reaches the term from the method the declaration was written as, so it is in the shape
     // rather than in anything the body said.
-    assert_eq!(TextShape.compile_shape(UserShapeProgram::default()), "user { display_name: text, email: text? }",);
+    assert_eq!(TextShape.compile_shape(Program_user_shape::default()), "user { display_name: text, email: text? }",);
 }
 
 #[test]
 fn a_nested_declaration_is_merged_and_not_nested() {
     assert_eq!(
-        TextShape.compile_shape(StoredUserShapeProgram::default()),
+        TextShape.compile_shape(Program_stored_user_shape::default()),
         "stored_user { ..user { display_name: text, email: text? }, \
          ..timestamps { created_at: u64 } }",
     );

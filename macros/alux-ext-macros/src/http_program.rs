@@ -250,7 +250,7 @@ mod tests {
                     fn status_api<Alg>(&self)
                     where
                         Alg: StatusAlg,
-                        This: HttpOperationAlg<StatusCurrentOperation<Alg>, (), LoginOut,
+                        This: HttpOperationAlg<Op_status_current<Alg>, (), LoginOut,
                             Endpoint = <This as RouteAlg>::Endpoint>,
                     {
                         self.routes().get("/status", self.op(Alg::status_current).out::<LoginOut>())
@@ -260,8 +260,8 @@ mod tests {
         )
         .unwrap()
         .to_string();
-        assert!(output.contains("struct StatusApiProgram"));
-        assert!(output.contains("StatusCurrentOperation < Alg >"));
+        assert!(output.contains("struct Program_status_api"));
+        assert!(output.contains("Op_status_current < Alg >"));
         assert!(output.contains("out :: < LoginOut >"));
         assert!(output.contains("let builder = compiler"));
         assert!(!output.contains("HttpProgramBuilder"));
@@ -286,7 +286,7 @@ mod tests {
         .to_string();
 
         assert!(output.contains(
-            "This : :: alux_http :: HttpOperationAlg < StatusCurrentOperation < Alg > , () , :: alux_http :: JsonOut"
+            "This : :: alux_http :: HttpOperationAlg < Op_status_current < Alg > , () , :: alux_http :: JsonOut"
         ));
     }
 
@@ -327,9 +327,9 @@ mod tests {
         // The `.json()` endpoint states its capability, and `other_api`, named by its `_api` suffix,
         // states the program it nests.
         assert!(output.contains(
-            "This : :: alux_http :: HttpOperationAlg < StatusCurrentOperation < Alg > , () , :: alux_http :: JsonOut"
+            "This : :: alux_http :: HttpOperationAlg < Op_status_current < Alg > , () , :: alux_http :: JsonOut"
         ));
-        assert!(output.contains("OtherApiProgram < Alg > : :: alux_http :: HttpProgramAlg < This"));
+        assert!(output.contains("Program_other_api < Alg > : :: alux_http :: HttpProgramAlg < This"));
         assert!(output.contains(". json ()"));
         assert!(output.contains(". program ("));
     }
@@ -352,7 +352,7 @@ mod tests {
         )
         .unwrap()
         .to_string();
-        assert!(output.contains("SubmitOperation < Domain >"));
+        assert!(output.contains("Op_submit < Domain >"));
         assert!(output.contains("This : HttpRouteAlg"));
         assert!(output.contains("Domain : DomainAlg"));
         assert!(output.contains("This : CustomEndpointAlg < Domain >"));
@@ -373,5 +373,29 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("type parameters only"));
+    }
+
+    #[test]
+    fn reifies_a_handler_by_its_exact_spelling() {
+        let output = http_program_defunc_internal(
+            quote!(name = ChatApiExt),
+            quote! { impl<This> This { fn chat_api(&self) { self.routes().get("/chat", self.op(Finder::chat_).json()) } } },
+        )
+        .unwrap()
+        .to_string();
+        // `Finder::chat_` names only the operation of a method spelled `chat_`, never `chat`'s.
+        assert!(output.contains("Op_chat_ < Finder >"));
+        assert!(!output.contains("Op_chat < Finder >"));
+    }
+
+    #[test]
+    fn names_a_declaration_by_its_exact_spelling() {
+        let output = http_program_defunc_internal(
+            quote!(name = ChatApiExt),
+            quote! { impl<This> This { fn chat__api(&self) { self.routes() } } },
+        )
+        .unwrap()
+        .to_string();
+        assert!(output.contains("struct Program_chat__api"));
     }
 }

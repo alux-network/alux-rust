@@ -225,10 +225,10 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct StatusRpcProgram"));
+        assert!(output.contains("struct Program_status_rpc"));
         assert!(output.contains("alux_jsonrpc :: JsonRpcProgramAlg"));
-        assert!(output.contains("StatusCurrentOperation < Alg >"));
-        assert!(output.contains("StatusForPathOperation < Alg >"));
+        assert!(output.contains("Op_status_current < Alg >"));
+        assert!(output.contains("Op_status_for_path < Alg >"));
         assert!(output.contains("CompileJsonRpcProgram :: compile_jsonrpc_program"));
         // One registration per method, merged into the collection, and no nested program type.
         assert_eq!(output.matches("jsonrpc_merge").count(), 2);
@@ -256,7 +256,7 @@ mod tests {
         // A reader landing on the generated type sees what the declaration says.
         assert!(
             output
-                .contains(r#"# [doc = r" Declares the status methods."] # [doc (hidden)] pub struct StatusRpcProgram"#)
+                .contains(r#"# [doc = r" Declares the status methods."] # [doc (hidden)] # [allow (non_camel_case_types)] pub struct Program_status_rpc"#)
         );
     }
 
@@ -351,8 +351,8 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("StatusRpcProgram < Alg >"));
-        assert!(output.contains("ItemsRpcProgram < Alg >"));
+        assert!(output.contains("Program_status_rpc < Alg >"));
+        assert!(output.contains("Program_items_rpc < Alg >"));
         assert!(output.contains("builder . program"));
     }
 }

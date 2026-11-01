@@ -203,11 +203,11 @@ where
 // context type the operation expects, so there is no hidden state to configure or get wrong. The
 // context is held only behind a reference, so it may be unsized, a `dyn` capability or a slice.
 #[doc(hidden)]
-struct ValuePlusOperation<Context: ?Sized>(core::marker::PhantomData<(fn(&Context), fn() -> ())>);
+struct Op_value_plus<Context: ?Sized>(core::marker::PhantomData<(fn(&Context), fn() -> ())>);
 
 // Because it holds nothing, `Default` is enough to build one. Program declarations rely on this.
 #[doc(hidden)]
-impl<Context: ?Sized> core::default::Default for ValuePlusOperation<Context> {
+impl<Context: ?Sized> core::default::Default for Op_value_plus<Context> {
     fn default() -> Self {
         Self(core::marker::PhantomData)
     }
@@ -217,7 +217,7 @@ impl<Context: ?Sized> core::default::Default for ValuePlusOperation<Context> {
 // arguments as a tuple in declaration order, and the names you gave those arguments. JSON-RPC named
 // parameters read `ARG_NAMES` instead of asking you to list the names a second time.
 #[doc(hidden)]
-impl<Context> ::alux_ext::OperationAlg for ValuePlusOperation<Context> {
+impl<Context> ::alux_ext::OperationAlg for Op_value_plus<Context> {
     type Context = Context;
     type Args = (u32,);
     const ARG_NAMES: &'static [&'static str] = &["increment"];
@@ -228,7 +228,7 @@ impl<Context> ::alux_ext::OperationAlg for ValuePlusOperation<Context> {
 // executor concerns live here at the boundary instead of in the method you wrote. The future owns
 // each argument, so it is `Send` where they are; the method states nothing about threads.
 #[doc(hidden)]
-impl<Context, Handle> ::alux_ext::ApplyAlg<Handle, (u32,)> for ValuePlusOperation<Context>
+impl<Context, Handle> ::alux_ext::ApplyAlg<Handle, (u32,)> for Op_value_plus<Context>
 where
     Handle: core::borrow::Borrow<Context> + Send,
     Context: Sync,
@@ -254,7 +254,7 @@ where
 }
 ```
 
-`#[doc(hidden)]` hides the machinery, not the name: downstream code refers to `ValuePlusOperation`,
+`#[doc(hidden)]` hides the machinery, not the name: downstream code refers to `Op_value_plus`,
 so that name is public compatibility surface and renaming it is a breaking change.
 
 ## Step 3: using both halves
@@ -270,7 +270,7 @@ assert_eq!(value.value_plus(2).await, 42);
 
 // You write this only when application must become data: the same computation, reached through the
 // operation value. `(2,)` is the argument tuple, `value` is the chosen handle.
-let operation = ValuePlusOperation::<Value>::default();
+let operation = Op_value_plus::<Value>::default();
 assert_eq!(operation.apply(value, (2,)).await, 42);
 ```
 

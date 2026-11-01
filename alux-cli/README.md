@@ -161,7 +161,7 @@ Each `.arg("name", source)` names the argument it declares. The names are checke
 #[ext(name = RemoteCliExt, defunc(via = cli))]
 impl<This> This where This: CliCommandsAlg {
     fn remote_cli<Machine>(&self) {
-        // error: argument 0 of `ConnectOperation<Machine>` is not `user`
+        // error: argument 0 of `Op_connect<Machine>` is not `user`
         self.commands().cmd(
             "connect",
             self.op(Machine::connect).arg("user", self.named("User")).arg("host", self.named("Host")),

@@ -112,7 +112,7 @@ fn alias(
     let generics = if used.is_empty() { quote!() } else { quote!(<#(#used),*>) };
     items.push(quote! {
         #[doc(hidden)]
-        #[allow(type_alias_bounds)]
+        #[allow(type_alias_bounds, non_camel_case_types)]
         type #name #generics = #aliased;
     });
     quote!(#name #generics)
@@ -448,7 +448,7 @@ impl ProgramBackendAlg for CliBackend {
         }
         for (index, (Reified { operation, carrier, .. }, inputs, mode, inner)) in contexts.into_iter().rev().enumerate()
         {
-            let inputs = alias(&mut items, &format_ident!("{program}Context{index}Sources"), &[], &quote!(#inputs));
+            let inputs = alias(&mut items, &format_ident!("{program}_Context{index}Sources"), &[], &quote!(#inputs));
             let context = quote!(<This as ::alux_cli::CliContextAlg<#operation, #inputs, #mode>>);
             where_clause.predicates.push(parse_quote! {
                 #operation: ::alux_ext::OperationAlg<Context = #carrier>
@@ -479,7 +479,7 @@ impl ProgramBackendAlg for CliBackend {
             });
             let args = alias(
                 &mut items,
-                &format_ident!("{program}Command{index}Args"),
+                &format_ident!("{program}_Command{index}Args"),
                 &parameters,
                 &quote!(<#operation as ::alux_ext::OperationAlg>::Args),
             );
@@ -487,8 +487,12 @@ impl ProgramBackendAlg for CliBackend {
             // Each source supplies the argument at its own position, so a source that cannot is
             // reported at the `.arg(..)` that declares it.
             for (position, ArgumentSource { span, source, name, fields }) in sources.into_iter().enumerate() {
-                let named_source =
-                    alias(&mut items, &format_ident!("{program}Command{index}Source{position}"), &[], &quote!(#source));
+                let named_source = alias(
+                    &mut items,
+                    &format_ident!("{program}_Command{index}Source{position}"),
+                    &[],
+                    &quote!(#source),
+                );
                 inputs = quote!((#inputs, #named_source));
                 checks.extend(source_checks(&operation, named.as_ref(), position, &name, &source, span));
                 checks.extend(part_checks(named.as_ref(), position, &fields, &source, span));
@@ -496,7 +500,7 @@ impl ProgramBackendAlg for CliBackend {
                     #named_source: ::alux_cli::CliSourceAt<#args, #position>
                 });
             }
-            let inputs = alias(&mut items, &format_ident!("{program}Command{index}Sources"), &[], &inputs);
+            let inputs = alias(&mut items, &format_ident!("{program}_Command{index}Sources"), &[], &inputs);
             // One source per operation argument, in order, each able to supply its argument.
             where_clause.predicates.push(parse_quote! {
                 #inputs: ::alux_cli::CliSources<#args>
@@ -657,7 +661,7 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("EchoOperation < Machine , Vec < Vec < u8 > > , Vec < u8 > >"), "{output}");
+        assert!(output.contains("Op_echo < Machine , Vec < Vec < u8 > > , Vec < u8 > >"), "{output}");
     }
 
     #[test]
@@ -735,20 +739,20 @@ mod tests {
         // Each long type is named once beside the program, and the evidence names it.
         assert!(
             output.contains(
-                "type NodeCliProgramCommand0Args < Machine > = < StartOperation < Machine > as :: alux_ext :: OperationAlg > :: Args ;"
+                "type Program_node_cli_Command0Args < Machine > = < Op_start < Machine > as :: alux_ext :: OperationAlg > :: Args ;"
             ),
             "{output}"
         );
         assert!(
             output.contains(
-                "type NodeCliProgramCommand0Source1 = :: alux_cli :: NamedSource < :: alux_cli :: NoFallback , :: alux_cli :: Optional > ;"
+                "type Program_node_cli_Command0Source1 = :: alux_cli :: NamedSource < :: alux_cli :: NoFallback , :: alux_cli :: Optional > ;"
             ),
             "{output}"
         );
         // One bound per source, at the `.arg(..)` that declares it.
         assert!(
             output.contains(
-                "NodeCliProgramCommand0Source1 : :: alux_cli :: CliSourceAt < NodeCliProgramCommand0Args < Machine > , 1usize >"
+                "Program_node_cli_Command0Source1 : :: alux_cli :: CliSourceAt < Program_node_cli_Command0Args < Machine > , 1usize >"
             ),
             "{output}"
         );
@@ -775,20 +779,20 @@ mod tests {
         // The names are checked on an item no context changes, so the check runs where it is written.
         assert!(
             output.contains(
-                ":: alux_cli :: cli_arg_mismatch (\"login\" , LoginArgNames :: ARG_NAMES , 0usize , \"user\")"
+                ":: alux_cli :: cli_arg_mismatch (\"login\" , ArgNames_login :: ARG_NAMES , 0usize , \"user\")"
             ),
             "{output}"
         );
         assert!(
             output.contains(
-                ":: alux_cli :: cli_arg_mismatch (\"login\" , LoginArgNames :: ARG_NAMES , 1usize , \"host\")"
+                ":: alux_cli :: cli_arg_mismatch (\"login\" , ArgNames_login :: ARG_NAMES , 1usize , \"host\")"
             ),
             "{output}"
         );
         assert!(output.contains("const _ : () ="), "{output}");
         // Each source is checked against the type its argument is stated with, where it is written.
         assert!(output.contains(":: alux_cli :: cli_source_stated :: <"), "{output}");
-        assert!(output.contains("(& LoginArgNames :: ARG_1)"), "{output}");
+        assert!(output.contains("(& ArgNames_login :: ARG_1)"), "{output}");
     }
 
     #[test]
@@ -811,25 +815,27 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct ReadingCliProgram"));
+        assert!(output.contains("struct Program_reading_cli"));
         assert!(output.contains("alux_cli :: CliProgramAlg"));
-        assert!(output.contains("LookupOperation < Machine >"));
+        assert!(output.contains("Op_lookup < Machine >"));
         assert!(
-            output.contains("type ReadingCliProgramCommand0Sources = (() , ReadingCliProgramCommand0Source0) ;"),
+            output.contains("type Program_reading_cli_Command0Sources = (() , Program_reading_cli_Command0Source0) ;"),
             "{output}"
         );
         assert!(
             output.contains(
-                "CliOperationAlg < LookupOperation < Machine > , ReadingCliProgramCommand0Sources , :: alux_cli :: Total"
+                "CliOperationAlg < Op_lookup < Machine > , Program_reading_cli_Command0Sources , :: alux_cli :: Total"
             ),
             "{output}"
         );
         assert!(
-            output.contains("CliOperationAlg < CountOperation < Machine > , ReadingCliProgramCommand1Sources , :: alux_cli :: Fallible"),
+            output.contains(
+                "CliOperationAlg < Op_count < Machine > , Program_reading_cli_Command1Sources , :: alux_cli :: Fallible"
+            ),
             "{output}"
         );
         assert!(
-            output.contains("ReadingCliProgramCommand0Sources : :: alux_cli :: CliSources < ReadingCliProgramCommand0Args < Machine > >"),
+            output.contains("Program_reading_cli_Command0Sources : :: alux_cli :: CliSources < Program_reading_cli_Command0Args < Machine > >"),
             "{output}"
         );
         // One declaration per command, merged into the collection, and no nested program type.
@@ -857,8 +863,8 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert!(output.contains("struct ReadingCliProgram"));
-        assert!(!output.contains("ReadingRpcProgram"), "the CLI backend lowered a JSON-RPC declaration");
+        assert!(output.contains("struct Program_reading_cli"));
+        assert!(!output.contains("Program_reading_rpc"), "the CLI backend lowered a JSON-RPC declaration");
         assert!(output.contains("# [jsonrpc (name = SurfacesExt , __alux_then ())] pub impl"), "{output}");
         assert!(output.contains("self . methods ()"), "the JSON-RPC declaration did not reach its backend");
         assert!(!output.contains("trait SurfacesExt"), "a backend before the last stated the extension");
@@ -905,7 +911,7 @@ mod tests {
         // The constructor keeps the domain bound and drops the interpreter's.
         assert!(
             output.contains(
-                "fn reading_cli < Machine > (& self) -> ReadingCliProgram < Machine > where Machine : Reading"
+                "fn reading_cli < Machine > (& self) -> Program_reading_cli < Machine > where Machine : Reading"
             ),
             "{output}"
         );
@@ -929,20 +935,19 @@ mod tests {
         .unwrap()
         .to_string();
 
-        let context = "< This as :: alux_cli :: CliContextAlg < OpenOperation < Shelf > , LibraryCliProgramContext0Sources , :: alux_cli :: Fallible > >";
+        let context = "< This as :: alux_cli :: CliContextAlg < Op_open < Shelf > , Program_library_cli_Context0Sources , :: alux_cli :: Fallible > >";
         assert!(
-            output.contains(&format!("NotesCliProgram < Store > : :: alux_cli :: CliProgramAlg < {context} :: Inner")),
+            output
+                .contains(&format!("Program_notes_cli < Store > : :: alux_cli :: CliProgramAlg < {context} :: Inner")),
             "{output}"
         );
         assert!(output.contains(":: alux_cli :: CliNamedSources"), "{output}");
         // The subtree is not compiled with the interpreter around it.
-        assert!(!output.contains("NotesCliProgram < Store > : :: alux_cli :: CliProgramAlg < This"), "{output}");
+        assert!(!output.contains("Program_notes_cli < Store > : :: alux_cli :: CliProgramAlg < This"), "{output}");
         // The expansion is in A-normal form: each part is bound once, then named.
         assert!(output.contains("let part0 = builder . named (\"Store\") ;"), "{output}");
         assert!(
-            output.contains(
-                "let part1 = builder . op (< OpenOperation < Shelf > > :: default ()) . arg (\"store\" , part0)"
-            ),
+            output.contains("let part1 = builder . op (< Op_open < Shelf > > :: default ()) . arg (\"store\" , part0)"),
             "{output}"
         );
         assert!(output.contains("builder . commands () . within (part1 , part3)"), "{output}");
@@ -981,7 +986,7 @@ mod tests {
         .unwrap()
         .to_string();
 
-        assert_eq!(output.matches("ReadingCliProgram < Machine > : :: alux_cli :: CliProgramAlg").count(), 2);
+        assert_eq!(output.matches("Program_reading_cli < Machine > : :: alux_cli :: CliProgramAlg").count(), 2);
         assert!(output.contains("builder . commands () . nest (\"admin\""), "{output}");
         assert!(output.contains("This : :: alux_cli :: CliNestAlg"));
         assert!(output.contains("builder . program"));

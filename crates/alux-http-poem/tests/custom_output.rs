@@ -59,7 +59,7 @@ where
 macro_rules! fluent {
     ($api:expr) => {
         $api.routes()
-            .post("/login", $api.op(LoginSubmitOperation::<App>::default()).form::<LoginParams>().out::<LoginOut>())
+            .post("/login", $api.op(Op_login_submit::<App>::default()).form::<LoginParams>().out::<LoginOut>())
             .into_route()
     };
 }
@@ -69,7 +69,7 @@ macro_rules! direct {
         let syntax = HttpProgramBuilder;
         syntax
             .routes()
-            .post("/login", syntax.op(LoginSubmitOperation::<App>::default()).form::<LoginParams>().out::<LoginOut>())
+            .post("/login", syntax.op(Op_login_submit::<App>::default()).form::<LoginParams>().out::<LoginOut>())
             .into_program()
             .compile_route($api)
     }};
@@ -167,7 +167,7 @@ async fn all_three_forms_execute_both_custom_answers() {
 
 #[test]
 fn all_three_forms_describe_the_same_custom_answers() {
-    assert_eq!(LoginSubmitOperation::<App>::ARG_NAMES, ["params"]);
+    assert_eq!(Op_login_submit::<App>::ARG_NAMES, ["params"]);
     let text = TextHandlerImpl;
     let expected = fluent!(text);
     assert_eq!(expected.labels(), ["POST /login"]);

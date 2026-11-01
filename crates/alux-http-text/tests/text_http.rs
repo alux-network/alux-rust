@@ -266,7 +266,7 @@ fn compiles_a_first_order_route_without_an_http_program_macro() {
     let compiler = TextHandlerImpl;
     let builder = HttpProgramBuilder;
     // The reading as it stands, declared without the convenience macro.
-    let status = builder.routes().get("/status", builder.op(StatusCurrentOperation::<TestStatus>::default()).json());
+    let status = builder.routes().get("/status", builder.op(Op_status_current::<TestStatus>::default()).json());
     let program = builder.routes().nest("/api", status).into_program();
     let routes = program.compile_route(&compiler);
 
@@ -299,7 +299,7 @@ fn composes_routes_categorically() {
 #[tokio::test]
 async fn invokes_an_async_algebra_operation_without_boxing() {
     let status = Arc::new(TestStatus { temp: 21.5 });
-    let output = StatusCurrentOperation::<TestStatus>::default().apply(status, ()).await;
+    let output = Op_status_current::<TestStatus>::default().apply(status, ()).await;
 
     assert!((output - 21.5).abs() < f32::EPSILON);
 }

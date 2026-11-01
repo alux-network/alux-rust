@@ -39,10 +39,10 @@ impl Bytes for Word {
 #[test]
 fn names_a_borrowing_operation_like_any_other() {
     let _program = CliProgramBuilder.text_commands::<Word>();
-    assert_eq!(<CmpBytesOperation<Word> as OperationAlg>::ARG_NAMES, &["other"]);
+    assert_eq!(<Op_cmp_bytes<Word> as OperationAlg>::ARG_NAMES, &["other"]);
     let word = Word(b"abc".to_vec());
     let other = b"abc".to_vec();
-    let cmp = CmpBytesOperation::<Word>::default();
+    let cmp = Op_cmp_bytes::<Word>::default();
     assert!(futures_block(cmp.apply(&word, (&other[..],))));
 }
 
