@@ -1,6 +1,6 @@
 [package]
 name = "alux-cli-clap"
-version = "0.3.0"
+version = "0.4.0"
 description = "clap interpretation of ALUX CLI programs: clap parses and renders help, the program applies operations"
 documentation = "https://docs.rs/alux-cli-clap"
 authors.workspace = true
