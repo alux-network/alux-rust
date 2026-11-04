@@ -1,6 +1,6 @@
 [package]
 name = "alux-cli"
-version = "0.3.0"
+version = "0.4.0"
 description = "Composable, interpreter-independent command-line programs for meaning-first Rust design"
 documentation = "https://docs.rs/alux-cli"
 authors.workspace = true
