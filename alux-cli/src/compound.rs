@@ -2,6 +2,7 @@ use crate::{
     ArgumentInfo, CliArgumentError, CliDecodeSources, CliNamedSource, CliNamedSources, CliSourceDecode, CliSourceFor,
     CliSources, CliWordsAlg, Optional, Part, Whole, nested, nested_pattern, source::words,
 };
+use alux_ext::for_tuples;
 use alux_shape::{
     Product, Sum, Sum2, Sum3, Sum4, Sum5, Sum6, Sum7, Sum8, Sum9, Sum10, Sum11, Sum12, Sum13, Sum14, Sum15, Sum16,
 };
@@ -166,7 +167,7 @@ fn chosen<Error>(arguments: &[ArgumentInfo], given: &[bool]) -> Result<Option<us
 }
 
 macro_rules! sum {
-    ($sum:ident; $(($source:ident, $alternative:ident, $value:ident, $variant:ident, $index:tt)),+) => {
+    ($sum:ident, $width:tt; $(($source:ident, $alternative:ident, $value:ident, $variant:ident, $index:tt)),+) => {
         impl<Presence, $($source),+> SumSource<nested!((); $($source)+), Presence> {
             /// Describes the alternatives of the sum `Value`, as parts of the argument `name`.
             fn describe<Value, $($alternative),+>(&self, name: &'static str) -> Vec<ArgumentInfo>
@@ -263,18 +264,4 @@ macro_rules! sum {
     };
 }
 
-sum!(Sum2; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1));
-sum!(Sum3; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2));
-sum!(Sum4; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3));
-sum!(Sum5; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4));
-sum!(Sum6; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5));
-sum!(Sum7; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6));
-sum!(Sum8; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7));
-sum!(Sum9; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8));
-sum!(Sum10; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8), (S9, A9, s9, J, 9));
-sum!(Sum11; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8), (S9, A9, s9, J, 9), (S10, A10, s10, K, 10));
-sum!(Sum12; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8), (S9, A9, s9, J, 9), (S10, A10, s10, K, 10), (S11, A11, s11, L, 11));
-sum!(Sum13; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8), (S9, A9, s9, J, 9), (S10, A10, s10, K, 10), (S11, A11, s11, L, 11), (S12, A12, s12, M, 12));
-sum!(Sum14; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8), (S9, A9, s9, J, 9), (S10, A10, s10, K, 10), (S11, A11, s11, L, 11), (S12, A12, s12, M, 12), (S13, A13, s13, N, 13));
-sum!(Sum15; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8), (S9, A9, s9, J, 9), (S10, A10, s10, K, 10), (S11, A11, s11, L, 11), (S12, A12, s12, M, 12), (S13, A13, s13, N, 13), (S14, A14, s14, O, 14));
-sum!(Sum16; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1), (S2, A2, s2, C, 2), (S3, A3, s3, D, 3), (S4, A4, s4, E, 4), (S5, A5, s5, F, 5), (S6, A6, s6, G, 6), (S7, A7, s7, H, 7), (S8, A8, s8, I, 8), (S9, A9, s9, J, 9), (S10, A10, s10, K, 10), (S11, A11, s11, L, 11), (S12, A12, s12, M, 12), (S13, A13, s13, N, 13), (S14, A14, s14, O, 14), (S15, A15, s15, P, 15));
+for_tuples!(sum, 2..=16, named = Sum, each = [S, A, s]);

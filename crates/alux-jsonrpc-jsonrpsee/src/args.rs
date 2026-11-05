@@ -1,3 +1,4 @@
+use alux_ext::for_tuples;
 use jsonrpsee::types::error::INVALID_PARAMS_CODE;
 use jsonrpsee::types::params::ParamsSequence;
 use jsonrpsee::types::{ErrorObjectOwned, Params};
@@ -78,7 +79,7 @@ where
 }
 
 macro_rules! jsonrpsee_args {
-    ($($index:literal => $arg:ident),+ $(,)?) => {
+    ($($arg:ident => $index:literal),+) => {
         impl<$($arg),+> JsonrpseeArgs for ($($arg,)+)
         where
             $($arg: DeserializeOwned,)+
@@ -100,22 +101,7 @@ macro_rules! jsonrpsee_args {
     };
 }
 
-jsonrpsee_args!(0 => A1);
-jsonrpsee_args!(0 => A1, 1 => A2);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13, 13 => A14);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13, 13 => A14, 14 => A15);
-jsonrpsee_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13, 13 => A14, 14 => A15, 15 => A16);
+for_tuples!(jsonrpsee_args, 1..=16);
 
 #[cfg(test)]
 mod tests {

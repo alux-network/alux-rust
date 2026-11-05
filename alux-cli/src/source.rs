@@ -1,3 +1,4 @@
+use alux_ext::for_tuples;
 use core::marker::PhantomData;
 use std::ffi::OsStr;
 
@@ -750,7 +751,7 @@ macro_rules! nested_pattern {
 pub(crate) use {nested, nested_pattern};
 
 macro_rules! sources {
-    ($(($source:ident, $argument:ident, $value:ident, $index:tt)),+) => {
+    ($(($source:ident, $argument:ident, $value:ident, $letter:ident, $index:tt)),+) => {
         impl<$($source, $argument),+> CliSources<($($argument,)+)> for nested!((); $($source)+)
         where
             $($source: CliSourceFor<$argument>,)+
@@ -781,144 +782,4 @@ macro_rules! sources {
     };
 }
 
-sources!((S0, A0, s0, 0));
-sources!((S0, A0, s0, 0), (S1, A1, s1, 1));
-sources!((S0, A0, s0, 0), (S1, A1, s1, 1), (S2, A2, s2, 2));
-sources!((S0, A0, s0, 0), (S1, A1, s1, 1), (S2, A2, s2, 2), (S3, A3, s3, 3));
-sources!((S0, A0, s0, 0), (S1, A1, s1, 1), (S2, A2, s2, 2), (S3, A3, s3, 3), (S4, A4, s4, 4));
-sources!((S0, A0, s0, 0), (S1, A1, s1, 1), (S2, A2, s2, 2), (S3, A3, s3, 3), (S4, A4, s4, 4), (S5, A5, s5, 5));
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8),
-    (S9, A9, s9, 9)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8),
-    (S9, A9, s9, 9),
-    (S10, A10, s10, 10)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8),
-    (S9, A9, s9, 9),
-    (S10, A10, s10, 10),
-    (S11, A11, s11, 11)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8),
-    (S9, A9, s9, 9),
-    (S10, A10, s10, 10),
-    (S11, A11, s11, 11),
-    (S12, A12, s12, 12)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8),
-    (S9, A9, s9, 9),
-    (S10, A10, s10, 10),
-    (S11, A11, s11, 11),
-    (S12, A12, s12, 12),
-    (S13, A13, s13, 13)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8),
-    (S9, A9, s9, 9),
-    (S10, A10, s10, 10),
-    (S11, A11, s11, 11),
-    (S12, A12, s12, 12),
-    (S13, A13, s13, 13),
-    (S14, A14, s14, 14)
-);
-sources!(
-    (S0, A0, s0, 0),
-    (S1, A1, s1, 1),
-    (S2, A2, s2, 2),
-    (S3, A3, s3, 3),
-    (S4, A4, s4, 4),
-    (S5, A5, s5, 5),
-    (S6, A6, s6, 6),
-    (S7, A7, s7, 7),
-    (S8, A8, s8, 8),
-    (S9, A9, s9, 9),
-    (S10, A10, s10, 10),
-    (S11, A11, s11, 11),
-    (S12, A12, s12, 12),
-    (S13, A13, s13, 13),
-    (S14, A14, s14, 14),
-    (S15, A15, s15, 15)
-);
+for_tuples!(sources, 1..=16, each = [S, A, s]);

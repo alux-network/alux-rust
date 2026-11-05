@@ -4,6 +4,7 @@
 //! read one at a time, and whether a call writes them by position or by name is the transport's
 //! statement rather than this one's.
 
+use alux_ext::for_tuples;
 use alux_shape::ShapeOf;
 use alux_shape_typescript::{TsShape, TsType};
 
@@ -15,7 +16,7 @@ pub trait TsParams {
 
 /// States `TsParams` for one tuple width.
 macro_rules! params {
-    ($($arg:ident),*) => {
+    ($($arg:ident => $index:tt),*) => {
         impl<$($arg),*> TsParams for ($($arg,)*)
         where
             $($arg: ShapeOf<TsShape, Shape = TsType>),*
@@ -33,19 +34,4 @@ impl TsParams for () {
     }
 }
 
-params!(A0);
-params!(A0, A1);
-params!(A0, A1, A2);
-params!(A0, A1, A2, A3);
-params!(A0, A1, A2, A3, A4);
-params!(A0, A1, A2, A3, A4, A5);
-params!(A0, A1, A2, A3, A4, A5, A6);
-params!(A0, A1, A2, A3, A4, A5, A6, A7);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14);
-params!(A0, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11, A12, A13, A14, A15);
+for_tuples!(params, 1..=16);

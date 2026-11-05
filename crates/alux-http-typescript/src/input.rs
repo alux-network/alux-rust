@@ -1,5 +1,6 @@
 //! States where each argument comes from, in the vocabulary a caller writes.
 
+use alux_ext::for_tuples;
 use alux_shape::ShapeOf;
 use alux_shape_typescript::{TsShape, TsType};
 use core::marker::PhantomData;
@@ -116,7 +117,7 @@ impl TsInputsAlg for () {
 }
 
 macro_rules! ts_products {
-    ($($input:ident),+ $(,)?) => {
+    ($($input:ident => $index:tt),+) => {
         impl<$($input),+> TsInputsAlg for ($($input,)+)
         where
             $($input: TsInputAlg,)+
@@ -128,19 +129,4 @@ macro_rules! ts_products {
     };
 }
 
-ts_products!(I1);
-ts_products!(I1, I2);
-ts_products!(I1, I2, I3);
-ts_products!(I1, I2, I3, I4);
-ts_products!(I1, I2, I3, I4, I5);
-ts_products!(I1, I2, I3, I4, I5, I6);
-ts_products!(I1, I2, I3, I4, I5, I6, I7);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15);
-ts_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16);
+for_tuples!(ts_products, 1..=16);
