@@ -49,6 +49,7 @@ alux-shape-jsonschema = { version = "0.3.0", path = "crates/alux-shape-jsonschem
 alux-shape-macros = { version = "0.3.0", path = "macros/alux-shape-macros" }
 alux-shape-morph = { version = "0.3.0", path = "crates/alux-shape-morph" }
 alux-shape-rust = { version = "0.3.0", path = "crates/alux-shape-rust" }
+alux-shape-syn = { version = "0.1.0", path = "crates/alux-shape-syn" }
 alux-shape-term = { version = "0.3.0", path = "crates/alux-shape-term" }
 alux-shape-text = { version = "0.3.0", path = "crates/alux-shape-text" }
 alux-shape-typescript = { version = "0.3.0", path = "crates/alux-shape-typescript" }

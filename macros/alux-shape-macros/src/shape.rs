@@ -10,38 +10,34 @@
 //! written, which is the interpretation's statement and not the type's.
 
 use crate::construct;
-use crate::words;
-use crate::written::written_of;
+use crate::written::shape as written_shape;
+use alux_shape_syn::{Body, Form, Layout, Member, Tagging, read_layout};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields, LitStr, Result, Variant, parse_quote};
-
-/// How a choice states which alternative a value carries.
-enum Tagging {
-    External,
-    Internal(Vec<String>),
-    Adjacent(Vec<String>, Vec<String>),
-    Untagged,
-}
+use syn::{Data, DeriveInput, Error, Fields, LitStr, Result, parse_quote};
 
 /// States `ShapeOf` for the type this derive was written on.
 pub(crate) fn expand(input: DeriveInput) -> Result<TokenStream> {
     let name = &input.ident;
-    let words = renamed(&input.attrs)?.unwrap_or_else(|| words::of_camel(&name.to_string()));
+    let Layout { words, body } = read_layout(&input)?;
     let words = literal(&words);
 
     let mut members = Vec::new();
-    let (body, construction) = match &input.data {
-        Data::Struct(data) => {
-            let body = product(&data.fields, &mut members)?;
-            let Fields::Named(named) = &data.fields else { unreachable!("a product is read from named members") };
-            (body, construct::product(&input, named)?)
-        }
-        Data::Enum(data) => (choice(&input.attrs, &data.variants, &mut members)?, construct::sum(&input, data)?),
-        Data::Union(_) => {
-            return Err(Error::new(input.span(), "a union states no shape"));
-        }
+    let construction = match &input.data {
+        // A struct with named members is a product of its fields; a tuple struct states its shape
+        // and nothing more.
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(named) => construct::product(&input, named)?,
+            Fields::Unnamed(_) | Fields::Unit => quote!(),
+        },
+        Data::Enum(data) => construct::sum(&input, data)?,
+        Data::Union(_) => return Err(Error::new(input.span(), "a union states no shape")),
+    };
+    let body = match &body {
+        Body::Product(fields) => product(fields, &mut members),
+        Body::Positional(forms) => positional(forms, &mut members),
+        Body::Choice(..) => choice(&body, &mut members),
     };
 
     // Each member's type states its own shape, which a type parameter does only where it is bound to.
@@ -91,47 +87,34 @@ fn literal(words: &[String]) -> TokenStream {
     quote!(&[#(#words),*])
 }
 
-/// The shape of one member's type, which the member then requires of it.
-fn shape_of_type(ty: &syn::Type, members: &mut Vec<syn::Type>) -> TokenStream {
-    members.push(ty.clone());
-    // The algebra is the one `alg` is, so its parameter is never named here.
-    quote!(<#ty as ::alux_shape::ShapeOf<_>>::shape_of(alg))
+/// The shape a form states: its type's, which the member then requires of it, or its own.
+fn form(form: &Form, members: &mut Vec<syn::Type>) -> TokenStream {
+    match form {
+        Form::Type(ty) => {
+            members.push((**ty).clone());
+            // The algebra is the one `alg` is, so its parameter is never named here.
+            quote!(<#ty as ::alux_shape::ShapeOf<_>>::shape_of(alg))
+        }
+        Form::Written(written) => written_shape(written),
+    }
 }
 
 /// The product a struct's members state.
-fn product(fields: &Fields, types: &mut Vec<syn::Type>) -> Result<TokenStream> {
-    let Fields::Named(named) = fields else {
-        return Err(Error::new(
-            fields.span(),
-            "a product is read from named members; a newtype or tuple layout states no member names",
-        ));
-    };
-
-    let mut members = Vec::new();
-
-    for field in &named.named {
-        if skipped(&field.attrs)? {
-            continue;
-        }
-
-        // A field states its own writing where its type cannot: a foreign type, or an alias whose
-        // meaning is narrower than the type it names.
-        let shape = match written_of(&field.attrs)? {
-            Some(written) => written.shape(),
-            None => shape_of_type(&field.ty, types),
-        };
-
-        if merged(&field.attrs)? {
-            members.push(quote!(alg.merge(#shape)));
-            continue;
-        }
-
-        let ident = field.ident.as_ref().expect("a named member has an identifier");
-        let words = renamed(&field.attrs)?.unwrap_or_else(|| words::of_snake(&ident.to_string()));
-        let words = literal(&words);
-
-        members.push(quote!(alg.field(#words, #shape)));
-    }
+fn product(fields: &[Member], types: &mut Vec<syn::Type>) -> TokenStream {
+    let members: Vec<_> = fields
+        .iter()
+        .map(|member| match member {
+            Member::Merge(merged) => {
+                let shape = form(merged, types);
+                quote!(alg.merge(#shape))
+            }
+            Member::Field(words, member) => {
+                let shape = form(member, types);
+                let words = literal(words);
+                quote!(alg.field(#words, #shape))
+            }
+        })
+        .collect();
 
     let bindings = members.iter().enumerate().map(|(index, member)| {
         let binding = format_ident!("member_{index}");
@@ -140,148 +123,53 @@ fn product(fields: &Fields, types: &mut Vec<syn::Type>) -> Result<TokenStream> {
     });
     let names = (0..members.len()).map(|index| format_ident!("member_{index}"));
 
-    Ok(quote! {{
+    quote! {{
         #(#bindings)*
 
         alg.product(vec![#(#names),*])
-    }})
+    }}
+}
+
+/// The shape a tuple or unit struct states: `unit` for no member, a newtype's item for one, and a
+/// tuple for more, as serde writes each.
+fn positional(forms: &[Form], types: &mut Vec<syn::Type>) -> TokenStream {
+    let shapes: Vec<_> = forms.iter().map(|member| form(member, types)).collect();
+    match shapes.as_slice() {
+        [] => quote!(alg.unit()),
+        [item] => item.clone(),
+        _ => quote!(alg.tuple(vec![#(#shapes),*])),
+    }
 }
 
 /// The choice a set of alternatives states, under the encoding the attributes state.
-fn choice(
-    attrs: &[syn::Attribute],
-    variants: &syn::punctuated::Punctuated<Variant, syn::Token![,]>,
-    types: &mut Vec<syn::Type>,
-) -> Result<TokenStream> {
-    let tagging = tagging(attrs)?;
-    let named_only = variants.iter().all(|variant| matches!(variant.fields, Fields::Unit));
-
-    let mut alternatives = Vec::new();
-
-    for variant in variants {
-        let words = renamed(&variant.attrs)?.unwrap_or_else(|| words::of_camel(&variant.ident.to_string()));
-        let words = literal(&words);
-
-        if named_only {
-            alternatives.push(words);
-            continue;
-        }
-
-        let shape = match &variant.fields {
-            Fields::Unit => quote!(alg.unit()),
-            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => shape_of_type(&fields.unnamed[0].ty, types),
-            _ => {
-                return Err(Error::new(
-                    variant.fields.span(),
-                    "an alternative states one shape; a tuple or struct alternative is not read yet",
-                ));
-            }
-        };
-
-        alternatives.push(quote!((#words, #shape)));
+fn choice(body: &Body, types: &mut Vec<syn::Type>) -> TokenStream {
+    let Body::Choice(tagging, alternatives) = body else { unreachable!("a choice is read from an enum") };
+    if body.names_only() {
+        let names = alternatives.iter().map(|alternative| literal(&alternative.words));
+        return quote!(alg.sum_of_names(vec![#(#names),*]));
     }
+    let alternatives: Vec<_> = alternatives
+        .iter()
+        .map(|alternative| {
+            let words = literal(&alternative.words);
+            let shape = alternative.carries.as_ref().map_or_else(|| quote!(alg.unit()), |carried| form(carried, types));
+            quote!((#words, #shape))
+        })
+        .collect();
 
-    if named_only {
-        return Ok(quote!(alg.sum_of_names(vec![#(#alternatives),*])));
-    }
-
-    Ok(match tagging {
+    match tagging {
         Tagging::External => quote!(alg.sum_external(vec![#(#alternatives),*])),
         Tagging::Untagged => quote!(alg.sum_untagged(vec![#(#alternatives),*])),
         Tagging::Internal(tag) => {
-            let tag = literal(&tag);
+            let tag = literal(tag);
 
             quote!(alg.sum_internal(#tag, vec![#(#alternatives),*]))
         }
         Tagging::Adjacent(tag, content) => {
-            let tag = literal(&tag);
-            let content = literal(&content);
+            let tag = literal(tag);
+            let content = literal(content);
 
             quote!(alg.sum_adjacent(#tag, #content, vec![#(#alternatives),*]))
         }
-    })
-}
-
-/// Which encoding of a choice the attributes state.
-fn tagging(attrs: &[syn::Attribute]) -> Result<Tagging> {
-    let mut tag = None;
-    let mut content = None;
-    let mut untagged = false;
-
-    for attr in serde_attrs(attrs) {
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("untagged") {
-                untagged = true;
-            } else if meta.path.is_ident("tag") {
-                tag = Some(words::of_spelled(&meta.value()?.parse::<LitStr>()?.value()));
-            } else if meta.path.is_ident("content") {
-                content = Some(words::of_spelled(&meta.value()?.parse::<LitStr>()?.value()));
-            } else if meta.input.peek(syn::Token![=]) {
-                let _: syn::Expr = meta.value()?.parse()?;
-            }
-
-            Ok(())
-        })?;
     }
-
-    Ok(match (untagged, tag, content) {
-        (true, ..) => Tagging::Untagged,
-        (false, Some(tag), Some(content)) => Tagging::Adjacent(tag, content),
-        (false, Some(tag), None) => Tagging::Internal(tag),
-        (false, None, _) => Tagging::External,
-    })
-}
-
-/// The words a `rename` states, if one does.
-pub(crate) fn renamed(attrs: &[syn::Attribute]) -> Result<Option<Vec<String>>> {
-    let mut renamed = None;
-
-    for attr in serde_attrs(attrs) {
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("rename") {
-                // A rename may state a name in any spelling, so its words are read back out of it.
-                renamed = Some(words::of_spelled(&meta.value()?.parse::<LitStr>()?.value()));
-            } else if meta.input.peek(syn::Token![=]) {
-                let _: syn::Expr = meta.value()?.parse()?;
-            }
-
-            Ok(())
-        })?;
-    }
-
-    Ok(renamed)
-}
-
-/// Whether a member states a merge rather than a member of its own.
-pub(crate) fn merged(attrs: &[syn::Attribute]) -> Result<bool> {
-    flag(attrs, "flatten")
-}
-
-/// Whether a member is written at all.
-pub(crate) fn skipped(attrs: &[syn::Attribute]) -> Result<bool> {
-    Ok(flag(attrs, "skip")? || flag(attrs, "skip_serializing")?)
-}
-
-/// Whether a bare `serde` flag is present.
-fn flag(attrs: &[syn::Attribute], name: &str) -> Result<bool> {
-    let mut present = false;
-
-    for attr in serde_attrs(attrs) {
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident(name) && !meta.input.peek(syn::Token![=]) {
-                present = true;
-            } else if meta.input.peek(syn::Token![=]) {
-                let _: syn::Expr = meta.value()?.parse()?;
-            }
-
-            Ok(())
-        })?;
-    }
-
-    Ok(present)
-}
-
-/// The `serde` attributes among a set, which are the ones a shape is read from.
-fn serde_attrs(attrs: &[syn::Attribute]) -> impl Iterator<Item = &syn::Attribute> {
-    attrs.iter().filter(|attr| attr.path().is_ident("serde"))
 }

@@ -103,6 +103,7 @@ Shared HTTP support:
 | [`alux-shape-text`](crates/alux-shape-text) | [![crates.io][v-shape-text]][c-shape-text] [![docs.rs][d-shape-text]][r-shape-text] | a readable description |
 | [`alux-shape-term`](crates/alux-shape-term) | [![crates.io][v-shape-term]][c-shape-term] [![docs.rs][d-shape-term]][r-shape-term] | the term itself |
 | [`alux-shape-morph`](crates/alux-shape-morph) | [![crates.io][v-shape-morph]][c-shape-morph] [![docs.rs][d-shape-morph]][r-shape-morph] | another shape |
+| [`alux-shape-syn`](crates/alux-shape-syn) | [![crates.io][v-shape-syn]][c-shape-syn] [![docs.rs][d-shape-syn]][r-shape-syn] | (the other way) the shape a serde-annotated layout states, read as syntax for the derive and the source reader |
 
 ### Of a benchmark
 
@@ -286,6 +287,10 @@ Packages are licensed under MIT. `just release <crate>:<level>...` bumps, publis
 [c-laws-check]: https://crates.io/crates/alux-laws-check
 [d-laws-check]: https://docs.rs/alux-laws-check/badge.svg
 [r-laws-check]: https://docs.rs/alux-laws-check
+[v-shape-syn]: https://img.shields.io/crates/v/alux-shape-syn
+[c-shape-syn]: https://crates.io/crates/alux-shape-syn
+[d-shape-syn]: https://docs.rs/alux-shape-syn/badge.svg
+[r-shape-syn]: https://docs.rs/alux-shape-syn
 [v-bench]: https://img.shields.io/crates/v/alux-bench
 [c-bench]: https://crates.io/crates/alux-bench
 [d-bench]: https://docs.rs/alux-bench/badge.svg
