@@ -1,0 +1,23 @@
+[package]
+name = "alux-laws-check"
+version = "0.1.0"
+description = "Runs ALUX law suites on subjects and reports every law that broke"
+documentation = "https://docs.rs/alux-laws-check"
+readme = "README.md"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+proptest = ["dep:proptest"]
+
+[dependencies]
+alux-ext.workspace = true
+alux-laws.workspace = true
+proptest = { workspace = true, optional = true }

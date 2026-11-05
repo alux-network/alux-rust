@@ -32,6 +32,7 @@ What a surface means, with no interpreter in it. Each depends on `alux-ext` and,
 | [`alux-jsonrpc`](alux-jsonrpc) | [![crates.io][v-rpc]][c-rpc] [![docs.rs][d-rpc]][r-rpc] | JSON-RPC programs, no RPC framework |
 | [`alux-cli`](alux-cli) | [![crates.io][v-cli]][c-cli] [![docs.rs][d-cli]][r-cli] | Command-line programs, no parser framework |
 | [`alux-bench`](alux-bench) | [![crates.io][v-bench]][c-bench] [![docs.rs][d-bench]][r-bench] | What a benchmark measures, no harness |
+| [`alux-laws`](alux-laws) | [![crates.io][v-laws]][c-laws] [![docs.rs][d-laws]][r-laws] | Law suites as programs, no runner |
 
 ## Interpretations
 
@@ -109,6 +110,12 @@ Shared HTTP support:
 | --- | --- | --- |
 | [`alux-bench-criterion`](crates/alux-bench-criterion) | [![crates.io][v-bench-criterion]][c-bench-criterion] [![docs.rs][d-bench-criterion]][r-bench-criterion] | [criterion](https://docs.rs/criterion) groups and functions |
 | [`alux-bench-direct`](crates/alux-bench-direct) | [![crates.io][v-bench-direct]][c-bench-direct] [![docs.rs][d-bench-direct]][r-bench-direct] | its own runner, saying each case as it finishes |
+
+### Of a law suite
+
+| Crate | | Interprets a suite as |
+| --- | --- | --- |
+| [`alux-laws-check`](crates/alux-laws-check) | [![crates.io][v-laws-check]][c-laws-check] [![docs.rs][d-laws-check]][r-laws-check] | checks on subjects and inputs, with one report |
 
 ### Other interpretations
 
@@ -271,6 +278,14 @@ Packages are licensed under MIT. `just release <crate>:<level>...` bumps, publis
 [c-openapi]: https://crates.io/crates/alux-http-openapi
 [d-openapi]: https://docs.rs/alux-http-openapi/badge.svg
 [r-openapi]: https://docs.rs/alux-http-openapi
+[v-laws]: https://img.shields.io/crates/v/alux-laws
+[c-laws]: https://crates.io/crates/alux-laws
+[d-laws]: https://docs.rs/alux-laws/badge.svg
+[r-laws]: https://docs.rs/alux-laws
+[v-laws-check]: https://img.shields.io/crates/v/alux-laws-check
+[c-laws-check]: https://crates.io/crates/alux-laws-check
+[d-laws-check]: https://docs.rs/alux-laws-check/badge.svg
+[r-laws-check]: https://docs.rs/alux-laws-check
 [v-bench]: https://img.shields.io/crates/v/alux-bench
 [c-bench]: https://crates.io/crates/alux-bench
 [d-bench]: https://docs.rs/alux-bench/badge.svg

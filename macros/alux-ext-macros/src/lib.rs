@@ -1,6 +1,7 @@
 //! Procedural macros for declaring and defunctionalizing DD programs.
 //!
-//! This crate is the shared syntax layer for DD extension, HTTP, JSON-RPC, CLI, and shape programs.
+//! This crate is the shared syntax layer for DD extension, HTTP, JSON-RPC, CLI, shape, and law
+//! programs.
 //! Its public surface stays small: parsing, validation, and code generation
 //! live in private modules, while this facade contains only procedural-macro
 //! entry points. Product crates re-export the macros they own.
@@ -14,6 +15,7 @@ mod ext;
 mod extension;
 mod http_program;
 mod jsonrpc_program;
+mod laws_program;
 mod lower;
 mod shape_program;
 mod syntax;
@@ -22,6 +24,7 @@ use cli_program::cli_program_defunc_internal;
 use ext::ext_internal;
 use http_program::http_program_defunc_internal;
 use jsonrpc_program::jsonrpc_program_defunc_internal;
+use laws_program::laws_program_defunc_internal;
 use proc_macro::TokenStream;
 use shape_program::shape_program_defunc_internal;
 
@@ -230,3 +233,39 @@ pub fn shape(attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn cli(attr: TokenStream, item: TokenStream) -> TokenStream {
     cli_program_defunc_internal(attr.into(), item.into()).unwrap_or_else(syn::Error::into_compile_error).into()
 }
+
+/// Lowers extension methods into a law suite.
+///
+/// This is the laws backend that `alux_ext::ext(..., defunc(via = laws))` selects. `via = laws`
+/// resolves the name in the authoring scope, so a declaration imports it as `use alux_laws::laws`.
+///
+/// Each method is a law over the block's subject: it takes `&self` or `&mut self` and at most one
+/// borrowed input, and returns `()` or a `Result`. It becomes an operation `Op_<law>` implementing
+/// `OperationAlg` and `alux_laws::LawOp`. The block also states a function named after the suite in
+/// snake case, returning the law program of those operations in block order. Which inputs a law is
+/// checked on, pinned or sampled, is the run's.
+///
+/// ```ignore
+/// use alux_ext::ext;
+/// use alux_laws::laws;
+///
+/// #[ext(name = CounterLaws, defunc(via = laws))]
+/// pub impl<This> This
+/// where
+///     This: CounterAlg,
+/// {
+///     /// Bumping adds one.
+///     fn bump_adds_one(&mut self) {
+///         let before = self.count();
+///         self.bump();
+///         assert_eq!(self.count(), before + 1);
+///     }
+/// }
+///
+/// // The expansion also defines `Op_bump_adds_one<This>` and `counter_laws<This>()`.
+/// ```
+#[proc_macro_attribute]
+pub fn laws(attr: TokenStream, item: TokenStream) -> TokenStream {
+    laws_program_defunc_internal(attr.into(), item.into()).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+

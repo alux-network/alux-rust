@@ -18,7 +18,7 @@ use syn::{
 
 /// Carries what an extension's arguments state about its trait.
 pub(crate) struct Stated {
-    name: Ident,
+    pub(crate) name: Ident,
     supertraits: Option<Punctuated<TypeParamBound, Plus>>,
 }
 
