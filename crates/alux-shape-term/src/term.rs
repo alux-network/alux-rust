@@ -24,6 +24,7 @@ pub enum Term {
     Base64(Box<Term>),
     Opt(Box<Term>),
     Seq(Box<Term>),
+    Tuple(Vec<Term>),
     Map(Box<Term>, Box<Term>),
     Product(Vec<Member>),
     Choice(Vec<Term>),
@@ -75,6 +76,7 @@ impl Term {
             Self::Base64(item) => alg.base64(item.fold(alg)),
             Self::Opt(item) => alg.opt(item.fold(alg)),
             Self::Seq(item) => alg.seq(item.fold(alg)),
+            Self::Tuple(items) => alg.tuple(items.iter().map(|item| item.fold(alg)).collect()),
             Self::Map(key, value) => alg.map(key.fold(alg), value.fold(alg)),
             Self::Product(members) => alg.product(members.iter().map(|member| member.fold(alg)).collect()),
             Self::Choice(alternatives) => alg.choice(alternatives.iter().map(|item| item.fold(alg)).collect()),
@@ -130,6 +132,7 @@ impl Term {
             Self::Base64(item) => Self::Base64(Box::new(item.expand(definitions, expanding))),
             Self::Opt(item) => Self::Opt(Box::new(item.expand(definitions, expanding))),
             Self::Seq(item) => Self::Seq(Box::new(item.expand(definitions, expanding))),
+            Self::Tuple(items) => Self::Tuple(items.iter().map(|item| item.expand(definitions, expanding)).collect()),
             Self::Map(key, value) => {
                 Self::Map(Box::new(key.expand(definitions, expanding)), Box::new(value.expand(definitions, expanding)))
             }
@@ -161,7 +164,7 @@ impl Term {
             | Self::Named { body: item, .. } => Box::new(std::iter::once(&**item)),
             Self::Map(key, value) => Box::new([&**key, &**value].into_iter()),
             Self::Product(members) => Box::new(members.iter().map(Member::shape)),
-            Self::Choice(alternatives) => Box::new(alternatives.iter()),
+            Self::Choice(alternatives) | Self::Tuple(alternatives) => Box::new(alternatives.iter()),
             _ => Box::new(std::iter::empty()),
         }
     }
@@ -261,6 +264,10 @@ impl ShapeAlg for TermShape {
 
     fn map(&self, key: Term, value: Term) -> Term {
         Term::Map(Box::new(key), Box::new(value))
+    }
+
+    fn tuple(&self, items: Vec<Term>) -> Term {
+        Term::Tuple(items)
     }
 
     fn product(&self, fields: Vec<Member>) -> Term {

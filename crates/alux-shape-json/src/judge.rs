@@ -211,6 +211,20 @@ impl ShapeAlg for Judge {
         })
     }
 
+    fn tuple(&self, items: Vec<Judgement>) -> Judgement {
+        let checks: Vec<Check> = items.iter().map(|item| item.check.clone()).collect();
+
+        Judgement::leaf(move |at, v| match v.as_array() {
+            Some(values) if values.len() == checks.len() => checks
+                .iter()
+                .zip(values)
+                .enumerate()
+                .try_for_each(|(i, (check, value))| check(&below(at, &i.to_string()), value)),
+            Some(_) => wrong(at, format!("a tuple of {}", checks.len())),
+            None => wrong(at, "a tuple"),
+        })
+    }
+
     fn product(&self, fields: Vec<Vec<Member>>) -> Judgement {
         let members: Vec<Member> = fields.into_iter().flatten().collect();
         let described = members.clone();

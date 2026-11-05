@@ -78,6 +78,10 @@ impl ShapeAlg for TextShape {
         format!("{{{key}: {value}}}")
     }
 
+    fn tuple(&self, items: Vec<String>) -> String {
+        format!("({})", items.join(", "))
+    }
+
     fn product(&self, fields: Vec<String>) -> String {
         format!("{{ {} }}", fields.join(", "))
     }

@@ -6,6 +6,7 @@
 //! in its own shape.
 
 use crate::{ShapeAlg, ShapeOf};
+use alux_ext::for_tuples;
 use std::collections::{BTreeMap, HashMap};
 
 /// States a shape for one integer width.
@@ -183,3 +184,22 @@ where
         alg.map(K::shape_of(alg), V::shape_of(alg))
     }
 }
+
+/// States a tuple's shape for one width: what `serde` writes, an array with one item per position.
+macro_rules! tuple_shapes {
+    ($($item:ident => $index:tt),+) => {
+        impl<A, $($item),+> ShapeOf<A> for ($($item,)+)
+        where
+            A: ShapeAlg,
+            $($item: ShapeOf<A, Shape = A::Ty>,)+
+        {
+            type Shape = A::Ty;
+
+            fn shape_of(alg: &A) -> A::Ty {
+                alg.tuple(vec![$($item::shape_of(alg)),+])
+            }
+        }
+    };
+}
+
+for_tuples!(tuple_shapes, 1..=16);

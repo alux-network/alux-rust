@@ -162,6 +162,11 @@ impl ShapeAlg for TsShape {
         TsType::of(format!("Record<string, {}>", value.expr), &[&key, &value])
     }
 
+    fn tuple(&self, items: Vec<TsType>) -> TsType {
+        let exprs: Vec<&str> = items.iter().map(|item| item.expr.as_str()).collect();
+        TsType::of(format!("[{}]", exprs.join(", ")), &items.iter().collect::<Vec<_>>())
+    }
+
     fn product(&self, fields: Vec<TsMember>) -> TsType {
         let mut product = Product::default();
         let mut declarations = BTreeMap::new();

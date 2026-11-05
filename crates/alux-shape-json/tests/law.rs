@@ -156,3 +156,49 @@ fn a_member_the_shape_forgot_would_be_caught() {
 
     assert!(partial.holds(&json).is_err());
 }
+
+/// A tuple struct: serde writes an array, one item per position.
+#[derive(Serialize, Shape)]
+struct Pair(u32, String);
+
+/// A newtype: serde writes its item alone.
+#[derive(Serialize, Shape)]
+struct Id(u64);
+
+/// A unit struct: serde writes `null`.
+#[derive(Serialize, Shape)]
+struct Marker;
+
+/// A product holding a Rust tuple, which serde writes as an array too.
+#[derive(Serialize, Shape)]
+struct Placed {
+    at: (i32, i32),
+    label: Pair,
+}
+
+#[test]
+fn a_tuple_struct_is_described_by_its_shape() {
+    assert_eq!(law(&Pair(7, "seven".into())), Ok(()));
+}
+
+#[test]
+fn a_newtype_is_described_by_its_item() {
+    assert_eq!(law(&Id(42)), Ok(()));
+}
+
+#[test]
+fn a_unit_struct_is_described_by_unit() {
+    assert_eq!(law(&Marker), Ok(()));
+}
+
+#[test]
+fn a_rust_tuple_is_described_by_its_shape() {
+    assert_eq!(law(&Placed { at: (1, -2), label: Pair(0, String::new()) }), Ok(()));
+}
+
+#[test]
+fn a_tuple_of_another_length_is_not_described() {
+    let judge = Pair::shape_of(&Judge::new(Spelling::LowerCamel));
+    assert!(judge.holds(&serde_json::json!([7])).is_err());
+    assert!(judge.holds(&serde_json::json!([7, "seven", 8])).is_err());
+}
