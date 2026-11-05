@@ -1,0 +1,20 @@
+[package]
+name = "alux-source"
+version = "0.1.0"
+description = "What Rust source declares: traits, impls, bounds and extensions, for any interpreter to read"
+documentation = "https://docs.rs/alux-source"
+readme = "README.md"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-laws.workspace = true
+alux-shape.workspace = true

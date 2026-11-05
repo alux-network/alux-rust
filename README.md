@@ -33,6 +33,7 @@ What a surface means, with no interpreter in it. Each depends on `alux-ext` and,
 | [`alux-cli`](alux-cli) | [![crates.io][v-cli]][c-cli] [![docs.rs][d-cli]][r-cli] | Command-line programs, no parser framework |
 | [`alux-bench`](alux-bench) | [![crates.io][v-bench]][c-bench] [![docs.rs][d-bench]][r-bench] | What a benchmark measures, no harness |
 | [`alux-laws`](alux-laws) | [![crates.io][v-laws]][c-laws] [![docs.rs][d-laws]][r-laws] | Law suites as programs, no runner |
+| [`alux-source`](alux-source) | [![crates.io][v-source]][c-source] [![docs.rs][d-source]][r-source] | What Rust source declares, no parser |
 
 ## Interpretations
 
@@ -117,6 +118,13 @@ Shared HTTP support:
 | Crate | | Interprets a suite as |
 | --- | --- | --- |
 | [`alux-laws-check`](crates/alux-laws-check) | [![crates.io][v-laws-check]][c-laws-check] [![docs.rs][d-laws-check]][r-laws-check] | checks on subjects and inputs, with one report |
+
+### Of Rust source
+
+| Crate | | Interprets or builds a source term as |
+| --- | --- | --- |
+| [`alux-source-syn`](crates/alux-source-syn) | [![crates.io][v-source-syn]][c-source-syn] [![docs.rs][d-source-syn]][r-source-syn] | a reading of Rust source with [syn](https://docs.rs/syn), syntax only |
+| [`alux-source-index`](crates/alux-source-index) | [![crates.io][v-source-index]][c-source-index] [![docs.rs][d-source-index]][r-source-index] | plain values that answer questions |
 
 ### Other interpretations
 
@@ -287,10 +295,22 @@ Packages are licensed under MIT. `just release <crate>:<level>...` bumps, publis
 [c-laws-check]: https://crates.io/crates/alux-laws-check
 [d-laws-check]: https://docs.rs/alux-laws-check/badge.svg
 [r-laws-check]: https://docs.rs/alux-laws-check
+[v-source]: https://img.shields.io/crates/v/alux-source
+[c-source]: https://crates.io/crates/alux-source
+[d-source]: https://docs.rs/alux-source/badge.svg
+[r-source]: https://docs.rs/alux-source
 [v-shape-syn]: https://img.shields.io/crates/v/alux-shape-syn
 [c-shape-syn]: https://crates.io/crates/alux-shape-syn
 [d-shape-syn]: https://docs.rs/alux-shape-syn/badge.svg
 [r-shape-syn]: https://docs.rs/alux-shape-syn
+[v-source-syn]: https://img.shields.io/crates/v/alux-source-syn
+[c-source-syn]: https://crates.io/crates/alux-source-syn
+[d-source-syn]: https://docs.rs/alux-source-syn/badge.svg
+[r-source-syn]: https://docs.rs/alux-source-syn
+[v-source-index]: https://img.shields.io/crates/v/alux-source-index
+[c-source-index]: https://crates.io/crates/alux-source-index
+[d-source-index]: https://docs.rs/alux-source-index/badge.svg
+[r-source-index]: https://docs.rs/alux-source-index
 [v-bench]: https://img.shields.io/crates/v/alux-bench
 [c-bench]: https://crates.io/crates/alux-bench
 [d-bench]: https://docs.rs/alux-bench/badge.svg
