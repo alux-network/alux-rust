@@ -19,6 +19,7 @@ mod laws_program;
 mod lower;
 mod shape_program;
 mod syntax;
+mod tuples;
 
 use cli_program::cli_program_defunc_internal;
 use ext::ext_internal;
@@ -269,3 +270,40 @@ pub fn laws(attr: TokenStream, item: TokenStream) -> TokenStream {
     laws_program_defunc_internal(attr.into(), item.into()).unwrap_or_else(syn::Error::into_compile_error).into()
 }
 
+/// Invokes a macro once per tuple width: `for_tuples!(callback, 0..=16)` expands to `callback!();`,
+/// `callback!(A1 => 0);`, `callback!(A1 => 0, A2 => 1);` and so on up to the widest, each width's
+/// type parameters named `A1` onward with their positions.
+///
+/// A crate states what one width means in its own `macro_rules!`; the widths are enumerated here,
+/// once for the workspace.
+///
+/// Two clauses serve a family of types, one per width. `named = Sum` passes each width's type name
+/// and number first, and `each = [S, A, s]` gives every position identifiers of its own, then its
+/// letter and its index: `for_tuples!(sum, 2..=16, named = Sum, each = [S, A, s])` expands to
+/// `sum!(Sum2, 2; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1));` and so on.
+///
+/// ```rust ignore
+/// macro_rules! tuple_len {
+///     ($($ty:ident => $index:tt),*) => {
+///         impl<$($ty),*> Len for ($($ty,)*) {
+///             const LEN: usize = 0 $(+ { let _ = $index; 1 })*;
+///         }
+///     };
+/// }
+///
+/// alux_ext::for_tuples!(tuple_len, 0..=16);
+/// ```
+#[proc_macro]
+pub fn for_tuples(input: TokenStream) -> TokenStream {
+    tuples::for_tuples(input.into()).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Invokes a macro once per position of each tuple width, the position and the type at it first:
+/// `for_tuple_positions!(callback, 1..=2)` expands to `callback!(0 => A1; A1 => 0);`,
+/// `callback!(0 => A1; A1 => 0, A2 => 1);` and `callback!(1 => A2; A1 => 0, A2 => 1);`.
+///
+/// For what holds of one position of a tuple, such as the type of its `N`th element.
+#[proc_macro]
+pub fn for_tuple_positions(input: TokenStream) -> TokenStream {
+    tuples::for_tuple_positions(input.into()).unwrap_or_else(syn::Error::into_compile_error).into()
+}
