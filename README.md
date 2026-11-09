@@ -104,7 +104,7 @@ Shared HTTP support:
 | [`alux-shape-text`](crates/alux-shape-text) | [![crates.io][v-shape-text]][c-shape-text] [![docs.rs][d-shape-text]][r-shape-text] | a readable description |
 | [`alux-shape-term`](crates/alux-shape-term) | [![crates.io][v-shape-term]][c-shape-term] [![docs.rs][d-shape-term]][r-shape-term] | the term itself |
 | [`alux-shape-morph`](crates/alux-shape-morph) | [![crates.io][v-shape-morph]][c-shape-morph] [![docs.rs][d-shape-morph]][r-shape-morph] | another shape |
-| [`alux-shape-syn`](crates/alux-shape-syn) | [![crates.io][v-shape-syn]][c-shape-syn] [![docs.rs][d-shape-syn]][r-shape-syn] | (the other way) the shape a serde-annotated layout states, read as syntax for the derive and the source reader |
+| [`alux-shape-syn`](crates/alux-shape-syn) | [![crates.io][v-shape-syn]][c-shape-syn] [![docs.rs][d-shape-syn]][r-shape-syn] | built from a serde layout's syntax, not interpreted |
 
 ### Of a benchmark
 
