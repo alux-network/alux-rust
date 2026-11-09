@@ -1,6 +1,6 @@
 [package]
 name = "alux-shape-text"
-version = "0.3.0"
+version = "0.3.1"
 description = "Readable interpretation of ALUX data shapes"
 documentation = "https://docs.rs/alux-shape-text"
 authors.workspace = true
