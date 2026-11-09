@@ -180,3 +180,20 @@ where
     }
 }
 ```
+
+## Tuples
+
+A tuple is the heterogeneous structure: its elements have different types, so sequencing it keeps each one's type instead of collecting a `Vec`. `TupleSequence` gives it the same `sequence`, for widths 0 to 16, with every element sharing one error:
+
+```rust
+use alux_traversable::TupleSequence;
+
+let a: Result<u32, String> = Ok(7);
+let b: Result<bool, String> = Ok(true);
+let c: Result<Vec<u8>, String> = Ok(vec![1, 22, 33]);
+
+assert_eq!((a, b, c).sequence(), Ok((7, true, vec![1, 22, 33])));
+```
+
+It is the plain applicative: the leftmost `Err` is the result, and converting errors stays the caller's (`map_err` per element). `traverse` over a tuple would take one function per position, so a caller writes it as those functions applied in place, then `sequence`.
+

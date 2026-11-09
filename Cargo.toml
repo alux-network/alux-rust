@@ -35,10 +35,15 @@ alux-http-salvo = { version = "0.5.0", path = "crates/alux-http-salvo" }
 alux-http-text = { version = "0.7.0", path = "crates/alux-http-text" }
 alux-http-typescript = { version = "0.3.0", path = "crates/alux-http-typescript" }
 alux-http-warp = { version = "0.3.0", path = "crates/alux-http-warp" }
+alux-source = { version = "0.1.0", path = "alux-source" }
+alux-source-index = { version = "0.1.0", path = "crates/alux-source-index" }
+alux-source-syn = { version = "0.1.0", path = "crates/alux-source-syn" }
 alux-jsonrpc = { version = "0.5.0", path = "alux-jsonrpc" }
 alux-jsonrpc-direct = { version = "0.4.0", path = "crates/alux-jsonrpc-direct" }
 alux-jsonrpc-jsonrpsee = { version = "0.5.0", path = "crates/alux-jsonrpc-jsonrpsee" }
 alux-jsonrpc-typescript = { version = "0.4.0", path = "crates/alux-jsonrpc-typescript" }
+alux-laws = { version = "0.1.0", path = "alux-laws" }
+alux-laws-check = { version = "0.1.0", path = "crates/alux-laws-check" }
 alux-sdk = { version = "0.7.0", path = "alux-sdk" }
 alux-sdk-macros = { version = "0.1.5", path = "macros/alux-sdk-macros" }
 alux-shape = { version = "0.3.0", path = "alux-shape" }
@@ -47,6 +52,7 @@ alux-shape-jsonschema = { version = "0.3.0", path = "crates/alux-shape-jsonschem
 alux-shape-macros = { version = "0.3.0", path = "macros/alux-shape-macros" }
 alux-shape-morph = { version = "0.3.0", path = "crates/alux-shape-morph" }
 alux-shape-rust = { version = "0.3.0", path = "crates/alux-shape-rust" }
+alux-shape-syn = { version = "0.1.0", path = "crates/alux-shape-syn" }
 alux-shape-term = { version = "0.3.0", path = "crates/alux-shape-term" }
 alux-shape-text = { version = "0.3.0", path = "crates/alux-shape-text" }
 alux-shape-typescript = { version = "0.3.0", path = "crates/alux-shape-typescript" }

@@ -1,5 +1,6 @@
 //! States where each argument comes from, in the vocabulary a document reads.
 
+use alux_ext::for_tuples;
 use alux_shape::ShapeOf;
 use alux_shape_jsonschema::{JsonSchema, JsonSchemaShape};
 use core::marker::PhantomData;
@@ -161,7 +162,7 @@ impl OpenApiInputsAlg for () {
 }
 
 macro_rules! openapi_products {
-    ($($input:ident),+ $(,)?) => {
+    ($($input:ident => $index:tt),+) => {
         impl<$($input),+> OpenApiInputsAlg for ($($input,)+)
         where
             $($input: OpenApiInputAlg,)+
@@ -173,19 +174,4 @@ macro_rules! openapi_products {
     };
 }
 
-openapi_products!(I1);
-openapi_products!(I1, I2);
-openapi_products!(I1, I2, I3);
-openapi_products!(I1, I2, I3, I4);
-openapi_products!(I1, I2, I3, I4, I5);
-openapi_products!(I1, I2, I3, I4, I5, I6);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15);
-openapi_products!(I1, I2, I3, I4, I5, I6, I7, I8, I9, I10, I11, I12, I13, I14, I15, I16);
+for_tuples!(openapi_products, 1..=16);

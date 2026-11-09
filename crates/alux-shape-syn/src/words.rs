@@ -7,7 +7,7 @@
 /// Names the words an identifier states, splitting where it marks a boundary.
 ///
 /// Only `_` separates, because it is the only boundary a snake-case identifier states explicitly.
-pub(crate) fn of_snake(identifier: &str) -> Vec<String> {
+pub fn of_snake(identifier: &str) -> Vec<String> {
     identifier.split('_').filter(|word| !word.is_empty()).map(str::to_lowercase).collect()
 }
 
@@ -16,7 +16,7 @@ pub(crate) fn of_snake(identifier: &str) -> Vec<String> {
 /// A run of capitals stays one word: `UserName` states `[user, name]` and `HTTPServer` states
 /// `[http, server]`. This is the one place a name is recovered rather than stated, so a declaration
 /// whose words the recovery would get wrong states them itself.
-pub(crate) fn of_camel(identifier: &str) -> Vec<String> {
+pub fn of_camel(identifier: &str) -> Vec<String> {
     let mut words: Vec<String> = Vec::new();
     let mut word = String::new();
     let mut previous: Option<char> = None;
@@ -48,7 +48,7 @@ pub(crate) fn of_camel(identifier: &str) -> Vec<String> {
 }
 
 /// Names the words an already-spelled name states, whichever way it was written.
-pub(crate) fn of_spelled(name: &str) -> Vec<String> {
+pub fn of_spelled(name: &str) -> Vec<String> {
     name.split(['_', '-', '.', ' ']).filter(|part| !part.is_empty()).flat_map(of_camel).collect()
 }
 

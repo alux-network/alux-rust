@@ -7,7 +7,7 @@ extern crate self as alux_ext;
 /// Program crates re-export their own backend attributes from this path so that authored code and
 /// generated code refer to the same macro implementation without depending on it directly.
 pub use alux_ext_macros as macros;
-pub use alux_ext_macros::ext;
+pub use alux_ext_macros::{ext, for_tuple_positions, for_tuples};
 
 mod operation;
 

@@ -1,6 +1,7 @@
 //! Reads each handler argument from what warp's filters gathered.
 
 use crate::WarpRequest;
+use alux_ext::for_tuples;
 use alux_http::{FromPartsAlg, read_cookies, read_header_name};
 use alux_http::{HttpErrorAlg, HttpStatus};
 use alux_http_parts::ReadParts;
@@ -79,7 +80,7 @@ macro_rules! captured {
 captured!(u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128, isize, bool, char, String);
 
 macro_rules! captured_product {
-    ($($input:ident => $index:tt),+ $(,)?) => {
+    ($($input:ident => $index:tt),+) => {
         impl<$($input),+> FromCapturedAlg for ($($input,)+)
         where
             $($input: FromStr,)+
@@ -91,21 +92,7 @@ macro_rules! captured_product {
     };
 }
 
-captured_product!(A => 0, B => 1);
-captured_product!(A => 0, B => 1, C => 2);
-captured_product!(A => 0, B => 1, C => 2, D => 3);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8, J => 9);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8, J => 9, K => 10);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8, J => 9, K => 10, L => 11);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8, J => 9, K => 10, L => 11, M => 12);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8, J => 9, K => 10, L => 11, M => 12, N => 13);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8, J => 9, K => 10, L => 11, M => 12, N => 13, O => 14);
-captured_product!(A => 0, B => 1, C => 2, D => 3, E => 4, F => 5, G => 6, H => 7, I => 8, J => 9, K => 10, L => 11, M => 12, N => 13, O => 14, P => 15);
+for_tuples!(captured_product, 2..=16);
 
 /// Reads the handler argument a request body states, taken as it arrived.
 pub trait FromRawAlg: Sized {

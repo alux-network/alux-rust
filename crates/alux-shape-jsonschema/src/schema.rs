@@ -173,6 +173,18 @@ impl ShapeAlg for JsonSchemaShape {
         }))
     }
 
+    fn tuple(&self, items: Vec<JsonSchema>) -> JsonSchema {
+        let count = items.len();
+        let items: Vec<Value> = items.into_iter().map(|item| item.schema).collect();
+        JsonSchema::stated(json!({
+            "type": "array",
+            "prefixItems": items,
+            "items": false,
+            "minItems": count,
+            "maxItems": count,
+        }))
+    }
+
     fn product(&self, fields: Vec<JsonMember>) -> JsonSchema {
         let mut properties = Map::new();
         let mut required = Vec::new();

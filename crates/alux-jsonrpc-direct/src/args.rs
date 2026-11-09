@@ -1,4 +1,5 @@
 use crate::error::{INVALID_PARAMS, RpcError};
+use alux_ext::for_tuples;
 use serde::de::DeserializeOwned;
 use serde_json::{Map, Value};
 use std::vec;
@@ -95,7 +96,7 @@ impl DirectArgs for () {
 }
 
 macro_rules! direct_args {
-    ($($index:literal => $arg:ident),+ $(,)?) => {
+    ($($arg:ident => $index:literal),+) => {
         impl<$($arg),+> DirectArgs for ($($arg,)+)
         where
             $($arg: DeserializeOwned,)+
@@ -115,22 +116,7 @@ macro_rules! direct_args {
     };
 }
 
-direct_args!(0 => A1);
-direct_args!(0 => A1, 1 => A2);
-direct_args!(0 => A1, 1 => A2, 2 => A3);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13, 13 => A14);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13, 13 => A14, 14 => A15);
-direct_args!(0 => A1, 1 => A2, 2 => A3, 3 => A4, 4 => A5, 5 => A6, 6 => A7, 7 => A8, 8 => A9, 9 => A10, 10 => A11, 11 => A12, 12 => A13, 13 => A14, 14 => A15, 15 => A16);
+for_tuples!(direct_args, 1..=16);
 
 #[cfg(test)]
 mod tests {

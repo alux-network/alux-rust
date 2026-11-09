@@ -84,6 +84,10 @@ macro_rules! forwarded_but_named {
             self.inner().map(key, value)
         }
 
+        fn tuple(&self, items: Vec<A::Ty>) -> A::Ty {
+            self.inner().tuple(items)
+        }
+
         fn product(&self, fields: Vec<A::Field>) -> A::Ty {
             self.inner().product(fields)
         }

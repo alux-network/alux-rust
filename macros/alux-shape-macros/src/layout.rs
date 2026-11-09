@@ -9,7 +9,7 @@
 //! layout come from one statement. It belongs in that backend; until it is there, it is an attribute of
 //! its own.
 
-use crate::words;
+use alux_shape_syn::{of_camel, of_snake};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::spanned::Spanned;
@@ -85,7 +85,7 @@ fn read_member(call: &ExprMethodCall, merged: bool) -> Result<Member> {
 fn name_of_type(carrier: &Type) -> syn::Ident {
     let text = quote!(#carrier).to_string();
     let last = text.rsplit(':').next().unwrap_or(&text).trim().to_owned();
-    let words = words::of_camel(last.split('<').next().unwrap_or(&last).trim());
+    let words = of_camel(last.split('<').next().unwrap_or(&last).trim());
 
     format_ident!("{}", words.join("_"), span = carrier.span())
 }
@@ -114,7 +114,7 @@ fn layout(method: &ImplItemFn, ext: &Option<syn::Path>, spelling: &str) -> Resul
         if member.merged { quote!(#[serde(flatten)] pub #name: #carrier) } else { quote!(pub #name: #carrier) }
     });
 
-    let name = words::of_snake(stem).iter().map(|word| pascal(word)).collect::<String>();
+    let name = of_snake(stem).iter().map(|word| pascal(word)).collect::<String>();
     let layout = format_ident!("{name}", span = method.sig.ident.span());
     let declaration = &method.sig.ident;
     let spelling = LitStr::new(spelling, Span::call_site());
@@ -187,7 +187,7 @@ impl VisitMut for Constructors {
             if let Some(Expr::Path(path)) = call.args.first()
                 && let Some(name) = path.path.get_ident()
             {
-                let words = words::of_snake(&name.to_string());
+                let words = of_snake(&name.to_string());
                 let words = words.iter().map(|word| LitStr::new(word, name.span()));
 
                 call.args[0] = syn::parse_quote!(&[#(#words),*]);

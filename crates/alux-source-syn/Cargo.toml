@@ -1,0 +1,28 @@
+[package]
+name = "alux-source-syn"
+version = "0.1.0"
+description = "Reads Rust source with syn as a term over alux-source"
+documentation = "https://docs.rs/alux-source-syn"
+readme = "README.md"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+alux-ext.workspace = true
+alux-shape.workspace = true
+alux-shape-syn.workspace = true
+alux-source.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+alux-shape-term.workspace = true
+alux-source-index.workspace = true

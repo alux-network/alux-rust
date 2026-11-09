@@ -1,6 +1,7 @@
 //! Procedural macros for declaring and defunctionalizing DD programs.
 //!
-//! This crate is the shared syntax layer for DD extension, HTTP, JSON-RPC, CLI, and shape programs.
+//! This crate is the shared syntax layer for DD extension, HTTP, JSON-RPC, CLI, shape, and law
+//! programs.
 //! Its public surface stays small: parsing, validation, and code generation
 //! live in private modules, while this facade contains only procedural-macro
 //! entry points. Product crates re-export the macros they own.
@@ -14,14 +15,17 @@ mod ext;
 mod extension;
 mod http_program;
 mod jsonrpc_program;
+mod laws_program;
 mod lower;
 mod shape_program;
 mod syntax;
+mod tuples;
 
 use cli_program::cli_program_defunc_internal;
 use ext::ext_internal;
 use http_program::http_program_defunc_internal;
 use jsonrpc_program::jsonrpc_program_defunc_internal;
+use laws_program::laws_program_defunc_internal;
 use proc_macro::TokenStream;
 use shape_program::shape_program_defunc_internal;
 
@@ -229,4 +233,77 @@ pub fn shape(attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn cli(attr: TokenStream, item: TokenStream) -> TokenStream {
     cli_program_defunc_internal(attr.into(), item.into()).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Lowers extension methods into a law suite.
+///
+/// This is the laws backend that `alux_ext::ext(..., defunc(via = laws))` selects. `via = laws`
+/// resolves the name in the authoring scope, so a declaration imports it as `use alux_laws::laws`.
+///
+/// Each method is a law over the block's subject: it takes `&self` or `&mut self` and at most one
+/// borrowed input, and returns `()` or a `Result`. It becomes an operation `Op_<law>` implementing
+/// `OperationAlg` and `alux_laws::LawOp`. The block also states a function named after the suite in
+/// snake case, returning the law program of those operations in block order. Which inputs a law is
+/// checked on, pinned or sampled, is the run's.
+///
+/// ```ignore
+/// use alux_ext::ext;
+/// use alux_laws::laws;
+///
+/// #[ext(name = CounterLaws, defunc(via = laws))]
+/// pub impl<This> This
+/// where
+///     This: CounterAlg,
+/// {
+///     /// Bumping adds one.
+///     fn bump_adds_one(&mut self) {
+///         let before = self.count();
+///         self.bump();
+///         assert_eq!(self.count(), before + 1);
+///     }
+/// }
+///
+/// // The expansion also defines `Op_bump_adds_one<This>` and `counter_laws<This>()`.
+/// ```
+#[proc_macro_attribute]
+pub fn laws(attr: TokenStream, item: TokenStream) -> TokenStream {
+    laws_program_defunc_internal(attr.into(), item.into()).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Invokes a macro once per tuple width: `for_tuples!(callback, 0..=16)` expands to `callback!();`,
+/// `callback!(A1 => 0);`, `callback!(A1 => 0, A2 => 1);` and so on up to the widest, each width's
+/// type parameters named `A1` onward with their positions.
+///
+/// A crate states what one width means in its own `macro_rules!`; the widths are enumerated here,
+/// once for the workspace.
+///
+/// Two clauses serve a family of types, one per width. `named = Sum` passes each width's type name
+/// and number first, and `each = [S, A, s]` gives every position identifiers of its own, then its
+/// letter and its index: `for_tuples!(sum, 2..=16, named = Sum, each = [S, A, s])` expands to
+/// `sum!(Sum2, 2; (S0, A0, s0, A, 0), (S1, A1, s1, B, 1));` and so on.
+///
+/// ```rust ignore
+/// macro_rules! tuple_len {
+///     ($($ty:ident => $index:tt),*) => {
+///         impl<$($ty),*> Len for ($($ty,)*) {
+///             const LEN: usize = 0 $(+ { let _ = $index; 1 })*;
+///         }
+///     };
+/// }
+///
+/// alux_ext::for_tuples!(tuple_len, 0..=16);
+/// ```
+#[proc_macro]
+pub fn for_tuples(input: TokenStream) -> TokenStream {
+    tuples::for_tuples(input.into()).unwrap_or_else(syn::Error::into_compile_error).into()
+}
+
+/// Invokes a macro once per position of each tuple width, the position and the type at it first:
+/// `for_tuple_positions!(callback, 1..=2)` expands to `callback!(0 => A1; A1 => 0);`,
+/// `callback!(0 => A1; A1 => 0, A2 => 1);` and `callback!(1 => A2; A1 => 0, A2 => 1);`.
+///
+/// For what holds of one position of a tuple, such as the type of its `N`th element.
+#[proc_macro]
+pub fn for_tuple_positions(input: TokenStream) -> TokenStream {
+    tuples::for_tuple_positions(input.into()).unwrap_or_else(syn::Error::into_compile_error).into()
 }

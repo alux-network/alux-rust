@@ -199,6 +199,12 @@ impl ShapeAlg for RustShape {
         Layout::of(format!("std::collections::BTreeMap<{}, {}>", key.ty, value.ty), &[&key, &value])
     }
 
+    fn tuple(&self, items: Vec<Layout>) -> Layout {
+        let tys: Vec<&str> = items.iter().map(|item| item.ty.as_str()).collect();
+        let trailing = if items.len() == 1 { "," } else { "" };
+        Layout::of(format!("({}{trailing})", tys.join(", ")), &items.iter().collect::<Vec<_>>())
+    }
+
     fn product(&self, fields: Vec<RustMember>) -> Layout {
         let mut declarations = BTreeMap::new();
 

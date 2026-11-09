@@ -65,6 +65,10 @@ pub trait ShapeAlg: Sorts {
     /// An association from one shape to another.
     fn map(&self, key: Self::Ty, value: Self::Ty) -> Self::Ty;
 
+    /// A fixed sequence of shapes, one at each position: a Rust tuple, and a tuple struct of more
+    /// than one member, which serde writes as an array.
+    fn tuple(&self, items: Vec<Self::Ty>) -> Self::Ty;
+
     /// A product of members.
     fn product(&self, fields: Vec<Self::Field>) -> Self::Ty;
 

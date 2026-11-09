@@ -5,8 +5,8 @@
 //! reading. A flattened member is one field carrying the whole value. An enum states a `Sum` when it
 //! has two to sixteen alternatives, which is what `Sum2` through `Sum16` hold.
 
-use crate::shape::{merged, renamed, skipped};
-use crate::words;
+use alux_shape_syn::{merged, renamed, skipped};
+use alux_shape_syn::{of_camel, of_snake};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{DataEnum, DeriveInput, Fields, FieldsNamed, LitStr, Result, parse_quote};
@@ -32,7 +32,7 @@ pub(crate) fn product(input: &DeriveInput, named: &FieldsNamed) -> Result<TokenS
         }
         // A flattened member is named by its identifier: its own words are its members'.
         let _ = merged(&field.attrs)?;
-        let words = renamed(&field.attrs)?.unwrap_or_else(|| words::of_snake(&ident.to_string()));
+        let words = renamed(&field.attrs)?.unwrap_or_else(|| of_snake(&ident.to_string()));
         idents.push(ident);
         types.push(&field.ty);
         names.push(identifier(&words));
@@ -74,7 +74,7 @@ pub(crate) fn sum(input: &DeriveInput, data: &DataEnum) -> Result<TokenStream> {
     for (variant, position) in data.variants.iter().zip(VARIANTS) {
         let ident = &variant.ident;
         let position = format_ident!("{position}");
-        let words = renamed(&variant.attrs)?.unwrap_or_else(|| words::of_camel(&ident.to_string()));
+        let words = renamed(&variant.attrs)?.unwrap_or_else(|| of_camel(&ident.to_string()));
         names.push(identifier(&words));
 
         match &variant.fields {
